@@ -1,0 +1,50 @@
+# 잔디로그 웹 CI — 설계서 10장(테스트 전략) · 11장(환경). 계약 · 타입 · 린트 · 테스트(시간대 3종) · 빌드를 PR마다 확인한다.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck · lint · test · codegen · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 타입 검사
+        run: npm run typecheck
+
+      - name: 린트
+        run: npm run lint
+
+      # UTC · Asia/Seoul · America/Los_Angeles 세 번 (ACC-KST)
+      - name: 테스트 (시간대 3종)
+        run: npm run test:tz
+
+      # 생성 타입(src/gql)이 docs/api/schema.graphql · 연산 문서와 어긋나면 실패 (ADR-07)
+      - name: GraphQL 계약 검사
+        run: npm run codegen:check
+
+      # 백엔드 연동 전까지 배포(Render)도 목 모드다 (설계서 11장)
+      - name: 빌드 (목 모드)
+        run: npm run build
+        env:
+          VITE_API_MODE: mock
