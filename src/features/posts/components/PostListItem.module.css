@@ -1,0 +1,97 @@
+/* 목업 .plist .pi */
+.item {
+  position: relative;
+  padding: 18px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.item:hover {
+  background: var(--surface-2);
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  min-width: 0;
+}
+/* 제목 링크가 카드 전체를 덮는다 (카드 클릭 → BD-03) */
+.link {
+  color: var(--ink);
+}
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.link:focus-visible {
+  outline: none;
+}
+.item:has(.link:focus-visible) {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.mark {
+  background: var(--mark);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.notRecord {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  cursor: help;
+}
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0 8px;
+  flex-wrap: wrap;
+}
+/* 카드 덮개 위로 올라오는 링크 */
+.meta > a,
+.author {
+  position: relative;
+  z-index: 1;
+}
+.by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.meta + .by {
+  margin-top: 0;
+}
+.author {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.author:hover {
+  text-decoration: underline;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+}
+.skeletonItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.skeletonTags {
+  display: flex;
+  gap: 8px;
+}

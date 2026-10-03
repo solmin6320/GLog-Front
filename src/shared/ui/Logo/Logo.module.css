@@ -1,0 +1,30 @@
+/* 목업 .logo .mark */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.mark {
+  display: grid;
+  grid-template-columns: repeat(2, 8px);
+  gap: 2px;
+}
+.mark i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: block;
+}
+.mark i:nth-child(1),
+.mark i:nth-child(4) {
+  background: var(--h3);
+}
+.mark i:nth-child(2),
+.mark i:nth-child(3) {
+  background: var(--h1);
+}

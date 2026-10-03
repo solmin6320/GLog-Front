@@ -1,0 +1,31 @@
+.title {
+  margin-top: 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+}
+.date {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.content {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 15.5px;
+  line-height: 1.85;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+.back {
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 24px;
+  }
+}

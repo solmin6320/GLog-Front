@@ -1,0 +1,150 @@
+/* 목업 .bstrip .bd .sq .dl .ul .legend .mstrip */
+.root {
+  max-width: 100%;
+}
+
+/* ---------- 큰 스트립 (32 · 46 · 54) ---------- */
+.big {
+  display: flex;
+  gap: 7px;
+  max-width: 100%;
+}
+.big .day {
+  /* 좁은 화면에서는 칸이 같이 줄어든다 (360px에서도 넘치지 않게) */
+  flex: 0 1 var(--sq);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.big .sq {
+  width: 100%;
+  max-width: var(--sq);
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+}
+/* 기록글 모서리: 다리 길이 = 칸 × 0.3 → 대각선 기준 15% */
+.big .rc {
+  --rc-stop: 15%;
+}
+
+/* ---------- 미니 스트립 (12, 표 안) ---------- */
+.mini {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.mini .day {
+  display: inline-flex;
+  position: relative;
+}
+.mini .sq {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+/* 6px 모서리 = 칸의 절반 → 대각선 기준 25% */
+.mini .rc {
+  --rc-stop: 25%;
+}
+.mini .future {
+  border-width: 1px;
+}
+.mini .today {
+  box-shadow: none;
+}
+
+/* ---------- 칸 ---------- */
+.day {
+  position: relative;
+}
+.sq {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  flex: none;
+  background: var(--h0);
+}
+.future {
+  border: 1.5px dashed var(--future-line);
+  background: transparent !important;
+}
+.today {
+  box-shadow: inset 0 0 0 2px var(--dark);
+}
+.rc {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(to bottom left, var(--blue) var(--rc-stop), transparent var(--rc-stop));
+}
+
+.dl {
+  font-size: 12.5px;
+  line-height: 1.2;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.dl.on {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ul {
+  display: block;
+  width: 22px;
+  max-width: 100%;
+  height: 3.5px;
+  border-radius: 3px;
+  background: var(--dark);
+}
+.ul.off {
+  background: transparent;
+}
+
+/* ---------- 범례 ---------- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  align-items: center;
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lgSq {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--h3);
+  display: inline-block;
+}
+.lgRc {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--h0);
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+}
+.lgRc::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-top: 7px solid var(--blue);
+  border-left: 7px solid transparent;
+}
+.lgUl {
+  width: 14px;
+  height: 3.5px;
+  border-radius: 2px;
+  background: var(--dark);
+  display: inline-block;
+}

@@ -1,0 +1,124 @@
+.wrap {
+  margin-top: 36px;
+}
+.empty {
+  padding: 18px 2px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-3);
+}
+/* 목업 .rows li (align top) */
+.list {
+  border-top: 1px solid var(--line);
+}
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.author {
+  font-weight: 700;
+  color: var(--ink);
+}
+.author:hover {
+  text-decoration: underline;
+}
+.date {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+.action {
+  border: 0;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.action:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.danger {
+  color: var(--red);
+}
+.content {
+  margin-top: 4px;
+  font-size: 14.5px;
+  white-space: pre-wrap;
+}
+
+.editForm {
+  margin-top: 8px;
+}
+.editInput {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14.5px;
+  resize: vertical;
+}
+.editInput:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: var(--focus-ring);
+}
+.editButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 목업 댓글 입력 바 */
+.form {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14.5px;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: var(--focus-ring);
+}
+.submit {
+  height: 46px;
+  flex: none;
+}

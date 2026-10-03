@@ -1,0 +1,20 @@
+/* 목업 heat() — 열 = 주, 행 = 월~일 */
+.scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+}
+.grid {
+  display: grid;
+  grid-auto-flow: column;
+  width: max-content;
+}
+.cell {
+  position: relative;
+  display: block;
+  border-radius: 2.5px;
+}
+.pad {
+  display: block;
+}

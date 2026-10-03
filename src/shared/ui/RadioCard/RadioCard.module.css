@@ -1,0 +1,76 @@
+/* 목업 .radio-c .rdo */
+.card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.card:hover:not(.on):not(.disabled) {
+  border-color: var(--ink-4);
+}
+.on {
+  border: 2px solid var(--green);
+  background: var(--green-tint);
+  padding: 12px 13px;
+}
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.card:has(.input:focus-visible) {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+/* 실제 라디오는 보이지 않게 두되 포커스 · 키보드는 그대로 */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.rdo {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-input);
+  background: var(--surface);
+  flex: none;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+}
+.on .rdo {
+  border-color: var(--green);
+}
+.on .rdo::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.desc {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}

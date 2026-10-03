@@ -1,0 +1,225 @@
+/* 팀 영역 화면 공용 (TM-01 · 02 · 03 · 04 · 05 · 08) — 목업 W-08 · W-09 */
+
+.block {
+  margin-bottom: 14px;
+}
+.section {
+  margin-top: 40px;
+}
+.muted {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.dot {
+  color: var(--ink-4);
+}
+.focusTarget:focus {
+  outline: none;
+}
+
+/* ---------- TM-01 팀 카드 (W-08) ---------- */
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.teamCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.teamCard:hover {
+  border-color: var(--ink-4);
+}
+.teamMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.teamHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.teamName {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teamMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.teamMeta b {
+  color: var(--ink);
+}
+.chev {
+  flex: none;
+  display: inline-flex;
+  color: var(--ink-4);
+}
+
+/* ---------- TM-02 · TM-03 폼 ---------- */
+.fieldset {
+  border: 0;
+  margin: 0 0 8px;
+  padding: 0;
+  min-width: 0;
+}
+.legend {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding: 0;
+}
+.radioGroup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.inlineAction {
+  margin: -10px 0 4px;
+}
+.aside {
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+/* ---------- TM-04 초대 카드 ---------- */
+.inviteCard {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+}
+.inviteMain {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.inviteTeam {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.inviteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.inviteActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ---------- TM-05 현황판 (W-09) ---------- */
+.leaderMenu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.leaderOnly {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.weekRange {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nameLink {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+.nameLink:hover {
+  text-decoration: underline;
+}
+.meMark {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.daysCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dayCount {
+  font-size: 15px;
+  min-width: 2.5em;
+}
+.postTitle {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- TM-08 요청 목록 ---------- */
+.requestBody {
+  min-width: 0;
+}
+.requestLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 14px;
+}
+.requestNote {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 767px) {
+  .teamCard {
+    padding: 16px;
+  }
+  .radioGroup {
+    grid-template-columns: 1fr;
+  }
+  .inviteActions {
+    width: 100%;
+  }
+  .inviteActions > button {
+    flex: 1 1 0;
+  }
+}

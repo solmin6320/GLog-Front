@@ -1,0 +1,42 @@
+/* 목업 .box .box-blue .box-mute .box-ok (+ red · warn) */
+.box {
+  border-radius: 10px;
+  padding: 13px 16px;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.icon {
+  display: inline-flex;
+  flex: none;
+}
+.body {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.action {
+  margin-left: auto;
+  flex: none;
+}
+.blue {
+  background: var(--blue-bg);
+  color: var(--blue-ink);
+}
+.mute {
+  background: var(--box-mute);
+  color: var(--ink-2);
+}
+.ok {
+  background: var(--green-tint);
+  color: var(--green);
+}
+.red {
+  background: var(--red-bg);
+  color: var(--red);
+}
+.warn {
+  background: var(--amber-bg);
+  color: var(--amber);
+}

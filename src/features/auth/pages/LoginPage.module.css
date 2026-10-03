@@ -1,0 +1,77 @@
+/* 목업 W-01 */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 0;
+}
+
+.strip {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 36px;
+}
+
+.title {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.sub {
+  margin-top: 16px;
+  font-size: 16px;
+  color: var(--ink-2);
+}
+
+.cta {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.persona {
+  width: 100%;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.hint {
+  margin-top: 18px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+.rulesLink {
+  margin-top: 22px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.rulesLink:hover {
+  color: var(--blue-ink);
+}
+
+@media screen and (max-width: 767px) {
+  .title {
+    font-size: 36px;
+  }
+
+  .cta {
+    margin-top: 36px;
+  }
+}

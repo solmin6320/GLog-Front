@@ -1,0 +1,65 @@
+.form {
+  width: 100%;
+  min-width: 0;
+}
+.box {
+  position: relative;
+}
+.icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.input {
+  padding-left: 42px;
+  padding-right: 44px;
+}
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.clear:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.sm .input {
+  height: 36px;
+  font-size: 13.5px;
+  padding-left: 36px;
+  padding-right: 38px;
+}
+.sm .icon {
+  left: 11px;
+}
+.sm .clear {
+  width: 28px;
+  height: 28px;
+  right: 4px;
+}
+
+@media (max-width: 767px) {
+  .sm .input {
+    font-size: 16px;
+  }
+}

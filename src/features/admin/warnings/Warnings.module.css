@@ -1,0 +1,107 @@
+/* AD-01 ②-1 경고 복구 · 벌칙 (목업 W-16) */
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 22px;
+}
+.section + .section {
+  margin-top: 38px;
+}
+
+.member {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.member:hover .memberName {
+  text-decoration: underline;
+}
+.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.private {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.muted {
+  color: var(--ink-3);
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* 표: 좁은 화면에서 첫 열(회원) · 끝 열(처리) 고정 (ACC-ADM-15) */
+@media (max-width: 767px) {
+  .stickyEnds th:first-child,
+  .stickyEnds td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
+  .stickyEnds th:last-child,
+  .stickyEnds td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+  }
+  .stickyEnds td:first-child,
+  .stickyEnds td:last-child {
+    background: var(--surface);
+  }
+}
+
+/* ⑧ 복구 미리보기 (영향 미리보기형 확인) */
+.lead {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.previewTable {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line-2);
+}
+.previewRow:last-child {
+  border-bottom: 0;
+}
+.previewRow dt {
+  color: var(--ink-2);
+}
+.previewRow dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.release {
+  color: var(--green);
+}
+.enter {
+  color: var(--red);
+}
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}

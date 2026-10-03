@@ -1,0 +1,7 @@
+/* W-15: 제목 오른쪽 오늘 날짜 */
+.date {
+  font-size: 14px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
