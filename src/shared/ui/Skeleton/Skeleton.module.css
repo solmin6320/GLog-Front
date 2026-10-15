@@ -1,0 +1,82 @@
+.sk {
+  display: block;
+  max-width: 100%;
+  background: var(--line-2);
+  border-radius: 6px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+}
+
+.list {
+  border-top: 1px solid var(--line);
+}
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.tRow {
+  display: flex;
+  gap: 16px;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--line-2);
+}
+.tRow:last-child {
+  border-bottom: 0;
+}
+.tHead {
+  background: var(--surface-2);
+  border-bottom-color: var(--line);
+}
+.tCell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}

@@ -1,0 +1,1227 @@
+# =====================================================================
+# 잔디로그(GLog) GraphQL 계약 v0.1
+# ---------------------------------------------------------------------
+# 상태     : 팀 확정 초안 (2026-10-02). 백엔드 리뷰 전. 3주차 말 스키마 동결 전에 백엔드와 합의한다.
+# 기준 문서: 기능명세서 v1.9 · 화면설계서 v0.7 · DB명세서 v0.4 · 목업 v2
+# 출발점   : docs/analysis/A3-schema.draft.graphql (A3 API 계약 분석가 초안)
+# 설명 문서: docs/01-requirements.md 6장 · docs/analysis/A3-api-contract.md
+#
+# v0.1에서 초안에 반영한 회의 결과 (docs/01-requirements.md 11장)
+#   - M-03  Post.inFinalizedWeek 추가 — E-28 "끝난 주의 글 삭제" 안내를 서버 플래그로 판단한다.
+#           클라이언트가 writtenDate < currentWeekStart 로 계산하면 월요일 00:00~판정 실행 사이와
+#           보류(HOLD) 주에 틀린 안내가 나간다.
+#   - M-02  이름은 이 파일을 기준으로 한다(exchangeLoginCode · clock · PREVIEW_STALE · VALIDATION_FAILED).
+#
+# 표기 규칙
+#   (제안) = 명세에 근거가 없다 / (추측) = 명세 취지에서 도출했다
+#   [Q-xx] = 화면설계서 5-4-10 미결 항목이 이 자리의 모양을 흔든다
+#   enum 값은 DB ENUM 값과 글자 그대로 같다(DB명세서 1장 · 부록 DDL).
+#   화면 라벨(통과 · 미달 · 아직 …)은 프론트가 enum → 문구로 매핑한다(5-2-8 문구 규칙).
+#
+# 공통 계약
+#   - 엔드포인트: POST /graphql 하나. 예외는 프로필 이미지 업로드 REST 1개(기능명세서 8장).
+#   - 인증: Authorization: Bearer <JWT>. 비로그인 허용 필드는 clock, me, exchangeLoginCode 뿐 (제안)
+#   - 권한: 서버 메서드 단위 @PreAuthorize (기능명세서 10장). 화면 가드는 1차 방어일 뿐.
+#   - 오류: errors[].extensions.code 에 도메인 코드 (제안). 코드표는 docs/01-requirements.md 6-4.
+#   - 예상 가능한 상태(잔디 조회 실패, 삭제된 글, 거절 계정 등)는 오류가 아니라 데이터로 내려준다.
+#   - 비공개 팀 이름 마스킹은 서버가 한다. 마스킹된 표기는 id 없는 값 객체(TeamLabel)로만 내려
+#     Apollo 정규화 캐시에서 실명 Team 객체와 섞이지 않게 한다.
+#   - 목록은 커서 Connection(nodes + pageInfo + totalCount)으로 통일한다 [Q-06].
+# =====================================================================
+
+
+# ---------------------------------------------------------------------
+# 0. 스칼라
+# ---------------------------------------------------------------------
+
+"""
+yyyy-MM-dd. 항상 한국시간(Asia/Seoul) 날짜다(기능명세서 5장, DB 1-0).
+주차는 그 주 월요일 Date 하나로 식별한다(DB 1-0 주차 표기).
+"""
+scalar Date
+
+"""
+ISO-8601 + 오프셋. 예: 2026-09-29T14:20:00+09:00 (제안)
+DB DATETIME은 KST 값이라 서버가 +09:00 오프셋을 붙여 보낸다.
+"""
+scalar DateTime
+
+
+# ---------------------------------------------------------------------
+# 1. DB와 1:1로 대응하는 enum (값을 바꾸지 않는다)
+# ---------------------------------------------------------------------
+
+"DB member.status (1-1)"
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
+"DB member.role (1-1)"
+enum MemberRole {
+  MEMBER
+  ADMIN
+}
+
+"DB post_index.post_type · posts.type (1-5, 3-1). URL 쿼리(?type=troubleshooting|devlog)는 소문자이므로 라우터에서 변환한다"
+enum PostType {
+  TROUBLESHOOTING
+  DEVLOG
+}
+
+"""
+posts.sections 의 키(DB 3-1: problem/cause/solution/did/learned)를 enum으로 올린 것 (제안)
+TROUBLESHOOTING = PROBLEM · CAUSE · SOLUTION / DEVLOG = DID · LEARNED (기능명세서 3장 작성 항목)
+"""
+enum PostSectionKey {
+  PROBLEM
+  CAUSE
+  SOLUTION
+  DID
+  LEARNED
+}
+
+"DB weekly_judgment.status (1-6). HOLD는 확정 상태가 아니다(E-35)"
+enum JudgmentStatus {
+  PASS
+  FAIL
+  EXEMPT
+  EXCLUDED
+  HOLD
+}
+
+"""
+DB weekly_judgment.skip_reason (1-6).
+EXCLUDED ↔ NO_TEAM · FIRST_WEEK / EXEMPT ↔ EXEMPTION_PERIOD · PERSONAL_EXEMPTION (DB 1-6 대응표, 고정)
+화면: FIRST_WEEK = "첫 참가"(AC-01 ⑤ · 목업 W-06 배지), NO_TEAM = "제외"
+"""
+enum SkipReason {
+  NO_TEAM
+  FIRST_WEEK
+  EXEMPTION_PERIOD
+  PERSONAL_EXEMPTION
+}
+
+"DB weekly_judgment.hold_reason (1-6). IDENTITY_MISMATCH는 재시도로 풀리지 않는다(E-08)"
+enum HoldReason {
+  API_ERROR
+  IDENTITY_MISMATCH
+}
+
+"DB judgment_correction.after_status (1-14). 정정으로 만들 수 있는 결과 3종(기능명세서 7장) [Q-05: B안이면 EXCLUDED 추가]"
+enum CorrectableJudgmentStatus {
+  PASS
+  FAIL
+  EXEMPT
+}
+
+"""
+DB warning.delete_reason (1-9).
+[충돌] FC-04는 정정·소급 면제로 '회수'된 경고를 사유를 구분해 저장한다고 적었으나 DB에는 이 두 값뿐이다.
+회수를 소프트 삭제로 남긴다면 RETRACTED 같은 값이 필요하다 (제안 — 계약서 9장 C-03)
+"""
+enum WarningDeleteReason {
+  KICKED
+  TEAM_DELETED
+}
+
+# DB team_invitation.status (PENDING / ACCEPTED / DECLINED, 1-4)는 노출하지 않는다.
+# 화면은 대기 중인 초대만 보여준다(TM-04 ①, TM-06 ③). 필요해지면 같은 값으로 enum InvitationStatus를 추가한다.
+
+"DB personal_exemption.status (1-13). 초대(DECLINED)와 단어가 다르지만 DB 그대로 둔다"
+enum PersonalExemptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+
+# ---------------------------------------------------------------------
+# 2. 서버 계산 값 enum (DB 컬럼이 아니다)
+# ---------------------------------------------------------------------
+
+"팀 단위 역할. 권한 판정은 항상 (회원, 팀) 쌍이다(화면설계서 5-2-1)"
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+"""
+판정 전(진행 중) 주의 상태 (제안)
+확정 판정(JudgmentStatus)과 섞지 않는다 — '보류는 진행 중과 다른 상태'(AD-01 ②-0 비고).
+TM-05 상태 칸: CONDITION_MET="통과", NOT_YET="아직", EXCLUDED/EXEMPT="제외"(TM-05 비고 제안)
+CM-01 ③ · AC-01 ④: CONDITION_MET="이번 주는 통과 예정이에요"
+"""
+enum LiveWeekStatus {
+  CONDITION_MET
+  NOT_YET
+  EXCLUDED
+  EXEMPT
+}
+
+"""
+잔디 조회 상태 (제안). 실패를 오류가 아니라 데이터로 내려 화면 일부만 대체한다.
+FAILED = E-32 "잔디를 아직 못 불러왔어요" / IDENTITY_MISMATCH = E-08 "GitHub 아이디가 바뀌었어요"
+"""
+enum GrassFetchStatus {
+  OK
+  FAILED
+  IDENTITY_MISMATCH
+}
+
+"""
+경고 한 건의 현재 상태 (추측 — DB 4-3 재계산 결과에서 파생, 저장 컬럼 아님)
+ACTIVE="유효" · DEDUCTED="차감됨" (AC-02 ③, 목업 W-07)
+FULFILLED="이행 완료" [Q-13 A안일 때만 쓴다. B안이면 이 값은 내려오지 않고 이력에서 빠진다]
+소프트 삭제된 경고는 회원 화면에 나오지 않는다(AC-02 ③).
+"""
+enum WarningStanding {
+  ACTIVE
+  DEDUCTED
+  FULFILLED
+}
+
+"""
+경고 카테고리·게시글 팀 표기 종류 (제안)
+PRIVATE → "비공개 팀"(열람자 구분 없이 무조건, E-23) / DELETED → "삭제된 팀"(기능명세서 6장, E-43)
+"""
+enum TeamLabelKind {
+  PUBLIC
+  PRIVATE
+  DELETED
+}
+
+"재계산 미리보기의 벌칙 대상 변화 (AD-01 ⑩ '벌칙 진입·해제', E-42 · E-50)"
+enum PenaltyChange {
+  NONE
+  ENTER
+  RELEASE
+}
+
+"AD-01 ⑥ 결과 필터: 전체 / 미달만 / 보류만"
+enum AdminJudgmentFilter {
+  ALL
+  FAIL
+  HOLD
+}
+
+"AD-01 ②-2 ⑤ 상태 필터: 승인 대기 / 거절 / 전체 (추측: '전체' = 대기 + 거절)"
+enum AdminMemberFilter {
+  PENDING
+  REJECTED
+  ALL
+}
+
+"글 + 댓글 혼합 목록의 행 종류 (AD-01 ②-5, TM-06 ⑧)"
+enum ContentKind {
+  POST
+  COMMENT
+}
+
+"AD-01 ②-5 ⑤ 종류 필터: 글 + 댓글 / 글만 / 댓글만"
+enum AdminContentFilter {
+  ALL
+  POST
+  COMMENT
+}
+
+
+# ---------------------------------------------------------------------
+# 3. 공통 타입
+# ---------------------------------------------------------------------
+
+"[Q-06] 커서 방식 초안. 오프셋으로 결정되면 이 타입과 각 Connection만 바뀌고, 프론트는 페이지 훅 안에서 흡수한다"
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+"서버 기준 시각 (제안). 주차·E-27 배너·이번 주 판단을 브라우저 시계로 하지 않기 위해 둔다"
+type ServerClock {
+  now: DateTime!
+  currentWeekStart: Date!
+  currentWeekEnd: Date!
+}
+
+"""
+마스킹된 팀 표기용 값 객체 (제안)
+일부러 id 필드를 두지 않는다 — 실명 Team:{id}와 같은 캐시 키로 합쳐지면 실명이 새거나 TM-01 이름이 깨진다.
+name은 PUBLIC일 때만 값이 있다. PRIVATE·DELETED는 프론트가 고정 문구로 그린다.
+"""
+type TeamLabel {
+  kind: TeamLabelKind!
+  name: String
+}
+
+"관리자 전용 팀 표기. 비공개 팀도 실명이다 — 경고 복구 · 벌칙 화면에만 쓴다(기능명세서 9장, AD-01 ②-1)"
+type AdminTeamLabel {
+  teamId: ID!
+  name: String!
+  isPublic: Boolean!
+  isDeleted: Boolean!
+}
+
+
+# ---------------------------------------------------------------------
+# 4. 회원 · 본인
+# ---------------------------------------------------------------------
+
+"""
+회원 공개 프로필. 작성자·팀원 표시와 PR-01이 같은 정규화 단위(Member:{id})를 쓴다.
+status·role은 여기 두지 않는다 — 본인은 Me, 관리자는 AdminMemberRow로만 본다 (제안)
+"""
+type Member {
+  id: ID!
+  "표시 이름(DB nickname). PR-01 ②"
+  nickname: String!
+  "GitHub 아이디. 로그인마다 최신값으로 갱신(DB 1-1). PR-01 ③"
+  githubLogin: String!
+  "null이면 기본 이미지(DB 1-1, 기능명세서 8장)"
+  profileImageUrl: String
+
+  "PR-01 ⑥ (DB 4-5: MongoDB 집계, 삭제 글 제외)"
+  postCount: Int!
+  commentCount: Int!
+
+  "PR-01 ⑦ 최근 12개월 잔디. 하루 1회 캐시 값(기능명세서 5장, 5-2-6)"
+  grassCalendar: GrassCalendar!
+
+  "PR-01 ⑧⑨ · CM-01 ④ · AC-02 ①② — 타인 프로필에서도 같은 값을 보인다(PR-01 '상태: 타인')"
+  warningState: WarningState!
+
+  "PR-01 ⑩ 첫 줄 '진행 중'. 이번 주 판정 대상이 아니면(팀 미소속) null"
+  currentWeek: WeekActivity
+
+  "PR-01 ⑩ · AC-01 ⑤ 확정·보류된 주차 이력, 최신순. 기본 8주(PR-01 ⑩ 제안) [Q-06]"
+  judgmentHistory(first: Int = 8, after: String): WeeklyJudgmentConnection!
+
+  "PR-01 ⑫ 공개 팀만. 비공개 팀은 항목째 뺀다(기능명세서 2장, PR-01 비고)"
+  publicTeams: [Team!]!
+}
+
+"""
+로그인한 본인. 라우터 가드(5-2-3)와 공통 헤더 ④가 쓴다.
+status · role은 토큰 클레임이 아니라 요청 시점 DB 값이어야 한다 (제안) — 승인 직후 재발급 없이 반영(AU-03 ⑤)
+"""
+type Me {
+  "Member.id와 같은 값"
+  id: ID!
+  member: Member!
+  status: MemberStatus!
+  role: MemberRole!
+  "팀 미소속 여부(5-2-7). CM-01 ⑨ · AC-01 상태 분기"
+  hasTeam: Boolean!
+  "CM-01 ⑤ · TM-01 ③ · 드로어 '받은 초대' 배지(목업 W-03)"
+  pendingInvitationCount: Int!
+}
+
+"""
+일회용 코드 교환 결과 (기능명세서 1장 토큰 교환, AU-02, FC-03)
+- ACTIVE  : accessToken 발급 → CM-01
+- PENDING : 본인 상태 조회 전용 제한 토큰 발급 (제안 — FC-03은 승인 후에만 토큰 저장. 계약서 4장·9장 C-01)
+- REJECTED: accessToken = null, 거절 안내 화면(E-02 '토큰 미발급')
+"""
+type AuthPayload {
+  status: MemberStatus!
+  accessToken: String
+  expiresAt: DateTime
+  "REJECTED면 null"
+  me: Me
+}
+
+
+# ---------------------------------------------------------------------
+# 5. 잔디 · 주간 활동 · 판정
+# ---------------------------------------------------------------------
+
+"""
+하루치 잔디. level은 GitHub contributionLevel을 0~4로 옮긴 값(목업 heat()의 h0~h4) (제안)
+"""
+type GrassDay {
+  date: Date!
+  count: Int!
+  level: Int!
+}
+
+type GrassCalendar {
+  status: GrassFetchStatus!
+  "갱신 기준 시각. 화면에 '오늘 오전 6시 기준'으로 표기(5-2-6). 한 번도 성공 못 했으면 null"
+  updatedAt: DateTime
+  "최근 12개월(53주 × 7일) (PR-01 ⑦)"
+  days: [GrassDay!]!
+  "E-39 비공개 기여 꺼짐 추정: 총 기여 0인데 기록글만 있음 (추측 — 감지 기간 미정)"
+  privateContributionSuspected: Boolean!
+}
+
+"""
+요일 한 칸 (CM-01 ② 점 7칸, AC-01 ② 표, TM-05 ⑥ 점 7칸)
+지난 주차는 DB judgment_day(1-8) 값이라 boolean만 있다 → grassCount · grassLevel · recordCount는 null.
+[충돌] 목업 W-06의 '잔디 3칸 / 기록글 1개' 같은 개수는 이번 주에만 그릴 수 있다(계약서 9장 C-07)
+"""
+type DayActivity {
+  date: Date!
+  grassCount: Int
+  grassLevel: Int
+  hasGrass: Boolean!
+  recordCount: Int
+  hasRecord: Boolean!
+  "hasGrass OR hasRecord. 같은 날 둘 다여도 1일(기능명세서 5장)"
+  verified: Boolean!
+  "'아직 오지 않은 날이에요'(목업 W-06)"
+  isFuture: Boolean!
+  isToday: Boolean!
+}
+
+"이번 주 진행 상태 (판정 전) (제안)"
+type LiveWeekState {
+  status: LiveWeekStatus!
+  "EXCLUDED → FIRST_WEEK(E-36) / EXEMPT → EXEMPTION_PERIOD · PERSONAL_EXEMPTION(E-46)"
+  skipReason: SkipReason
+  "통과까지 남은 인증일 수 'n일 더 인증하면 통과!'(CM-01 ③). 프론트 계산도 가능하지만 앱과 규칙을 한 곳에 둔다"
+  verifiedDaysNeeded: Int!
+  recordsNeeded: Int!
+}
+
+"""
+한 주의 활동 (CM-01 ②③, AC-01 ②④⑤, PR-01 ⑩ 첫 줄)
+이번 주면 live가, 지난 주면 judgment가 채워진다.
+"""
+type WeekActivity {
+  weekStart: Date!
+  weekEnd: Date!
+  isCurrentWeek: Boolean!
+  "항상 7개, 월~일"
+  days: [DayActivity!]!
+  "제외 · 면제 주는 null → '—'(AC-01 ⑤)"
+  verifiedDays: Int
+  "기록글 수는 실시간(5-2-6)"
+  recordCount: Int
+  live: LiveWeekState
+  "지난 주의 판정. 판정 기록이 없으면 null"
+  judgment: WeeklyJudgment
+  grassStatus: GrassFetchStatus!
+  grassUpdatedAt: DateTime
+  "E-39 (CM-01 ⑥ 배너 우선순위 E-39 → E-32 → E-36 → E-46 은 프론트가 적용)"
+  privateContributionSuspected: Boolean!
+}
+
+"DB weekly_judgment (1-6)"
+type WeeklyJudgment {
+  id: ID!
+  weekStart: Date!
+  weekEnd: Date!
+  status: JudgmentStatus!
+  skipReason: SkipReason
+  "관리자 화면 표시용. 회원 화면에서 보류 주를 어떻게 부를지는 명세에 없다 (계약서 9장 C-15)"
+  holdReason: HoldReason
+  verifiedDays: Int
+  recordCount: Int
+  "관리자 정정을 거쳤는가"
+  corrected: Boolean!
+  "확정 시각. AD-01 ⑦ '9/28 07:00 실행'"
+  judgedAt: DateTime
+  "그 주 미달로 받은 경고가 지금 살아 있으면 true → PR-01 '미달 (경고)' (추측)"
+  hasActiveWarning: Boolean!
+}
+
+type WeeklyJudgmentConnection {
+  nodes: [WeeklyJudgment!]!
+  pageInfo: PageInfo!
+}
+
+
+# ---------------------------------------------------------------------
+# 6. 경고
+# ---------------------------------------------------------------------
+
+"""
+경고 현재 상태 — 저장값이 아니라 판정 이력 replay 결과(기능명세서 6장, DB 4-3)
+[충돌] AC-02 비고는 DB 'member_warning_state'를 읽는다고 적었지만 DB명세서 v0.4에 그런 테이블은 없다
+"""
+type WarningState {
+  "살아 있는 경고 수. [Q-10 ⓒ] 3을 넘을 수 있는지 미정 → 화면 게이지는 3에서 자른다"
+  activeCount: Int!
+  "경고 3회 도달(기능명세서 6장). CM-01 ④ · PR-01 ⑧ 빨간 '벌칙 대상' 배지"
+  isPenaltyTarget: Boolean!
+  "연속 통과 n / 2주 (AC-02 ②). [Q-10 ⓑ] 벌칙 대상 상태에서 쌓이는지 미정"
+  consecutivePasses: Int!
+  "E-41 '다음 차감까지 n주'. 벌칙 대상이거나 경고 0이면 null [Q-10 ⓐ]"
+  weeksUntilDeduction: Int
+  "PR-01 ⑨ 팀(카테고리)별 경고 수. 중복 집계라 합계 ≠ activeCount(기능명세서 8장). 유효 경고만 센다 (추측 — 목업 W-07·W-14 대조)"
+  byCategory: [CategoryWarningCount!]!
+}
+
+type CategoryWarningCount {
+  label: TeamLabel!
+  count: Int!
+}
+
+"AC-02 ③ 경고 이력 한 줄. 소프트 삭제된 경고는 나오지 않는다"
+type WarningRecord {
+  id: ID!
+  weekStart: Date!
+  weekEnd: Date!
+  "사유 '인증일 n일 · 기록글 n개'"
+  verifiedDays: Int
+  recordCount: Int
+  "판정 시점 소속 팀 전부(E-38). 비공개 → PRIVATE, 삭제 → DELETED"
+  categories: [TeamLabel!]!
+  standing: WarningStanding!
+}
+
+"AC-02 화면 묶음"
+type MyWarnings {
+  state: WarningState!
+  history: [WarningRecord!]!
+}
+
+
+# ---------------------------------------------------------------------
+# 7. 팀 · 초대
+# ---------------------------------------------------------------------
+
+"""
+팀 (DB team 1-2). 실명 객체다 — 조회자가 볼 자격이 있을 때만 이 타입으로 내려간다.
+(내 팀 목록, 팀 현황판, 받은 초대, 공개 팀 배지, 공개 팀 글의 팀 이름)
+"""
+type Team {
+  id: ID!
+  name: String!
+  description: String
+  isPublic: Boolean!
+  memberCount: Int!
+  "조회자의 이 팀 역할. 비소속이면 null. TM-01 ⑤ · TM-05 ③④ 노출 조건"
+  viewerRole: TeamRole
+  leader: Member!
+  "[Q-01] A안(재열람 가능)이면 팀장에게만 값, B안(해시 저장)이면 항상 null. 생성 직후 값은 CreateTeamPayload.inviteCode"
+  inviteCode: String
+
+  "TM-01 ⑧ 이번 주 요약. 소속자만"
+  currentWeekSummary: TeamWeekSummary!
+  "TM-05 ⑤⑥ 이번 주 현황표. 소속자만(E-09)"
+  currentWeekBoard: TeamWeekBoard!
+  "TM-05 ⑦ 이 팀에 연결된 글 최신순. 5건(제안)"
+  recentPosts(first: Int = 5): [Post!]!
+
+  "TM-06 ④ · TM-08 ① 팀원 목록. 소속자만"
+  members: [TeamMembership!]!
+  "TM-06 ③ 보낸 초대(대기 중). 팀장만"
+  pendingInvitations: [SentInvitation!]!
+  "TM-06 ⑧ 팀 글 · 댓글 관리. 팀장만. 삭제 버튼 없음(수정만)"
+  managedContents(first: Int = 20, after: String): ContentRowConnection!
+  """
+  TM-08 ⑤ 개인 면제 요청 목록. 팀장만.
+  [DB 공백] personal_exemption에 team_id가 없다 → '이 팀장(requested_by)이 요청했고 대상이 지금 이 팀 소속'으로 거른다 (추측)
+  """
+  exemptionRequests: [PersonalExemptionRequest!]!
+}
+
+type TeamMembership {
+  member: Member!
+  role: TeamRole!
+  joinedAt: DateTime!
+}
+
+"""
+TM-01 ⑧ '이번 주 통과 n명 · 미달 n명 · 아직 n명'
+[충돌] TM-05 비고는 '미달은 판정 확정 뒤에만' → 진행 중인 주에는 failCount가 항상 0이다(목업 W-08도 0명)
+"""
+type TeamWeekSummary {
+  passCount: Int!
+  failCount: Int!
+  notYetCount: Int!
+  excludedCount: Int!
+}
+
+"TM-05 ⑤ 이번 주 현황표"
+type TeamWeekBoard {
+  weekStart: Date!
+  weekEnd: Date!
+  "'인증일은 오늘 오전 6시 기준이에요'(TM-05 ⑤, 5-2-6)"
+  grassUpdatedAt: DateTime
+  rows: [TeamWeekRow!]!
+}
+
+"""
+TM-05 ⑥ 팀원 행.
+누적 경고 · 벌칙 대상 여부는 넣지 않는다 — 다른 팀 경고가 새어나간다(기능명세서 2장, 확정)
+"""
+type TeamWeekRow {
+  member: Member!
+  "본인 행 배경 강조, '나' 표시(목업 W-09)"
+  isViewer: Boolean!
+  days: [DayActivity!]!
+  "E-32 잔디 미조회면 null → '—'"
+  verifiedDays: Int
+  recordCount: Int!
+  "이 팀 카테고리가 붙은 살아 있는 경고만 센다(기능명세서 2장, DB 1-10 warning_team)"
+  teamWarningCount: Int!
+  status: LiveWeekStatus!
+  grassStatus: GrassFetchStatus!
+}
+
+"""
+TM-04 받은 초대 한 건. 비공개 팀이어도 초대받은 당사자에게는 실명(TM-04 ①)
+"""
+type ReceivedInvitation {
+  id: ID!
+  team: Team!
+  "[DB 공백] team_invitation에 초대한 사람 컬럼이 없다 → 조회 시점 팀장 (추측)"
+  invitedBy: Member!
+  createdAt: DateTime!
+}
+
+"TM-06 ③ 보낸 초대"
+type SentInvitation {
+  id: ID!
+  invitee: Member!
+  createdAt: DateTime!
+}
+
+
+# ---------------------------------------------------------------------
+# 8. 게시판
+# ---------------------------------------------------------------------
+
+"빈 항목은 body = null → '작성되지 않음'(BD-03 ⑦)"
+type PostSection {
+  key: PostSectionKey!
+  body: String
+}
+
+"""
+게시글 (MongoDB posts 3-1 + MariaDB post_index 1-5)
+권한 판단은 서버 계산 필드(viewerCan*)로 받는다 — 비공개 팀 글은 팀 정보가 숨겨져 클라이언트가
+'이 글 팀의 팀장인가'를 스스로 계산할 수 없다(BD-03 ④ · ⑪, 5-2-4).
+"""
+type Post {
+  id: ID!
+  type: PostType!
+  title: String!
+  "작성 항목 순서대로(TROUBLESHOOTING 3칸 · DEVLOG 2칸)"
+  sections: [PostSection!]!
+  "최대 5개 · 개당 20자(BD-04 ⑦ 제안)"
+  tags: [String!]!
+  "DB는 배열(3-1), 화면은 1칸(BD-04 ⑧) → 1차 구현은 0~1개 (제안, 계약서 9장 C-08)"
+  commitUrls: [String!]!
+  author: Member!
+  "공개 팀에 연결된 글만 값. 비공개 · 삭제 · 미연결이면 null(BD-01 ⑧, BD-03 ⑥, E-23)"
+  publicTeam: Team
+  "false면 '인증 미포함' 배지(E-25)"
+  isRecord: Boolean!
+  "주차 귀속 날짜(KST, 서버 저장 시각 기준 E-27) [Q-11: 작성일 기준인지 필수 항목을 다 채운 날 기준인지 미정]"
+  writtenDate: Date!
+  "writtenDate가 속한 주가 이미 판정 확정됐으면 true. E-28 '이미 끝난 주의 인증 결과는 바뀌지 않아요' 안내 판단용. 월요일 00:00~판정 실행 사이 · 보류 주는 false (M-03, 제안)"
+  inFinalizedWeek: Boolean!
+  createdAt: DateTime!
+  "값이 있으면 '(수정됨)'(BD-03 ③ 제안)"
+  updatedAt: DateTime
+  commentCount: Int!
+  "BD-03 ⑩ 등록순. 페이지 크기는 명세 없음 (제안: 50)"
+  comments(first: Int = 50, after: String): CommentConnection!
+  "작성자 본인 또는 연결 팀의 팀장(BD-03 ④, 기능명세서 2장)"
+  viewerCanEdit: Boolean!
+  "작성자 본인 또는 관리자. 팀장은 삭제 불가(BD-03 비고)"
+  viewerCanDelete: Boolean!
+  "팀장이 남의 글을 수정하는 경우 배너(BD-04 비고) 판단용"
+  viewerIsAuthor: Boolean!
+  "BD-04 수정 모드의 ⑨ 소속 팀 기본값. viewerCanEdit일 때만 값(비공개 팀이어도 id만) (제안)"
+  editTeamId: ID
+}
+
+"E-31 삭제된 글 안내(404와 구분). 본문 · 댓글은 내려주지 않는다"
+type DeletedPost {
+  id: ID!
+  deletedAt: DateTime
+}
+
+"post(id) 결과. null = 없는 글(E-53)"
+union PostLookup = Post | DeletedPost
+
+type Comment {
+  id: ID!
+  "1~500자(BD-03 ⑫ 제안)"
+  content: String!
+  author: Member!
+  createdAt: DateTime!
+  updatedAt: DateTime
+  "작성자 또는 그 글이 연결된 팀의 팀장"
+  viewerCanEdit: Boolean!
+  "작성자 또는 관리자"
+  viewerCanDelete: Boolean!
+}
+
+type PostConnection {
+  nodes: [Post!]!
+  pageInfo: PageInfo!
+  "BD-01 ⑬ '검색 결과 n건'(현재 탭 기준)"
+  totalCount: Int!
+}
+
+type CommentConnection {
+  nodes: [Comment!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"BD-01 ① 검색 시 탭별 결과 수(제안 — 목업 W-05)"
+type PostTypeCounts {
+  troubleshooting: Int!
+  devlog: Int!
+}
+
+"BD-01 ④ 많이 쓰인 태그 상위 10개(제안)"
+type TagCount {
+  tag: String!
+  count: Int!
+}
+
+"""
+글 · 댓글 혼합 목록의 한 줄 (AD-01 ②-5 ⑥, TM-06 ⑧) (제안)
+글과 댓글이 같은 목록에 섞이므로 정규화하지 않도록 id 필드를 두지 않는다(targetId 사용).
+팀 열은 두지 않는다(AD-01 ②-5 비고: 비공개 팀 이름 유출 경로 차단).
+"""
+type ContentRow {
+  kind: ContentKind!
+  "글 id 또는 댓글 id"
+  targetId: ID!
+  "댓글이면 그 댓글이 달린 글 id. 클릭 → BD-03"
+  postId: ID!
+  postType: PostType!
+  "글이면 제목, 댓글이면 본문 앞부분 (추측)"
+  title: String!
+  author: Member!
+  createdAt: DateTime!
+}
+
+type ContentRowConnection {
+  nodes: [ContentRow!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+
+# ---------------------------------------------------------------------
+# 9. 공지
+# ---------------------------------------------------------------------
+
+"DB notice (1-15)"
+type Notice {
+  id: ID!
+  title: String!
+  "줄바꿈 유지, 댓글 없음(NT-02 ④)"
+  content: String!
+  isPinned: Boolean!
+  "잔디 인정 규칙 공지. 삭제 불가(EX-AD01-02)"
+  isSystem: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime
+}
+
+type NoticeConnection {
+  nodes: [Notice!]!
+  pageInfo: PageInfo!
+}
+
+
+# ---------------------------------------------------------------------
+# 10. 면제
+# ---------------------------------------------------------------------
+
+"DB exemption_period (1-12). 주 단위, 전체 회원 적용"
+type ExemptionPeriod {
+  id: ID!
+  weekStart: Date!
+  weekEnd: Date!
+  reason: String!
+  createdAt: DateTime!
+  updatedAt: DateTime
+  "이미 판정이 끝난 주인가 — 수정 · 삭제 시 소급 재계산 대상(DB 1-12, E-45)"
+  isPast: Boolean!
+}
+
+type ExemptionPeriodConnection {
+  nodes: [ExemptionPeriod!]!
+  pageInfo: PageInfo!
+}
+
+"DB personal_exemption (1-13). 관리자 목록에는 팀 이름을 넣지 않는다(AD-01 ②-3 ⑦)"
+type PersonalExemptionRequest {
+  id: ID!
+  member: Member!
+  "요청한 팀장"
+  requestedBy: Member!
+  weekStart: Date!
+  weekEnd: Date!
+  reason: String!
+  status: PersonalExemptionStatus!
+  "거절 사유(E-48) — TM-08 ⑤ '거절됨 · 사유: …'"
+  rejectReason: String
+  createdAt: DateTime!
+  respondedAt: DateTime
+  "E-44 이미 전체 면제 기간인 주 (안내용)"
+  overlapsExemptionPeriod: Boolean!
+  "그 주 판정이 이미 끝났는가 — true면 승인이 소급 면제가 된다 → 미리보기 필요 (추측, 계약서 9장 C-04)"
+  isRetroactive: Boolean!
+}
+
+type PersonalExemptionRequestConnection {
+  nodes: [PersonalExemptionRequest!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+
+# ---------------------------------------------------------------------
+# 11. 관리자 (웹 전용, 관리자만 — AD-01)
+# ---------------------------------------------------------------------
+
+"""
+AD-01 ⑤ 처리 대기 요약 + 관리자 메뉴 배지를 한 번에 (인수인계 5-1 'adminDashboardSummary', AD-01 비고 '배지 숫자는 한 번에 받아 공유')
+"""
+type AdminDashboardSummary {
+  pendingMemberCount: Int!
+  """
+  ⑤ '이번 주 미달' — 가장 최근에 실행된 판정 주의 미달 수 (추측)
+  목요일 화면(목업 W-15)에서 보이는 판정은 지난 주(9/21~9/27)이므로 용어가 모호하다(계약서 9장 C-13)
+  """
+  latestWeekFailCount: Int!
+  latestJudgedWeekStart: Date
+  penaltyTargetCount: Int!
+  pendingExemptionRequestCount: Int!
+  "자동 재시도가 소진된 미해결 보류 수 — 주차 무관 합계 (제안)"
+  heldJudgmentCount: Int!
+}
+
+"AD-01 ⑦ 집계: 통과 · 미달 · 면제 · 첫 참가 (+ 보류 ⑧)"
+type JudgmentCounts {
+  pass: Int!
+  fail: Int!
+  exempt: Int!
+  firstWeek: Int!
+  "팀 없음 제외 — 화면 집계에는 없다 (추측: 목록 기본 필터에서도 뺀다)"
+  noTeam: Int!
+  "0이면 보류 관련 표시를 하지 않는다(AD-01 ⑧)"
+  hold: Int!
+}
+
+"AD-01 ⑦ 회원별 행. 팀 이름은 넣지 않는다(기능명세서 9장)"
+type AdminJudgmentRow {
+  judgment: WeeklyJudgment!
+  member: Member!
+  "'누적 경고' 열 — 그 주 당시가 아니라 현재 값"
+  activeWarningCount: Int!
+  isPenaltyTarget: Boolean!
+  "HOLD 이고 API_ERROR일 때만 true. IDENTITY_MISMATCH는 재시도해도 안 풀린다(E-08)"
+  canRetry: Boolean!
+  "확정 상태면 true → [정정]. HOLD면 false → [재시도](AD-01 ⑦)"
+  canCorrect: Boolean!
+}
+
+type AdminJudgmentConnection {
+  nodes: [AdminJudgmentRow!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"AD-01 ⑥⑦ 한 주차의 판정 결과"
+type AdminJudgmentWeek {
+  weekStart: Date!
+  weekEnd: Date!
+  "판정 실행 시각. 판정 전 주간이면 null → '이번 주 판정은 월요일 오전에 실행돼요.'(5-4-9)"
+  executedAt: DateTime
+  counts: JudgmentCounts!
+  "회원 검색: 닉네임 · GitHub 아이디(AD-01 ⑥)"
+  rows(
+    filter: AdminJudgmentFilter = ALL
+    search: String
+    first: Int = 20
+    after: String
+  ): AdminJudgmentConnection!
+}
+
+"""
+재계산 미리보기 — 계산만 하고 아무것도 바꾸지 않는다(기능명세서 7장)
+쓰는 곳: 판정 정정(AD-01 ⑩) · 경고 복구(②-1 ⑧) · 소급 면제(②-3 ⑥ 과거 주간, ⑦ 소급 승인)
+"""
+type RecalcPreview {
+  member: Member!
+  warningCountBefore: Int!
+  warningCountAfter: Int!
+  penaltyChange: PenaltyChange!
+  "'다시 계산되는 주차 n주'(목업 W-15)"
+  affectedWeekCount: Int!
+  "벌칙 이행 체크 이전 주차라 기록만 바뀌고 경고 수는 그대로(E-58 · E-59)"
+  frozenByFulfillment: Boolean!
+  "카테고리가 하나도 없는 경고 복구 → '삭제된 팀'(E-43)"
+  restoresWithoutCategory: Boolean!
+  """
+  반영 직전 서버 재검증용 기준값 (제안 — AD-01 ⑩ 비고). 반영 뮤테이션에 expectedBasis로 돌려준다.
+  인수인계 5-2 '잘라낼 순서 3번'이라 nullable · 선택 인자로 둬서 잘라도 스키마가 바뀌지 않게 한다
+  """
+  basis: String
+}
+
+"면제 기간 소급 등록 · 수정 · 삭제 미리보기 (제안 — 인수인계의 신설 5개에 없던 것)"
+type ExemptionPeriodPreview {
+  weekStart: Date!
+  "이미 판정된 주인가. false면 재계산 없음 → 바로 등록"
+  isRetroactive: Boolean!
+  affectedMemberCount: Int!
+  changes: [RecalcPreview!]!
+  basis: String
+}
+
+"AD-01 ②-1 ⑤ 벌칙 대상. 경고가 붙은 팀은 비공개여도 실명"
+type PenaltyTarget {
+  member: Member!
+  activeWarningCount: Int!
+  "DB penalty_fulfillment.reached_week 의미(그 주 월요일). 목업 W-16 '도달 9/28'은 판정일로 보인다(계약서 9장 C-14)"
+  reachedWeekStart: Date!
+  reachedAt: DateTime
+  teams: [AdminTeamLabel!]!
+}
+
+"AD-01 ②-1 ⑦ 삭제된 경고(추방 · 팀 삭제로 카테고리가 모두 빠진 것). 회수된 경고는 나오지 않는다"
+type DeletedWarning {
+  id: ID!
+  member: Member!
+  weekStart: Date!
+  weekEnd: Date!
+  deleteReason: WarningDeleteReason!
+  deletedAt: DateTime!
+  "'복구 후 카테고리'. isDeleted 팀은 '삭제된 팀'"
+  restoreCategories: [AdminTeamLabel!]!
+}
+
+type DeletedWarningConnection {
+  nodes: [DeletedWarning!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"AD-01 ②-2 가입 승인 행. status는 이 타입에서만 노출"
+type AdminMemberRow {
+  member: Member!
+  status: MemberStatus!
+  "신청 = 첫 로그인 시각(DB member.created_at)"
+  appliedAt: DateTime!
+}
+
+type AdminMemberConnection {
+  nodes: [AdminMemberRow!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"보류 재실행 결과 → 토스트 '{n}명 처리했어요.'(E-35)"
+type RerunResult {
+  processedCount: Int!
+  stillHeldCount: Int!
+  rows: [AdminJudgmentRow!]!
+}
+
+
+# ---------------------------------------------------------------------
+# 12. 입력 타입
+# ---------------------------------------------------------------------
+
+"BD-01 · 헤더 검색(5-1-0-1) 공통 필터. 헤더 검색은 서버에 따로 묻지 않고 이 필터로 BD-01에 들어온다"
+input PostFilter {
+  "null이면 종류 무관(관리자 · 프로필용)"
+  type: PostType
+  tag: String
+  "제목 · 내용 · 태그 검색. 앞뒤 공백 제거 후 2~50자(E-61 · E-63)"
+  query: String
+  "[Q-12] TM-05 ⑧ '전체보기(팀 필터)'. A안이면 사용, B안이면 남겨두고 쓰지 않는다"
+  teamId: ID
+  "[Q-12] PR-01 ⑥ '작성자 필터'"
+  authorId: ID
+}
+
+input PostSectionInput {
+  key: PostSectionKey!
+  body: String
+}
+
+"""
+글 작성 (BD-04). 필수 항목이 비어도 저장은 허용(E-24 추측) — isRecord는 서버가 계산한다(DB 1-5).
+type과 맞지 않는 section key는 VALIDATION_FAILED.
+"""
+input CreatePostInput {
+  type: PostType!
+  "1~60자(BD-04 ③ 제안). 제목만 진짜 필수"
+  title: String!
+  sections: [PostSectionInput!]!
+  tags: [String!]!
+  commitUrls: [String!]!
+  "본인이 속한 팀만. null = 연결 안 함(BD-04 ⑨)"
+  teamId: ID
+}
+
+"""
+글 수정. 종류는 바꿀 수 없다(BD-04 ② 제안).
+전체 치환(필드 전부 보냄) 방식 (제안) — 'teamId 생략'과 'teamId: null(연결 해제)'을 헷갈리지 않기 위해.
+팀장이 남의 글을 수정할 때 teamId는 서버가 무시한다(BD-04 비고: ②⑨ 비활성).
+"""
+input UpdatePostInput {
+  title: String!
+  sections: [PostSectionInput!]!
+  tags: [String!]!
+  commitUrls: [String!]!
+  teamId: ID
+}
+
+input CreateTeamInput {
+  "1~20자(TM-02 ① 제안)"
+  name: String!
+  "100자 이내(TM-02 ② 제안). DB는 200자"
+  description: String
+  "기본 공개(TM-02 ③)"
+  isPublic: Boolean!
+}
+
+input RequestPersonalExemptionInput {
+  teamId: ID!
+  "이 팀 팀원 또는 본인(TM-08 ①)"
+  memberId: ID!
+  "이번 주 · 다음 주(TM-08 ② 제안)"
+  weekStart: Date!
+  "200자 이내(TM-08 ③ 제안). DB는 500자"
+  reason: String!
+}
+
+input CorrectJudgmentInput {
+  judgmentId: ID!
+  newStatus: CorrectableJudgmentStatus!
+  "필수(DB 1-14)"
+  reason: String!
+  expectedBasis: String
+}
+
+input ExemptionPeriodInput {
+  weekStart: Date!
+  reason: String!
+  expectedBasis: String
+}
+
+input NoticeInput {
+  title: String!
+  content: String!
+  isPinned: Boolean!
+}
+
+
+# ---------------------------------------------------------------------
+# 13. 뮤테이션 결과 타입
+# ---------------------------------------------------------------------
+
+"TM-02 ⑤ 초대코드는 이 응답에서만 반드시 온다(1회 발급, 재발급 불가 — 기능명세서 2장)"
+type CreateTeamPayload {
+  team: Team!
+  inviteCode: String!
+}
+
+"수락이면 team이 있고 TM-05로 이동, 거절이면 null"
+type RespondInvitationPayload {
+  invitationId: ID!
+  team: Team
+}
+
+"판정 정정 · 경고 복구 · 이행 체크 · 소급 면제 후 영향받은 회원의 새 상태. 프론트는 이 결과로 부분 패치하지 않고 관련 쿼리를 재조회한다"
+type RecalcPayload {
+  member: Member!
+  warningState: WarningState!
+  "판정 정정이면 바뀐 판정"
+  judgment: WeeklyJudgment
+}
+
+
+# ---------------------------------------------------------------------
+# 14. Query
+# ---------------------------------------------------------------------
+
+type Query {
+  # --- 공통 ----------------------------------------------------------
+  "서버 시각 · 이번 주 경계 (제안). 비로그인 허용"
+  clock: ServerClock!
+  "본인. 토큰이 없으면 null. 승인 대기 제한 토큰으로도 조회 가능(AU-03 ④⑤)"
+  me: Me
+
+  # --- 내 활동 (AC-01 · AC-02 · CM-01) --------------------------------
+  "AC-01 · CM-01 ②③. weekStart 생략 = 이번 주. 미래 주는 VALIDATION_FAILED"
+  myWeek(weekStart: Date): WeekActivity!
+  "AC-02 · CM-01 ④"
+  myWarnings: MyWarnings!
+
+  # --- 팀 (TM-01~TM-08) -----------------------------------------------
+  "TM-01 참가 순서(오래된 순, 제안) · BD-04 ⑨ 셀렉트 · TM-04 이후 갱신"
+  myTeams: [Team!]!
+  "TM-04"
+  myInvitations: [ReceivedInvitation!]!
+  "TM-05 · TM-06 · TM-08. 없는 팀 → null(E-53), 비소속 → FORBIDDEN(E-09), 관리자도 예외 없음"
+  team(id: ID!): Team
+
+  # --- 프로필 (PR-01) ------------------------------------------------
+  "없는 회원 → null(E-53)"
+  member(id: ID!): Member
+
+  # --- 게시판 (BD-01 · BD-03 · BD-04, 헤더 검색) ----------------------
+  "최신순 고정(BD-01 비고 제안). 20개씩(BD-01 ⑪ 제안) [Q-06]"
+  posts(filter: PostFilter!, first: Int = 20, after: String): PostConnection!
+  "BD-01 ① 검색 시 탭별 건수 (제안)"
+  postTypeCounts(filter: PostFilter!): PostTypeCounts!
+  "BD-01 ④. type 생략 = 전체 (제안: 현재 탭 기준)"
+  popularTags(type: PostType, first: Int = 10): [TagCount!]!
+  "BD-03 · BD-04 수정 모드"
+  post(id: ID!): PostLookup
+
+  # --- 공지 (NT-01 · NT-02 · CM-01 ⑦) --------------------------------
+  "고정 공지가 먼저, 그다음 최신순(NT-01 ①②). CM-01 ⑦은 first: 3"
+  notices(first: Int = 20, after: String): NoticeConnection!
+  notice(id: ID!): Notice
+  "잔디 인정 규칙 공지(isSystem). CM-01 ⑥ · PR-01 E-39 [설정 방법] → NT-02 (제안)"
+  grassRuleNotice: Notice
+
+  # --- 관리자 (AD-01, ADMIN만) ----------------------------------------
+  adminDashboardSummary: AdminDashboardSummary!
+  "AD-01 ⑥⑦. weekStart 생략 = 가장 최근 판정 주"
+  adminJudgmentWeek(weekStart: Date): AdminJudgmentWeek!
+  "AD-01 ⑨ 주차와 무관한 미해결 보류 전체 (인수인계 5-1 명칭 유지, 제안: 지난 주차 보류가 묻히지 않게)"
+  heldJudgments: [AdminJudgmentRow!]!
+  "AD-01 ⑩ (인수인계 5-1 명칭)"
+  judgmentCorrectionPreview(
+    judgmentId: ID!
+    newStatus: CorrectableJudgmentStatus!
+  ): RecalcPreview!
+  "AD-01 ②-1 ⑤"
+  penaltyTargets: [PenaltyTarget!]!
+  "AD-01 ②-1 ⑦"
+  deletedWarnings(first: Int = 20, after: String): DeletedWarningConnection!
+  "AD-01 ②-1 ⑧ (인수인계 5-1 명칭). E-42 · E-43 · E-59"
+  restoreWarningPreview(warningId: ID!): RecalcPreview!
+  "AD-01 ②-2"
+  adminMembers(
+    filter: AdminMemberFilter = PENDING
+    search: String
+    first: Int = 20
+    after: String
+  ): AdminMemberConnection!
+  "AD-01 ②-3 ⑤"
+  exemptionPeriods(first: Int = 20, after: String): ExemptionPeriodConnection!
+  "AD-01 ②-3 ⑥ 과거 주간 등록 · 수정 · 삭제 전 미리보기 (제안). 수정이면 periodId, 삭제면 removing: true"
+  exemptionPeriodPreview(
+    weekStart: Date!
+    periodId: ID
+    removing: Boolean = false
+  ): ExemptionPeriodPreview!
+  "AD-01 ②-3 ⑦"
+  personalExemptionRequests(
+    status: PersonalExemptionStatus = PENDING
+    first: Int = 20
+    after: String
+  ): PersonalExemptionRequestConnection!
+  "AD-01 ②-3 ⑦ 이미 판정된 주의 승인(소급) 미리보기. 소급이 아니면 null (추측)"
+  personalExemptionApprovalPreview(requestId: ID!): RecalcPreview
+  "AD-01 ②-5. 검색: 제목 · 내용 · 작성자"
+  adminContents(
+    filter: AdminContentFilter = ALL
+    search: String
+    first: Int = 20
+    after: String
+  ): ContentRowConnection!
+}
+
+
+# ---------------------------------------------------------------------
+# 15. Mutation
+# ---------------------------------------------------------------------
+
+type Mutation {
+  # --- 인증 (AU-02 · AU-03) -------------------------------------------
+  "비로그인 허용. 코드 재사용 · 만료 → LOGIN_CODE_INVALID(E-05 · E-06)"
+  exchangeLoginCode(code: String!): AuthPayload!
+  "무상태 JWT라 서버 처리는 없다 (제안). 클라이언트가 토큰 폐기 + 캐시 초기화"
+  logout: Boolean!
+
+  # --- 팀 -------------------------------------------------------------
+  "TM-02"
+  createTeam(input: CreateTeamInput!): CreateTeamPayload!
+  "TM-03. E-10 · E-11 · E-12(차단 사유 · 남은 기간 미노출)"
+  joinTeamByInviteCode(code: String!): Team!
+  "TM-06 ②. 가입 회원만(E-15), 이미 팀원(E-16), 추방자 재초대 허용(E-13)"
+  inviteMember(teamId: ID!, githubLogin: String!): SentInvitation!
+  "TM-06 ③ [취소]. DB에 철회 상태값이 없어 행 삭제로 해석 (추측)"
+  cancelInvitation(invitationId: ID!): ID!
+  "TM-04 ②③. E-17 · E-18"
+  respondInvitation(invitationId: ID!, accept: Boolean!): RespondInvitationPayload!
+  "TM-05 ④ 팀원만. 팀장은 LEADER_MUST_TRANSFER(E-19). 자진 탈퇴는 경고 유지(기능명세서 6장)"
+  leaveTeam(teamId: ID!): ID!
+  "TM-06 ⑤. 그 팀 경고 카테고리 제거 · 0이면 경고 소프트 삭제(E-22)"
+  kickMember(teamId: ID!, memberId: ID!): Team!
+  "TM-06 ⑥ 되돌릴 수 없음. 성공 후 조회자는 TM-06 권한을 잃는다"
+  transferLeadership(teamId: ID!, memberId: ID!): Team!
+  "TM-06 ⑦ 즉시 반영"
+  setTeamVisibility(teamId: ID!, isPublic: Boolean!): Team!
+  "TM-06 ⑨. 글은 남고 팀 연결만 해제(E-21), 카테고리 제거(E-22). 마지막 1인 팀장의 '나가기'도 이것(E-20 추측)"
+  deleteTeam(teamId: ID!): ID!
+  "TM-08 ④. E-44 · E-47"
+  requestPersonalExemption(input: RequestPersonalExemptionInput!): PersonalExemptionRequest!
+
+  # --- 게시판 ---------------------------------------------------------
+  "BD-04 등록"
+  createPost(input: CreatePostInput!): Post!
+  "BD-04 수정. 작성자 또는 연결 팀 팀장"
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+  "BD-03 ④ 작성자 또는 관리자(AD-01 ②-5). 확정 판정 불변(E-28)"
+  deletePost(id: ID!): ID!
+  "BD-03 ⑫"
+  addComment(postId: ID!, content: String!): Comment!
+  "BD-03 ⑪ · TM-06 ⑧ 작성자 또는 팀장"
+  updateComment(id: ID!, content: String!): Comment!
+  "BD-03 ⑪ · AD-01 ②-5 작성자 또는 관리자"
+  deleteComment(id: ID!): ID!
+
+  # --- 프로필 ---------------------------------------------------------
+  "PR-02 ③ 기본 이미지로. 파일 업로드는 REST(계약서 5장)"
+  resetProfileImage: Member!
+
+  # --- 관리자: 판정 (AD-01 대시보드) ----------------------------------
+  "AD-01 ⑦ [재시도] · ⑨ [전체 재시도]. judgmentIds 생략 = 재시도 가능한 보류 전부. 확정 건은 건드리지 않는다(E-35)"
+  rerunHeldJudgments(judgmentIds: [ID!]): RerunResult!
+  "AD-01 ⑩ [정정하고 재계산]. 사유 필수. 연쇄 재계산(E-49 · E-50 · E-58 · E-60)"
+  correctJudgment(input: CorrectJudgmentInput!): RecalcPayload!
+
+  # --- 관리자: 경고 복구 · 벌칙 ---------------------------------------
+  "AD-01 ②-1 ⑥ 되돌릴 수 없는 고정점(E-58). 경고 0 · 연속 0 [Q-10 ⓓ]"
+  fulfillPenalty(memberId: ID!): RecalcPayload!
+  "AD-01 ②-1 ⑧"
+  restoreWarning(warningId: ID!, expectedBasis: String): RecalcPayload!
+
+  # --- 관리자: 가입 승인 ----------------------------------------------
+  approveMember(memberId: ID!): AdminMemberRow!
+  "확인 다이얼로그 후. 감사 기록 대상(기능명세서 9장)"
+  rejectMember(memberId: ID!): AdminMemberRow!
+  "거절 → 승인 대기로 되돌리기(AD-01 ②-2 ⑧)"
+  revertMemberToPending(memberId: ID!): AdminMemberRow!
+
+  # --- 관리자: 면제 ---------------------------------------------------
+  "과거 주간이면 exemptionPeriodPreview를 먼저 거친다(AD-01 ②-3 ⑥, E-45)"
+  createExemptionPeriod(input: ExemptionPeriodInput!): ExemptionPeriod!
+  updateExemptionPeriod(id: ID!, input: ExemptionPeriodInput!): ExemptionPeriod!
+  "[미결] 이미 판정된 주의 면제 기간을 지우면 그 주를 어떻게 판정할지 명세에 없다(계약서 9장 C-05)"
+  deleteExemptionPeriod(id: ID!, expectedBasis: String): ID!
+  "AD-01 ②-3 ⑦ [승인]. 소급이면 미리보기 후 (추측)"
+  approvePersonalExemption(requestId: ID!, expectedBasis: String): PersonalExemptionRequest!
+  "거절 사유 필수(E-48 제안)"
+  rejectPersonalExemption(requestId: ID!, reason: String!): PersonalExemptionRequest!
+
+  # --- 관리자: 공지 ---------------------------------------------------
+  createNotice(input: NoticeInput!): Notice!
+  updateNotice(id: ID!, input: NoticeInput!): Notice!
+  "isSystem이면 SYSTEM_NOTICE_UNDELETABLE(EX-AD01-02)"
+  deleteNotice(id: ID!): ID!
+  "AD-01 ②-4 ⑥ 고정 ON/OFF 즉시 토글"
+  setNoticePinned(id: ID!, pinned: Boolean!): Notice!
+}

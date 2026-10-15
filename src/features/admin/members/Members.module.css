@@ -1,0 +1,109 @@
+/* AD-01 ②-2 가입 승인 — W-15 · W-16 관리자 표 언어 (패널 제목 20 · 툴바 40 · 표 .tb) */
+
+/* ③ 패널 제목 + 건수 요약 */
+.head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 18px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.meta {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+/* ⑤ 툴바: 검색 · 상태 필터 · 전체 건수 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 14px;
+}
+.search {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-width: 0;
+}
+.search input[type='search'] {
+  height: 40px;
+  font-size: 13.5px;
+}
+.filter {
+  flex: 0 0 auto;
+  width: 132px;
+}
+.count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ⑥ 회원 칸: 아바타 + 닉네임 + @아이디(새 탭) */
+.member {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.nick {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.gh {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.applied {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* 좁은 화면: 표만 가로로 스크롤하고 첫 열(회원) · 끝 열(처리)은 고정한다 (ACC-ADM-15) */
+@media (max-width: 767px) {
+  .table td:first-child,
+  .table th:first-child,
+  .table td:last-child,
+  .table th:last-child {
+    position: sticky;
+    z-index: 1;
+    background: var(--surface);
+  }
+  .table th:first-child,
+  .table th:last-child {
+    background: var(--surface-2);
+  }
+  .table td:first-child,
+  .table th:first-child {
+    left: 0;
+  }
+  .table td:last-child,
+  .table th:last-child {
+    right: 0;
+  }
+  .count {
+    margin-left: 0;
+  }
+}

@@ -1,0 +1,1 @@
+export { BareLayout } from './BareLayout';

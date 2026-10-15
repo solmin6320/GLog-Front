@@ -1,0 +1,16 @@
+/* 목업 .wbar */
+.wbar {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+}
+.bar {
+  display: block;
+  width: 26px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--gauge-off);
+}
+.on {
+  background: var(--amber);
+}

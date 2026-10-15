@@ -1,0 +1,200 @@
+/* AD-01 ②-3 면제 관리 — W-15 · W-16 관리자 표 언어 (패널 제목 20 · 섹션 제목 16 · 표 .tb) */
+
+/* ③ 패널 제목 + 건수 요약 + [면제 기간 등록] */
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 22px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.meta {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.headAction {
+  margin-left: auto;
+}
+
+/* ⑤ · ⑦ 섹션 */
+.section + .section {
+  margin-top: 38px;
+}
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.empty {
+  padding: 22px 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+.note svg {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+/* 표 칸 */
+.week {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.pastTag {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.who {
+  white-space: nowrap;
+  color: var(--ink);
+}
+.reasonCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+.reason {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.overlap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--blue);
+}
+.actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* 다이얼로그 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.affected {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.listCaption {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.muted {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+/* 영향 미리보기형 (공통 요소) — 경고 복구 미리보기와 같은 모양 */
+.previewTable {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 4px 14px;
+}
+.previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.previewRow:last-child {
+  border-bottom: 0;
+}
+.previewRow dt {
+  color: var(--ink-2);
+}
+.previewRow dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.release {
+  color: var(--green);
+}
+.enter {
+  color: var(--red);
+}
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* 좁은 화면: 표만 가로로 스크롤하고 첫 열 · 끝 열(처리)은 고정한다 (ACC-ADM-15) */
+@media (max-width: 767px) {
+  .table td:first-child,
+  .table th:first-child,
+  .table td:last-child,
+  .table th:last-child {
+    position: sticky;
+    z-index: 1;
+    background: var(--surface);
+  }
+  .table th:first-child,
+  .table th:last-child {
+    background: var(--surface-2);
+  }
+  .table td:first-child,
+  .table th:first-child {
+    left: 0;
+  }
+  .table td:last-child,
+  .table th:last-child {
+    right: 0;
+  }
+  .headAction {
+    margin-left: 0;
+  }
+}

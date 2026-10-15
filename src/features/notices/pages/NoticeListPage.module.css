@@ -1,0 +1,24 @@
+.body {
+  margin-top: 24px;
+}
+/* 목업 W-02 공지 행: 고정 = 주황 핀 + 굵은 제목 */
+.pin,
+.pinSpace {
+  display: inline-flex;
+  flex: none;
+  width: 15px;
+}
+.pin {
+  color: var(--amber);
+}
+.title,
+.titlePinned {
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.titlePinned {
+  font-weight: 700;
+}

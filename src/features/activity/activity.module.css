@@ -1,0 +1,217 @@
+/* AC-01 · AC-02 — 목업 W-06 · W-07 */
+
+/* ---------- AC-01 ① 주차 이동 ---------- */
+.weekNav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 26px;
+}
+.weekLabel {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0 6px;
+}
+
+.banner {
+  margin-bottom: 24px;
+}
+
+/* ② | ④ */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+  align-items: start;
+}
+.days {
+  min-width: 0;
+}
+.headRight {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.strip {
+  margin-bottom: 16px;
+}
+
+/* ② 표 칸 */
+.date {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dateFuture {
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.futureText {
+  font-size: 13.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.dash {
+  color: var(--ink-3);
+}
+.zero {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.grass {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.squares {
+  display: inline-flex;
+  gap: 3px;
+}
+.squares i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.grassCount {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.detail {
+  font-size: 13.5px;
+}
+
+/* ④ 이번 주 판정 */
+.cardTitle {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.judgeStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.message {
+  margin-top: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.subMessage {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.teamlessBody {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+/* ⑤ 지난 판정 */
+.history {
+  margin-top: 44px;
+}
+
+/* ---------- AC-02 ①② ---------- */
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.gauge {
+  margin-top: 10px;
+}
+.lead {
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.calm {
+  font-size: 15px;
+  font-weight: 700;
+}
+.guide {
+  margin-top: 22px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.penaltyBadge {
+  margin-top: 14px;
+}
+.penaltyText {
+  margin-top: 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+/* ③ 경고 이력 */
+.warnHistory {
+  margin-top: 40px;
+}
+
+/* ④⑤ 기준 · 벌칙 안내 */
+.guides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 40px;
+}
+.guideTitle {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+}
+.rules {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.rule {
+  display: grid;
+  grid-template-columns: 114px 1fr;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.rule dt {
+  font-weight: 700;
+}
+.rule dd {
+  margin: 0;
+  color: var(--ink-3);
+}
+.penaltyGuide {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink-3);
+}
+
+@media (max-width: 767px) {
+  .layout,
+  .summary,
+  .guides {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .history,
+  .warnHistory {
+    margin-top: 32px;
+  }
+  .rule {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

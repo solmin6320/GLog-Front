@@ -1,0 +1,62 @@
+/* 목업 W-13 태그 입력 (.field .inp 안에 칩) */
+.field {
+  margin-bottom: 20px;
+}
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.opt {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+.box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: text;
+}
+.box:focus-within {
+  border-color: var(--green);
+  box-shadow: var(--focus-ring);
+}
+.box[data-invalid] {
+  border-color: var(--red);
+}
+.input {
+  flex: 1 1 120px;
+  min-width: 120px;
+  height: 32px;
+  border: 0;
+  padding: 0 4px;
+  background: transparent;
+  font-size: 14.5px;
+}
+.input:focus {
+  outline: none;
+}
+.input:disabled {
+  cursor: not-allowed;
+}
+.hint,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.error {
+  color: var(--red);
+}

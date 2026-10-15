@@ -1,0 +1,38 @@
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+.bar {
+  flex: none;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.body {
+  flex: 1;
+  padding: 48px 24px 64px;
+}
+
+.inner {
+  width: 100%;
+  max-width: var(--w-md);
+  margin: 0 auto;
+}
+
+@media screen and (max-width: 767px) {
+  .bar {
+    padding: 0 16px;
+  }
+
+  .body {
+    padding: 32px 16px 48px;
+  }
+}
