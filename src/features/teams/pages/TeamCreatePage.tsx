@@ -136,7 +136,7 @@ function CreatedView({ created }: { created: Created }) {
       </div>
       <Card>
         <SectionHeader title="초대코드" />
-        <InviteCodeBox code={created.inviteCode} note="이 코드는 다시 발급할 수 없어요. 꼭 저장해 주세요." />
+        <InviteCodeBox code={created.inviteCode} note="팀원 관리 화면에서 언제든 다시 볼 수 있어요." />
         <div className={s.formActions}>
           <LinkButton to={paths.team(created.teamId)}>팀 보러 가기</LinkButton>
         </div>

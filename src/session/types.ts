@@ -2,7 +2,7 @@
  * 세션 모델 (요구사항 4-1 · 계약서 3장). 화면은 status · viewer · clock만 본다.
  * 토큰이 어디 있는지, 대기 회원에게 토큰이 있는지는 세션 계층만 안다(B-01).
  */
-export type SessionStatus = 'LOADING' | 'ANONYMOUS' | 'PENDING' | 'REJECTED' | 'ACTIVE';
+export type SessionStatus = 'LOADING' | 'ANONYMOUS' | 'PENDING' | 'REJECTED' | 'SUSPENDED' | 'ACTIVE';
 
 export type Viewer = {
   /** Me.id (= Member.id) */

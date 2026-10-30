@@ -234,6 +234,41 @@
   }
 }
 
+/* ---------- 중간 폭 (768~1279px): 닫힘은 좁게, 열면 제자리에서 왼쪽으로 겹쳐 펼친다 — 헤더 폭이 늘지 않는다 ---------- */
+
+@media screen and (min-width: 768px) and (max-width: 1279px) {
+  .trigger {
+    width: 180px;
+  }
+
+  .open {
+    width: 180px;
+    height: 34px;
+  }
+
+  .open .field {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 9;
+    width: min(470px, calc(100vw - 32px));
+  }
+
+  .open .pop {
+    width: min(470px, calc(100vw - 32px));
+  }
+
+  .keys {
+    display: none;
+  }
+
+  /* 열면 메뉴를 덮으므로 닫는 방법을 눈에 보이게 */
+  .close {
+    display: inline-flex;
+    margin-left: auto;
+  }
+}
+
 /* 입력 중 본문 가림 — 헤더 아래만 덮는다 */
 .scrim {
   position: fixed;

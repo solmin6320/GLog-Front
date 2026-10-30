@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { skipToken, useQuery } from '@apollo/client/react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import type { PostFilter } from '@/gql/graphql';
+import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
 import { parsePostsSearch, paths, postTypeToEnum, type PostTypeParam } from '@/shared/lib/paths';
 import { EmptyState, LinkButton, LoadMore, PageContainer, QueryBoundary, Segmented, TextLink } from '@/shared/ui';
@@ -23,6 +25,7 @@ export default function PostListPage() {
   const [sp] = useSearchParams();
   const navigate = useNavigate();
   const { type, q, tag } = parsePostsSearch(sp);
+  useDocumentTitle(POST_TYPE_LABEL[type === 'devlog' ? 'DEVLOG' : 'TROUBLESHOOTING']);
   const go = (next: { type: PostTypeParam; q?: string; tag?: string }) => void navigate(paths.posts(next));
 
   const where: PostFilter = { ...(q ? { query: q } : {}), ...(tag ? { tag } : {}) };
@@ -38,6 +41,18 @@ export default function PostListPage() {
 
   const countOf = (t: PostTypeParam) =>
     t === 'devlog' ? counts.data?.postTypeCounts.devlog : counts.data?.postTypeCounts.troubleshooting;
+
+  // 헤더 검색에서 왔는데 지금 탭에 결과가 없고 다른 탭에만 있으면, 한 번만 그 탭으로 옮긴다(직접 탭을 고른 경우는 그대로)
+  const location = useLocation();
+  const fromHeaderSearch = (location.state as { fromHeaderSearch?: boolean } | null)?.fromHeaderSearch === true;
+  const here = countOf(type);
+  const otherType: PostTypeParam = type === 'devlog' ? 'troubleshooting' : 'devlog';
+  const there = countOf(otherType);
+  useEffect(() => {
+    if (fromHeaderSearch && here === 0 && (there ?? 0) > 0) {
+      void navigate(paths.posts({ type: otherType, q, tag }), { replace: true });
+    }
+  }, [fromHeaderSearch, here, there, otherType, q, tag, navigate]);
 
   const board = (body: ReactNode) => (
     <>

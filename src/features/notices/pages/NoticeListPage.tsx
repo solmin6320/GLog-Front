@@ -1,3 +1,4 @@
+import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
 import { formatDateTimeMD } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
@@ -21,6 +22,7 @@ import s from './NoticeListPage.module.css';
  * 읽기 전용 · 댓글 없음. 20개씩 [더 보기](③).
  */
 export default function NoticeListPage() {
+  useDocumentTitle('공지사항');
   const list = usePagedList(NoticeListQuery, { variables: {}, select: (d) => d.notices });
   return (
     <PageContainer>

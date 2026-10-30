@@ -40,7 +40,7 @@ export default function TeamManagePage() {
             {t.inviteCode ? (
               <section className={m.section} aria-labelledby="manage-code-heading">
                 <SectionHeader id="manage-code-heading" title="초대코드" />
-                <InviteCodeBox code={t.inviteCode} note="다시 발급할 수 없어요." />
+                <InviteCodeBox code={t.inviteCode} note="코드는 바뀌지 않아요. 팀원에게 이 코드를 알려 주세요." />
               </section>
             ) : null}
             <InviteMemberSection teamId={team.id} pending={t.pendingInvitations} />

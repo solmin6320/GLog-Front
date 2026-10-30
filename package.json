@@ -19,11 +19,6 @@
     "codegen:check": "graphql-codegen --config codegen.ts --check",
     "check": "npm run typecheck && npm run lint && npm run test && npm run codegen:check"
   },
-  "msw": {
-    "workerDirectory": [
-      "public"
-    ]
-  },
   "dependencies": {
     "@apollo/client": "^4.3.1",
     "graphql": "^16.14.2",

@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client/react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { MSG } from '@/domain/messages';
 import type { PostDetailQueryQuery } from '@/gql/graphql';
+import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useAction, usePagedList } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
 import { isObjectId } from '@/shared/lib/ids';
@@ -22,7 +23,6 @@ import {
 } from '@/shared/ui';
 import { PostDelete, PostDetailQuery, removePostFromLists } from '../api';
 import { Comments } from '../components/Comments';
-import { CommitCard } from '../components/CommitCard';
 import { NotRecordBadge } from '../components/PostListItem';
 import { isFilled, POST_TYPE_LABEL, SECTION_LABEL } from '../postText';
 import { useProfilePath } from '../useProfilePath';
@@ -56,6 +56,9 @@ function PostDetail({ postId }: { postId: string }) {
     select: (d) => (d.post?.__typename === 'Post' ? d.post.comments : null),
     pageSize: COMMENT_PAGE,
   });
+  // 탭 제목은 글 제목 (지운 글 · 없는 글은 게시판)
+  const post = detail.data?.post;
+  useDocumentTitle(post?.__typename === 'Post' ? post.title : '게시판');
   return (
     <PageContainer width="md">
       <QueryBoundary
@@ -205,10 +208,6 @@ function PostView({
           );
         })}
       </div>
-
-      {post.commitUrls.map((url) => (
-        <CommitCard key={url} url={url} />
-      ))}
 
       <Comments
         postId={post.id}

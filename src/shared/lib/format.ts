@@ -70,6 +70,12 @@ function hourLabel(hour: number, minute: number): string {
   return minute === 0 ? `${ampm} ${h12}시` : `${ampm} ${h12}시 ${minute}분`;
 }
 
+/** 2026년 10월 16일 (금) 오후 2시 59분 — 잔디를 언제 불러왔는지 날짜와 시각을 모두 적는다 */
+export function formatStamp(iso: DateTimeString): string {
+  const p = kstPartsOf(iso);
+  return `${p.year}년 ${p.month}월 ${p.day}일 (${weekdayLabel(p.date)}) ${hourLabel(p.hour, p.minute)}`;
+}
+
 /**
  * 잔디 갱신 기준 문구 (M-15). 서버 updatedAt과 clock.now로 만든다.
  * 오늘 오전 6시 기준 / 어제 오전 6시 기준 / 9/29 오전 6시 기준

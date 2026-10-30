@@ -49,10 +49,11 @@ function statusFromError(e: AppError): SessionStatus | null {
   if (e.code === 'UNAUTHENTICATED') return 'ANONYMOUS';
   if (e.code === 'ACCOUNT_PENDING') return 'PENDING';
   if (e.code === 'ACCOUNT_REJECTED') return 'REJECTED';
+  if (e.code === 'ACCOUNT_SUSPENDED') return 'SUSPENDED';
   return null;
 }
 
-const isMemberStatus = (s: SessionStatus) => s === 'ACTIVE' || s === 'PENDING' || s === 'REJECTED';
+const isMemberStatus = (s: SessionStatus) => s === 'ACTIVE' || s === 'PENDING' || s === 'REJECTED' || s === 'SUSPENDED';
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const client = useApolloClient();

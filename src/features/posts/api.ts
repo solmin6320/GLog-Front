@@ -72,7 +72,6 @@ export const PostDetailQuery = graphql(`
           body
         }
         tags
-        commitUrls
         author {
           id
           nickname
@@ -187,7 +186,6 @@ export const PostEditorPostQuery = graphql(`
           body
         }
         tags
-        commitUrls
         isRecord
         inFinalizedWeek
         viewerCanEdit
@@ -213,7 +211,6 @@ export const PostCreate = graphql(`
         body
       }
       tags
-      commitUrls
       isRecord
       createdAt
       updatedAt
@@ -233,7 +230,6 @@ export const PostUpdate = graphql(`
         body
       }
       tags
-      commitUrls
       isRecord
       inFinalizedWeek
       updatedAt

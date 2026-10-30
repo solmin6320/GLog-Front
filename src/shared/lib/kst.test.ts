@@ -6,6 +6,7 @@ import {
   kstDateOf,
   kstIso,
   kstPartsOf,
+  parseServerDateTime,
   mondayOf,
   parseDate,
   toDateString,
@@ -168,5 +169,17 @@ describe('kstIso', () => {
       expect(kstDateOf(kstIso(d, 23, 59))).toBe(d);
       expect(kstPartsOf(kstIso(d, 6, 30))).toMatchObject({ date: d, hour: 6, minute: 30 });
     }
+  });
+});
+
+describe('parseServerDateTime (백엔드는 KST를 오프셋 없이 보낸다)', () => {
+  it('오프셋 없는 시각은 KST로 읽는다', () => {
+    expect(parseServerDateTime('2026-09-29T14:20:00')).toBe(Date.parse('2026-09-29T14:20:00+09:00'));
+    expect(parseServerDateTime('2026-09-29T14:20:00.123')).toBe(Date.parse('2026-09-29T14:20:00.123+09:00'));
+    expect(kstPartsOf('2026-09-29T00:10:00').date).toBe('2026-09-29');
+  });
+  it('오프셋 · Z가 있으면 그대로', () => {
+    expect(parseServerDateTime('2026-09-29T05:20:00Z')).toBe(Date.parse('2026-09-29T05:20:00Z'));
+    expect(parseServerDateTime('2026-09-29T14:20:00+09:00')).toBe(Date.parse('2026-09-29T14:20:00+09:00'));
   });
 });

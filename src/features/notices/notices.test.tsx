@@ -1,10 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { db, type NoticeRow } from '@/mocks/db/store';
-import { renderRoute } from '@/test/render';
+import { beforeEach } from 'vitest';
+import { installNotices, type BackendNotice } from '@/test/fixtures/admin';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
 
-// NT-01 공지 목록 · NT-02 공지 상세 (ACC-NT01-* · ACC-NT02-*)
+// NT-01 공지 목록 · NT-02 공지 상세 (ACC-NT01-* · ACC-NT02-*) — bridge + 가짜 백엔드 (notice.graphqls)
 
-const notice = (id: string, title: string, at: string, isPinned = false): NoticeRow => ({
+let notices: BackendNotice[];
+beforeEach(() => {
+  notices = installNotices();
+  const rule = notices.find((n) => n.id === '2');
+  if (rule) rule.content = '매주 월요일 오전에 지난 한 주(월~일)를 개인 단위로 판정해요.\n\n통과 조건\n인증일 3일 이상, 기록글 1개 이상';
+});
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
+
+const notice = (id: string, title: string, at: string, isPinned = false): BackendNotice => ({
   id,
   title,
   content: `${title} 본문`,
@@ -12,7 +21,6 @@ const notice = (id: string, title: string, at: string, isPinned = false): Notice
   isSystem: false,
   createdAt: at,
   updatedAt: null,
-  deletedAt: null,
 });
 
 const rows = async () => within(await screen.findByRole('list', { name: '공지 목록' })).getAllByRole('listitem');
@@ -36,7 +44,7 @@ describe('NT-01 공지 목록', () => {
 
   it('ACC-NT01-01 25건(고정 1) → 처음 20건, [더 보기]로 이어 붙이고 끝이면 "여기까지예요."', async () => {
     for (let i = 7; i <= 25; i += 1) {
-      db.notices.push(notice(String(i), `추가 공지 ${i}`, `2026-08-${String(i - 5).padStart(2, '0')}T09:00:00+09:00`));
+      notices.push(notice(String(i), `추가 공지 ${i}`, `2026-08-${String(i - 5).padStart(2, '0')}T09:00:00+09:00`));
     }
     const { user } = renderRoute('/notices');
     expect(await rows()).toHaveLength(20);
@@ -48,7 +56,7 @@ describe('NT-01 공지 목록', () => {
   });
 
   it('ACC-NT01-02 고정 공지 2건 → 둘 다 일반 공지보다 위, 둘 사이는 최신순', async () => {
-    const regular = db.notices.find((n) => n.id === '5');
+    const regular = notices.find((n) => n.id === '5');
     if (regular) regular.isPinned = true;
     renderRoute('/notices');
     const items = await rows();
@@ -60,7 +68,7 @@ describe('NT-01 공지 목록', () => {
   });
 
   it('ACC-NT01-03 공지 0건 → "등록된 공지가 없어요."', async () => {
-    db.notices.length = 0;
+    notices.length = 0;
     renderRoute('/notices');
     expect(await screen.findByText('등록된 공지가 없어요.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: '공지 목록' })).not.toBeInTheDocument();
@@ -81,7 +89,7 @@ describe('NT-02 공지 상세', () => {
   });
 
   it('일반 공지에는 고정 배지가 없다 · HTML 문자열은 글자 그대로', async () => {
-    const n = db.notices.find((x) => x.id === '6');
+    const n = notices.find((x) => x.id === '6');
     if (n) n.content = '<b>굵게</b>\n둘째 줄';
     renderRoute('/notices/6');
     expect(await screen.findByRole('heading', { level: 1, name: '10월 정기 모임은 10/8(목) 저녁 7시예요' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { formatMonthDay } from '@/shared/lib/format';
 import { weekdayIndex, weekdayLabel } from '@/shared/lib/kst';
 import { useOverflowX } from '../useOverflowX';
@@ -6,54 +6,109 @@ import { VisuallyHidden } from '../VisuallyHidden';
 import styles from './GrassHeatmap.module.css';
 
 const clampLevel = (n: number) => Math.max(0, Math.min(4, Math.round(n)));
+const LEVELS = [0, 1, 2, 3, 4] as const;
+/** 왼쪽 요일 라벨: 월 · 수 · 금만 (GitHub와 같은 밀도) */
+const ROW_LABELS = ['월', '', '수', '', '금', '', ''] as const;
+
+type Day = { date: string; count: number; level: number };
+
+/** 열(주)마다 그 주에 처음 나오는 달을 라벨로. 같은 달이 이어지면 비운다 */
+function monthLabels(days: Day[], lead: number, columns: number): (string | null)[] {
+  const labels: (string | null)[] = Array.from({ length: columns }, () => null);
+  let last = -1;
+  days.forEach((d, i) => {
+    const col = Math.floor((lead + i) / 7);
+    const month = Number(d.date.slice(5, 7));
+    if (month !== last) {
+      // 첫 열이 달 중간에서 시작하면 다음 달 라벨과 겹치지 않게 건너뛴다
+      if (!(col === 0 && Number(d.date.slice(8, 10)) > 20)) labels[col] = `${month}월`;
+      last = month;
+    }
+  });
+  return labels;
+}
 
 /**
- * 1년 잔디 히트맵. 열 = 주(월~일 행). 첫 날이 월요일이 아니면 앞을 빈칸으로 채운다.
- * 좁은 화면에서는 가로 스크롤 — 처음엔 최근 쪽(오른쪽 끝)을 보여 준다.
+ * 1년 잔디 히트맵 (GitHub 프로필 달력과 같은 모양). 열 = 주(월~일 행), 카드 폭을 꽉 채운다.
+ * 위에 월 라벨, 왼쪽에 월 · 수 · 금 라벨, 아래에 적음 → 많음 범례. 좁은 화면에서는 칸이 너무 작아지지 않게 가로 스크롤.
  */
-export function GrassHeatmap({
-  days,
-  cell = 12,
-  gap = 3,
-}: {
-  days: { date: string; count: number; level: number }[];
-  cell?: number;
-  gap?: number;
-}) {
+export function GrassHeatmap({ days }: { days: Day[] }) {
   const [ref, overflow] = useOverflowX<HTMLDivElement>();
   const first = days[0];
   const lead = first ? weekdayIndex(first.date) : 0;
+  const columns = Math.max(1, Math.ceil((lead + days.length) / 7));
+  const months = monthLabels(days, lead, columns);
 
   useEffect(() => {
     const el = ref.current;
     if (el) el.scrollLeft = el.scrollWidth;
   }, [ref, days.length]);
 
+  // 칸에 커서를 올리면 날짜와 기여 수를 띄운다. 스크롤 영역에 잘리지 않게 화면 기준(fixed)으로 그린다
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const showTip = (e: MouseEvent<HTMLElement>) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+    if (!el) return setTip(null);
+    const r = el.getBoundingClientRect();
+    const half = 90;
+    const x = Math.min(Math.max(r.left + r.width / 2, half), window.innerWidth - half);
+    setTip({ x, y: r.top, text: el.dataset.tip ?? '' });
+  };
+
+  const cols = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+
   return (
-    <div ref={ref} className={styles.scroll} role="region" aria-label="잔디 기록" tabIndex={overflow ? 0 : undefined}>
-      <ul
-        className={styles.grid}
-        style={{ gridTemplateRows: `repeat(7, ${cell}px)`, gridAutoColumns: `${cell}px`, gap: `${gap}px` }}
-      >
-        {Array.from({ length: lead }, (_, i) => (
-          <li key={`pad-${i}`} className={styles.pad} aria-hidden="true" />
+    <div className={styles.wrap}>
+      <div ref={ref} className={styles.scroll} role="region" aria-label="잔디 기록" tabIndex={overflow ? 0 : undefined}>
+        <div className={styles.frame} style={{ minWidth: `${columns * 13 + 32}px` }}>
+          <span aria-hidden="true" />
+          <div className={styles.months} style={cols} aria-hidden="true">
+            {months.map((m, i) => (
+              <span key={i} className={styles.month}>
+                {m}
+              </span>
+            ))}
+          </div>
+          <div className={styles.rows} aria-hidden="true">
+            {ROW_LABELS.map((l, i) => (
+              <span key={i}>{l}</span>
+            ))}
+          </div>
+          <ul className={styles.grid} style={cols} onMouseOver={showTip} onMouseLeave={() => setTip(null)}>
+            {Array.from({ length: lead }, (_, i) => (
+              <li key={`pad-${i}`} className={styles.pad} aria-hidden="true" />
+            ))}
+            {days.map((d) => {
+              const level = clampLevel(d.level);
+              return (
+                <li
+                  key={d.date}
+                  className={styles.cell}
+                  style={{ background: `var(--h${level})` }}
+                  data-level={level}
+                  data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · 기여 ${d.count}건`}
+                >
+                  <VisuallyHidden>
+                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.count > 0 ? `잔디 ${d.count}칸` : '잔디 없음'}`}
+                  </VisuallyHidden>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+      <div className={styles.legend} aria-hidden="true">
+        <span>적음</span>
+        {LEVELS.map((l) => (
+          <span key={l} className={styles.swatch} style={{ background: `var(--h${l})` }} />
         ))}
-        {days.map((d) => {
-          const level = clampLevel(d.level);
-          return (
-            <li
-              key={d.date}
-              className={styles.cell}
-              style={{ width: cell, height: cell, background: `var(--h${level})` }}
-              data-level={level}
-            >
-              <VisuallyHidden>
-                {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.count > 0 ? `잔디 ${d.count}칸` : '잔디 없음'}`}
-              </VisuallyHidden>
-            </li>
-          );
-        })}
-      </ul>
+        <span>많음</span>
+      </div>
+      {tip ? (
+        <div className={styles.tip} style={{ left: tip.x, top: tip.y }} role="presentation">
+          {tip.text}
+        </div>
+      ) : null}
     </div>
   );
 }

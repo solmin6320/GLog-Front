@@ -1,7 +1,7 @@
 import { graphql } from '@/gql';
 
 /**
- * AD-01 ②-2 가입 승인 (화면설계서 5-1-10 ②-2). 연산 이름은 `AdminMembers*`.
+ * AD-01 ②-2 회원 · 관리자 권한 (화면설계서 5-1-10 ②-2). 가입은 승인 없이 바로 활성이라 이 탭은 회원 명단과 관리자 승격을 맡는다. 연산 이름은 `AdminMembers*`.
  * 승인 · 거절 · 되돌리기는 값 하나만 바뀌는 조작이라 낙관적으로 행을 고친다(요구사항 6-5) — cache.ts.
  * 탭 배지는 refetchQueries: [ADMIN_COUNTS_QUERY] (layouts/api.ts AdminLayoutCountsQuery를 이름으로 부른다).
  */
@@ -21,6 +21,7 @@ export const AdminMembersQuery = graphql(`
           profileImageUrl
         }
         status
+        role
         appliedAt
       }
       pageInfo {
@@ -41,7 +42,58 @@ export const AdminMembersSummaryQuery = graphql(`
   }
 `);
 
-/** ⑦ 승인 */
+/** 활성 일반 회원 → 관리자 (현재 관리자만) */
+export const AdminMembersPromote = graphql(`
+  mutation AdminMembersPromote($memberId: ID!) {
+    promoteToAdmin(memberId: $memberId) {
+      member {
+        id
+        nickname
+        githubLogin
+        profileImageUrl
+      }
+      status
+      role
+      appliedAt
+    }
+  }
+`);
+
+/** 활성 일반 회원의 이용 정지 (현재 관리자만) */
+export const AdminMembersSuspend = graphql(`
+  mutation AdminMembersSuspend($memberId: ID!) {
+    suspendMember(memberId: $memberId) {
+      member {
+        id
+        nickname
+        githubLogin
+        profileImageUrl
+      }
+      status
+      role
+      appliedAt
+    }
+  }
+`);
+
+/** 정지 해제 → 활성 */
+export const AdminMembersUnsuspend = graphql(`
+  mutation AdminMembersUnsuspend($memberId: ID!) {
+    unsuspendMember(memberId: $memberId) {
+      member {
+        id
+        nickname
+        githubLogin
+        profileImageUrl
+      }
+      status
+      role
+      appliedAt
+    }
+  }
+`);
+
+/** ⑦ 승인 (기존 승인 대기 계정 정리용) */
 export const AdminMembersApprove = graphql(`
   mutation AdminMembersApprove($memberId: ID!) {
     approveMember(memberId: $memberId) {
@@ -52,6 +104,7 @@ export const AdminMembersApprove = graphql(`
         profileImageUrl
       }
       status
+      role
       appliedAt
     }
   }
@@ -68,6 +121,7 @@ export const AdminMembersReject = graphql(`
         profileImageUrl
       }
       status
+      role
       appliedAt
     }
   }
@@ -84,6 +138,7 @@ export const AdminMembersRevert = graphql(`
         profileImageUrl
       }
       status
+      role
       appliedAt
     }
   }

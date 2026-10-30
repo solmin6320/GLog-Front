@@ -150,3 +150,32 @@
     margin-top: 32px;
   }
 }
+
+/* 다음 할 일 버튼 — 진행 안내와 한 덩어리로 (근접성) */
+.next {
+  margin-top: 14px;
+}
+.nextBtn {
+  min-width: 180px;
+}
+/* 자세히 — 눈에 띄지 않게 하되 손가락이 닿는 높이는 지킨다 (피츠) */
+.more {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 44px;
+  padding: 0 4px;
+}
+
+@media (max-width: 767px) {
+  .nextBtn {
+    width: 100%;
+  }
+  /* 덩어리 안은 가깝게, 덩어리 사이는 멀게 */
+  .top {
+    gap: 40px;
+  }
+  .banner {
+    margin-top: 40px;
+  }
+}

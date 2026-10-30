@@ -56,6 +56,8 @@ enum MemberStatus {
   PENDING
   ACTIVE
   REJECTED
+  "관리자가 이용을 막은 회원. 로그인과 기존 토큰이 모두 막힌다"
+  SUSPENDED
 }
 
 "DB member.role (1-1)"
@@ -208,6 +210,10 @@ enum AdminJudgmentFilter {
 
 "AD-01 ②-2 ⑤ 상태 필터: 승인 대기 / 거절 / 전체 (추측: '전체' = 대기 + 거절)"
 enum AdminMemberFilter {
+  "정지된 회원"
+  SUSPENDED
+  "가입은 승인 없이 바로 활성이라 활성 회원 전체. 관리자 승격 대상 목록"
+  ACTIVE
   PENDING
   REJECTED
   ALL
@@ -350,6 +356,8 @@ type GrassCalendar {
   updatedAt: DateTime
   "최근 12개월(53주 × 7일) (PR-01 ⑦)"
   days: [GrassDay!]!
+  "지난 1년 기여 수 합계 (GitHub 프로필의 contributions in the last year)"
+  totalContributions: Int!
   "E-39 비공개 기여 꺼짐 추정: 총 기여 0인데 기록글만 있음 (추측 — 감지 기간 미정)"
   privateContributionSuspected: Boolean!
 }
@@ -440,6 +448,8 @@ type WeeklyJudgmentConnection {
 [충돌] AC-02 비고는 DB 'member_warning_state'를 읽는다고 적었지만 DB명세서 v0.4에 그런 테이블은 없다
 """
 type WarningState {
+  "판정 보류가 남아 있어 경고 수를 아직 셀 수 없다(서버 onHold). true면 activeCount · consecutivePasses · byCategory는 0/빈 값이라 화면은 숫자 대신 '확인 중'을 그린다 (2026-10-31 추가)"
+  isOnHold: Boolean!
   "살아 있는 경고 수. [Q-10 ⓒ] 3을 넘을 수 있는지 미정 → 화면 게이지는 3에서 자른다"
   activeCount: Int!
   "경고 3회 도달(기능명세서 6장). CM-01 ④ · PR-01 ⑧ 빨간 '벌칙 대상' 배지"
@@ -603,8 +613,6 @@ type Post {
   sections: [PostSection!]!
   "최대 5개 · 개당 20자(BD-04 ⑦ 제안)"
   tags: [String!]!
-  "DB는 배열(3-1), 화면은 1칸(BD-04 ⑧) → 1차 구현은 0~1개 (제안, 계약서 9장 C-08)"
-  commitUrls: [String!]!
   author: Member!
   "공개 팀에 연결된 글만 값. 비공개 · 삭제 · 미연결이면 null(BD-01 ⑧, BD-03 ⑥, E-23)"
   publicTeam: Team
@@ -905,7 +913,8 @@ type DeletedWarningConnection {
 type AdminMemberRow {
   member: Member!
   status: MemberStatus!
-  "신청 = 첫 로그인 시각(DB member.created_at)"
+  role: MemberRole!
+  "가입 = 첫 로그인 시각(DB member.created_at)"
   appliedAt: DateTime!
 }
 
@@ -955,7 +964,6 @@ input CreatePostInput {
   title: String!
   sections: [PostSectionInput!]!
   tags: [String!]!
-  commitUrls: [String!]!
   "본인이 속한 팀만. null = 연결 안 함(BD-04 ⑨)"
   teamId: ID
 }
@@ -969,7 +977,6 @@ input UpdatePostInput {
   title: String!
   sections: [PostSectionInput!]!
   tags: [String!]!
-  commitUrls: [String!]!
   teamId: ID
 }
 
@@ -1199,7 +1206,13 @@ type Mutation {
   "AD-01 ②-1 ⑧"
   restoreWarning(warningId: ID!, expectedBasis: String): RecalcPayload!
 
-  # --- 관리자: 가입 승인 ----------------------------------------------
+  # --- 관리자: 회원 · 관리자 승격 · 정지 -------------------------------
+  "활성 일반 회원의 이용을 정지한다. 로그인과 기존 토큰이 막힌다. 관리자·본인은 불가"
+  suspendMember(memberId: ID!): AdminMemberRow!
+  "정지를 풀어 활성으로"
+  unsuspendMember(memberId: ID!): AdminMemberRow!
+  "활성 일반 회원을 관리자로 올린다. 현재 관리자만 할 수 있다"
+  promoteToAdmin(memberId: ID!): AdminMemberRow!
   approveMember(memberId: ID!): AdminMemberRow!
   "확인 다이얼로그 후. 감사 기록 대상(기능명세서 9장)"
   rejectMember(memberId: ID!): AdminMemberRow!

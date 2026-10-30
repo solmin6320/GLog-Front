@@ -1,5 +1,6 @@
 import { useQuery } from '@apollo/client/react';
 import { useParams } from 'react-router';
+import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { formatDateTime } from '@/shared/lib/format';
 import { isBigintId } from '@/shared/lib/ids';
 import { paths } from '@/shared/lib/paths';
@@ -25,6 +26,7 @@ export default function NoticeDetailPage() {
 
 function NoticeDetail({ id }: { id: string }) {
   const q = useQuery(NoticeDetailQuery, { variables: { id } });
+  useDocumentTitle(q.data?.notice?.title ?? '공지사항');
   return (
     <PageContainer width="md">
       <QueryBoundary

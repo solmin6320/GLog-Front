@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
+import { BottomNav } from './BottomNav';
+import { Breadcrumb } from './Breadcrumb';
 import { Drawer } from './Drawer';
 import { Header } from './Header';
 import s from './AppLayout.module.css';
@@ -22,9 +24,13 @@ export function AppLayout() {
     <div className={s.shell}>
       <Header drawerOpen={drawerOpen} onOpenDrawer={openDrawer} />
       <Drawer open={drawerOpen} onClose={closeDrawer} />
+      <div inert={drawerOpen}>
+        <Breadcrumb />
+      </div>
       <main id="main" className={s.main} inert={drawerOpen}>
         <Outlet />
       </main>
+      <BottomNav />
     </div>
   );
 }

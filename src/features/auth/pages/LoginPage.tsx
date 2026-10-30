@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useSession } from '@/session';
-import { isMockMode } from '@/shared/config/env';
-import { Button, Select, WeekStrip, type StripDay } from '@/shared/ui';
+import { Button, WeekStrip, type StripDay } from '@/shared/ui';
 import { GrassRulesModal } from '../components/GrassRulesModal';
 import s from './LoginPage.module.css';
 
@@ -17,30 +16,10 @@ const DEMO_WEEK: StripDay[] = [
   { date: '2026-10-04', grassLevel: 0, hasRecord: false, verified: false, isToday: false, isFuture: false },
 ];
 
-type PersonaOption = { value: string; label: string };
-
-/** 목 모드에서만 체험 계정 목록을 불러온다. 화면 코드는 목을 정적으로 import하지 않는다. */
-function useMockPersonas(): PersonaOption[] | null {
-  const [options, setOptions] = useState<PersonaOption[] | null>(null);
-  useEffect(() => {
-    if (!isMockMode) return;
-    let alive = true;
-    void import('@/mocks/control').then((m) => {
-      if (alive) setOptions(m.MOCK_PERSONAS.map((p) => ({ value: p.key, label: p.label })));
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return options;
-}
-
 /** AU-01 로그인 (화면설계서 5-1-1, 목업 W-01) */
 export default function LoginPage() {
   useDocumentTitle('로그인');
   const session = useSession();
-  const personas = useMockPersonas();
-  const [persona, setPersona] = useState('member');
   const [redirecting, setRedirecting] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
 
@@ -55,7 +34,7 @@ export default function LoginPage() {
 
   const login = () => {
     setRedirecting(true);
-    window.location.assign(session.loginUrl(isMockMode ? persona : undefined));
+    window.location.assign(session.loginUrl());
   };
 
   return (
@@ -72,19 +51,8 @@ export default function LoginPage() {
           {redirecting ? '이동 중...' : 'GitHub으로 로그인'}
         </Button>
 
-        {personas && (
-          <div className={s.persona}>
-            <Select
-              label="체험할 계정 (목 모드)"
-              options={personas}
-              value={persona}
-              onChange={(e) => setPersona(e.target.value)}
-              disabled={redirecting}
-            />
-          </div>
-        )}
 
-        <p className={s.hint}>첫 로그인 후에는 관리자 승인이 필요해요</p>
+        <p className={s.hint}>GitHub 계정으로 로그인하면 바로 시작할 수 있어요</p>
 
         <button type="button" className={s.rulesLink} onClick={() => setRulesOpen(true)}>
           잔디 인정 규칙 보기

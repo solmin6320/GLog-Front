@@ -73,12 +73,22 @@
   margin-top: 44px;
   align-items: start;
 }
+/* 경고 숫자 줄 높이 — 옆 칸(주간 판정 이력) 빈 상태가 이 높이만큼 내려가 구분선 · 문구 위치가 맞는다 */
+.grid {
+  --summary-h: 40px;
+}
 .warnBig {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  min-height: var(--summary-h);
   margin-bottom: 16px;
+}
+/* 주간 판정 이력 빈 상태: 경고 숫자 줄만큼 띄워 경고의 구분선 · 문구와 같은 높이에 둔다 */
+/* 제목 아래 여백(14px)은 이 margin과 겹쳐(collapse) 사라지므로 함께 더한다 */
+.emptyAligned {
+  margin-top: calc(14px + var(--summary-h) + 16px);
 }
 .penaltyText {
   margin: -4px 0 16px;
@@ -174,4 +184,26 @@
   .formActions > * {
     flex: 1 1 0;
   }
+}
+
+/* 잔디를 불러온 날짜 · 시각 (히트맵 바로 아래) */
+.stamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* 지난 1년 기여 수 — 히트맵 위 */
+.total {
+  margin: 0 0 14px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.total strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
 }

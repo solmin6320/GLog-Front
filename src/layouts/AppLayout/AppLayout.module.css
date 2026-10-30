@@ -61,10 +61,22 @@
   min-width: 0;
 }
 
+/* 중간 폭에서도 이름은 숨기고 아바타만 — 헤더가 한 줄을 넘지 않게 */
+@media screen and (max-width: 1279px) {
+  .nick {
+    display: none;
+  }
+}
+
 @media screen and (max-width: 767px) {
   .header {
     gap: 8px;
     padding: 0 12px;
+  }
+
+  /* 하단 탭(56px)이 본문을 가리지 않게 */
+  .main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
   }
 
   /* 좁은 화면: 이름 숨김(아바타만) — A4 3-4 */

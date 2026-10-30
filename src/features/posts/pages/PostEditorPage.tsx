@@ -1,6 +1,7 @@
 import { useQuery } from '@apollo/client/react';
 import { useParams, useSearchParams } from 'react-router';
 import type { PostEditorPostQueryQuery, PostEditorTeamsQueryQuery } from '@/gql/graphql';
+import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { isObjectId } from '@/shared/lib/ids';
 import { parsePostNewSearch, postTypeToEnum } from '@/shared/lib/paths';
 import { FullState, PageContainer, QueryBoundary } from '@/shared/ui';
@@ -26,6 +27,7 @@ function teamOptions(teams: MyTeam[], keepTeamId?: string | null) {
 export default function PostEditorPage() {
   const { postId } = useParams();
   const [sp] = useSearchParams();
+  useDocumentTitle(postId === undefined ? '글쓰기' : '글 수정');
   if (postId === undefined) {
     const { type, team } = parsePostNewSearch(sp);
     return <NewPost type={postTypeToEnum(type)} team={team} />;
@@ -54,7 +56,6 @@ function NewPost({ type, team }: { type: PostFormValues['type']; team?: string }
               title: '',
               sections: {},
               tags: [],
-              commit: '',
               teamId: team && d.myTeams.some((t) => t.id === team) ? team : '',
             }}
           />
@@ -104,7 +105,6 @@ function EditForm({ post, teams }: { post: EditablePost; teams: MyTeam[] }) {
         title: post.title,
         sections: Object.fromEntries(post.sections.map((sec) => [sec.key, sec.body ?? ''])),
         tags: post.tags,
-        commit: post.commitUrls[0] ?? '',
         teamId: post.editTeamId ?? '',
       }}
     />

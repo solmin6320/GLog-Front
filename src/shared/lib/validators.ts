@@ -70,7 +70,6 @@ export const VALIDATION_MSG = {
   /** (제안) */
   tagDuplicate: '이미 단 태그예요.',
   /** E-29 */
-  commitUrl: 'GitHub 커밋 주소 형식이 아니에요.',
   /** (제안) */
   inviteCode: '초대코드는 영문, 숫자, -로 되어 있어요.',
   /** (제안) */
@@ -182,22 +181,6 @@ export function validateNewTag(raw: string | null | undefined, existing: readonl
 }
 
 /* ---------- 관련 커밋 (E-29) ---------- */
-
-const GITHUB_OWNER = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})';
-const GITHUB_REPO = '[A-Za-z0-9._-]{1,100}';
-const COMMIT_URL_RE = new RegExp(`^https://github\\.com/${GITHUB_OWNER}/${GITHUB_REPO}/commit/[0-9a-fA-F]{7,40}/?$`);
-
-/**
- * `https://github.com/{owner}/{repo}/commit/{sha}` 형식만 통과. sha는 7~40자 16진수.
- * 비어 있으면 통과(선택 항목). 존재 여부는 확인하지 않는다(E-29).
- */
-export function validateCommitUrl(value: string | null | undefined): ValidationResult {
-  const v = clean(value);
-  if (!v) return null;
-  const repo = v.split('/')[4];
-  if (!COMMIT_URL_RE.test(v) || repo === '.' || repo === '..') return VALIDATION_MSG.commitUrl;
-  return null;
-}
 
 /* ---------- 초대코드 · GitHub 아이디 ---------- */
 

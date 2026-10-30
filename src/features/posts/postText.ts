@@ -37,13 +37,6 @@ export const NOT_RECORD_TIP = '필수 항목을 다 채우면 인증에 들어�
 /** 공백만 있는 칸은 빈 칸이다 (ACC-BD04-04) */
 export const isFilled = (v: string | null | undefined) => (v ?? '').trim().length > 0;
 
-/** `https://github.com/{owner}/{repo}/commit/{sha}` → 'owner/repo · 7자리 sha'. 형식이 다르면 주소 그대로 */
-export function commitLabel(url: string): string {
-  const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/commit\/([0-9a-fA-F]{7,40})\/?$/.exec(url.trim());
-  if (!m) return url;
-  return `${m[1]}/${m[2]} · ${m[3]?.slice(0, 7)}`;
-}
-
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

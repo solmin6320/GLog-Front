@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'UNAUTHENTICATED'
   | 'ACCOUNT_PENDING'
   | 'ACCOUNT_REJECTED'
+  | 'ACCOUNT_SUSPENDED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'POST_DELETED'
@@ -28,6 +29,7 @@ export type ErrorCode =
   | 'PREVIEW_STALE'
   | 'RECALC_BUSY'
   | 'INTERNAL'
+  | 'NOT_AVAILABLE'
   | 'NETWORK';
 
 export type ErrorCategory = 'auth' | 'status' | 'forbidden' | 'notFound' | 'validation' | 'conflict' | 'server' | 'network';
@@ -39,6 +41,7 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   UNAUTHENTICATED: 'auth',
   ACCOUNT_PENDING: 'status',
   ACCOUNT_REJECTED: 'status',
+  ACCOUNT_SUSPENDED: 'status',
   FORBIDDEN: 'forbidden',
   TEAM_JOIN_BLOCKED: 'forbidden',
   NOT_FOUND: 'notFound',
@@ -57,6 +60,7 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   PREVIEW_STALE: 'conflict',
   RECALC_BUSY: 'server',
   INTERNAL: 'server',
+  NOT_AVAILABLE: 'server',
   NETWORK: 'network',
 };
 

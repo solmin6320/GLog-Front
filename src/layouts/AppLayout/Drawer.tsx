@@ -1,10 +1,10 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { Link, useLocation } from 'react-router';
-import { useIsAdmin, useSession, useViewer } from '@/session';
+import { useIsAdmin, useViewer } from '@/session';
 import { Icon, IconButton, Logo } from '@/shared/ui';
 import { AdminLayoutCountsQuery } from '../api';
-import { DRAWER_GROUPS, drawerActive, type DrawerBadgeKey } from './drawerNav';
+import { DRAWER_GROUPS, drawerActive, leafLabel, type DrawerBadgeKey } from './drawerNav';
 import s from './Drawer.module.css';
 
 export const DRAWER_ID = 'app-drawer';
@@ -22,7 +22,6 @@ export function Drawer({ open, onClose }: Props) {
 function DrawerPanel({ onClose }: { onClose: () => void }) {
   const viewer = useViewer();
   const isAdmin = useIsAdmin();
-  const { signOut } = useSession();
   const { pathname, search } = useLocation();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +36,14 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
 
   const active = drawerActive(pathname, search);
   const groups = DRAWER_GROUPS.filter((g) => !g.adminOnly || isAdmin);
+  const activeGroup = groups.find((g) => g.key === active?.group);
+  const here = activeGroup
+    ? {
+        group: activeGroup.label,
+        // 글쓰기 · 글 수정 · 프로필 수정은 소메뉴 대신 화면 이름
+        item: leafLabel(pathname) ?? activeGroup.items.find((i) => i.key === active?.item)?.label ?? null,
+      }
+    : null;
 
   // 열릴 때: 본문 스크롤 잠금 · 닫기 버튼에 포커스. 닫힐 때: 잠금 해제 · 열기 전 포커스(☰)로 복귀.
   useEffect(() => {
@@ -78,11 +85,6 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const handleSignOut = () => {
-    onClose();
-    void signOut();
-  };
-
   return (
     <>
       <div className={s.scrim} aria-hidden="true" onClick={onClose} />
@@ -103,12 +105,26 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
         </div>
 
         <nav className={s.body} aria-label="전체 메뉴">
+          {here ? (
+            <p className={s.here} aria-hidden="true">
+              <span className={s.hereLabel}>지금 위치</span>
+              <span className={s.herePath}>
+                {here.group}
+                {here.item ? (
+                  <>
+                    <Icon name="chevR" size={14} />
+                    <strong>{here.item}</strong>
+                  </>
+                ) : null}
+              </span>
+            </p>
+          ) : null}
           <ul className={s.nav}>
             {groups.map((g) => {
               const groupOn = active?.group === g.key;
               const topClass = `${s.top} ${groupOn ? s.on : ''}`;
               return (
-                <li key={g.key} className={s.group}>
+                <li key={g.key} className={`${s.group} ${groupOn ? s.groupOn : active ? s.groupOff : ''}`}>
                   {g.to ? (
                     <Link
                       to={g.to}
@@ -157,12 +173,6 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
           </ul>
         </nav>
 
-        <div className={s.foot}>
-          <button type="button" className={s.logout} onClick={handleSignOut}>
-            <Icon name="logout" size={18} />
-            로그아웃
-          </button>
-        </div>
       </div>
     </>
   );

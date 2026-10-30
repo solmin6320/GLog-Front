@@ -90,7 +90,7 @@ export const DRAWER_GROUPS: readonly DrawerGroup[] = [
     items: [
       { key: 'adminDashboard', label: '관리자 대시보드', to: paths.admin() },
       { key: 'adminWarnings', label: '경고 복구 · 벌칙', to: paths.adminWarnings(), badge: 'penaltyTargets' },
-      { key: 'adminMembers', label: '가입 승인', to: paths.adminMembers(), badge: 'pendingMembers' },
+      { key: 'adminMembers', label: '회원 · 관리자 권한', to: paths.adminMembers(), badge: 'pendingMembers' },
       { key: 'adminExemptions', label: '면제 관리', to: paths.adminExemptions(), badge: 'pendingExemptions' },
       { key: 'adminNotices', label: '공지 관리', to: paths.adminNotices() },
       { key: 'adminPosts', label: '게시물 관리', to: paths.adminPosts() },
@@ -163,4 +163,12 @@ export function drawerActive(pathname: string, search = ''): DrawerActive | null
     default:
       return null;
   }
+}
+
+/** 소메뉴 아래 화면 이름 — 경로 표시 마지막 칸과 드로어 "지금 위치"가 같이 쓴다 */
+export function leafLabel(pathname: string): string | null {
+  if (/^\/posts\/new\/?$/.test(pathname)) return '글쓰기';
+  if (/^\/posts\/[^/]+\/edit\/?$/.test(pathname)) return '글 수정';
+  if (/^\/profile\/edit\/?$/.test(pathname)) return '프로필 수정';
+  return null;
 }

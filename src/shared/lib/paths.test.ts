@@ -199,14 +199,15 @@ describe('/admin (대시보드)', () => {
 });
 
 describe('/admin/members · /admin/posts · /admin/notices', () => {
-  it('members: 기본 pending은 뺀다, 왕복', () => {
-    expect(paths.adminMembers({ status: 'pending' })).toBe('/admin/members');
+  it('members: 기본 active는 뺀다, 왕복', () => {
+    expect(paths.adminMembers({ status: 'active' })).toBe('/admin/members');
+    expect(paths.adminMembers({ status: 'pending' })).toBe('/admin/members?status=pending');
     expect(paths.adminMembers({ status: 'rejected', q: 'kim' })).toBe('/admin/members?status=rejected&q=kim');
     expect(parseAdminMembersSearch(searchOf(paths.adminMembers({ status: 'all', q: '서연' })))).toEqual({
       status: 'all',
       q: '서연',
     });
-    expect(parseAdminMembersSearch(sp('status=approved'))).toEqual({ status: 'pending', q: undefined });
+    expect(parseAdminMembersSearch(sp('status=approved'))).toEqual({ status: 'active', q: undefined });
   });
 
   it('posts: 기본 all은 뺀다, 왕복', () => {

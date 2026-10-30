@@ -1,9 +1,18 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { setMockControl } from '@/mocks/control';
-import { db, nextId } from '@/mocks/db/store';
-import { server } from '@/mocks/node';
-import { addDays, kstIso } from '@/shared/lib/kst';
-import { renderRoute } from '@/test/render';
+import { beforeEach } from 'vitest';
+import { addDays } from '@/shared/lib/kst';
+import { backend } from '@/test/backend';
+import { installHome, myTeam } from '@/test/fixtures/home';
+import { installProfiles, profiles, profileWeek, type ProfileFx } from '@/test/fixtures/profile';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
+
+// bridge + 가짜 백엔드 (profile · profile-history · profile-warning.graphqls)
+let all: Record<string, ProfileFx>;
+beforeEach(() => {
+  installHome();
+  all = installProfiles(profiles());
+});
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
 
 // PR-01 프로필 (화면설계서 5-1-9 · 목업 W-14). 회원 id: 한동관 1 · 김철수 2 · 박지훈 6
 
@@ -59,35 +68,21 @@ describe('PR-01 프로필', () => {
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 
-  it('ACC-PR01-04 · ⑪: [더 보기]로 8주씩 이어 붙이고 끝이면 "여기까지예요."', async () => {
-    // 김철수(판정 5주)에게 지난 판정 6주를 더 넣어 11주로 만든다
-    for (let i = 1; i <= 6; i += 1) {
-      const weekStart = addDays('2026-08-24', -7 * i);
-      db.judgments.push({
-        id: nextId('judgments'),
-        memberId: '2',
-        weekStart,
-        status: 'PASS',
-        skipReason: null,
-        holdReason: null,
-        verifiedDays: 3,
-        recordCount: 1,
-        days: Array.from({ length: 7 }, () => ({ hasGrass: false, hasRecord: false })),
-        corrected: false,
-        executedAt: kstIso(addDays(weekStart, 7), 7),
-        judgedAt: kstIso(addDays(weekStart, 7), 7),
-      });
-    }
+  it('ACC-PR01-04 · ⑪: [더 보기]로 이어 붙이고 끝이면 "여기까지예요." (서버는 20주씩)', async () => {
+    // 김철수에게 지난 판정 25주 — 첫 페이지 20주 + 진행 중 1, 더 보기로 나머지 5주
+    const chulsoo = all['2']!;
+    chulsoo.history = [profileWeek('2026-09-28', 'IN_PROGRESS', 3, 1), ...Array.from({ length: 25 }, (_, i) => profileWeek(addDays('2026-09-21', -7 * i), 'PASS', 3, 1))];
     const { user } = renderRoute('/profile/2');
     const table = await screen.findByRole('table', { name: '주간 판정 이력' });
-    expect(rowsOf(table)).toHaveLength(9); // 진행 중 1 + 8주
+    await waitFor(() => expect(rowsOf(table)).toHaveLength(21)); // 진행 중 1 + 20주
     await user.click(screen.getByRole('button', { name: '더 보기' }));
-    await waitFor(() => expect(rowsOf(screen.getByRole('table', { name: '주간 판정 이력' }))).toHaveLength(12));
+    await waitFor(() => expect(rowsOf(screen.getByRole('table', { name: '주간 판정 이력' }))).toHaveLength(26));
     expect(screen.getByText('여기까지예요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 
   it('ACC-PR01-01: 타인 — [프로필 수정] · [관리자 메뉴] 없음, 비공개 팀 카테고리는 "비공개 팀", 소속 팀에서 빠진다', async () => {
+    backend.on('myTeams', [myTeam('1', false)]);
     renderRoute('/profile/6', { as: 'plain' });
     expect(await screen.findByRole('heading', { level: 1, name: '박지훈' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '프로필 수정' })).not.toBeInTheDocument();
@@ -103,6 +98,7 @@ describe('PR-01 프로필', () => {
   });
 
   it('타인 프로필의 공개 팀은 내가 그 팀 소속일 때만 현황판 링크', async () => {
+    backend.on('myTeams', []); // 박지훈은 A팀 소속이 아니다
     renderRoute('/profile/2', { as: 'penalty' });
     const teams = await screen.findByRole('region', { name: '소속 팀' });
     expect(within(teams).getByText('사이드 프로젝트 A팀')).toBeInTheDocument();
@@ -117,42 +113,33 @@ describe('PR-01 프로필', () => {
   });
 
   it('E-53: 형식이 틀린 userId는 조회 없이 404 · 없는 회원도 404', async () => {
-    const operations: string[] = [];
-    const onStart = ({ request }: { request: Request }) => {
-      void request
-        .clone()
-        .json()
-        .then((b: { operationName?: string }) => operations.push(b.operationName ?? ''))
-        .catch(() => undefined);
-    };
-    server.events.on('request:start', onStart);
-    try {
-      const bad = renderRoute('/profile/abc');
-      expect(await screen.findByRole('heading', { name: '찾는 내용이 없어요. 삭제됐을 수 있어요.' })).toBeInTheDocument();
-      await new Promise((r) => setTimeout(r, 30));
-      expect(operations).toContain('SessionQuery');
-      expect(operations).not.toContain('ProfileQuery');
-      expect(operations).not.toContain('ProfileHistoryQuery');
-      bad.unmount();
-    } finally {
-      server.events.removeListener('request:start', onStart);
-    }
+    const bad = renderRoute('/profile/abc');
+    expect(await screen.findByRole('heading', { name: '찾는 내용이 없어요. 삭제됐을 수 있어요.' })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(backend.calls('me').length).toBeGreaterThan(0);
+    expect(backend.calls('profile')).toHaveLength(0);
+    bad.unmount();
     renderRoute('/profile/999');
     expect(await screen.findByRole('heading', { name: '찾는 내용이 없어요. 삭제됐을 수 있어요.' })).toBeInTheDocument();
   });
 
-  it('E-32: 잔디를 못 불러오면 ⑦ 빈 상태 + [다시 시도] · E-08은 배너', async () => {
-    setMockControl({ grass: 'failed' });
-    const first = renderRoute('/profile/me');
+  it('E-32: 잔디 캐시가 없으면(grass: null) ⑦ 빈 상태 + 본인에게 [다시 시도]', async () => {
+    // 서버는 잔디 상태를 null 하나로만 알린다 — 아이디 변경(E-08) · 마지막 갱신 시각은 bridge가 구분하지 못한다
+    all['1']!.grass = null;
+    renderRoute('/profile/me');
     const grass = await screen.findByRole('region', { name: 'GitHub 잔디' });
     expect(within(grass).getByText('GitHub 잔디를 불러오지 못했어요.')).toBeInTheDocument();
     expect(within(grass).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
-    expect(within(grass).getByText('어제 오전 6시 기준')).toBeInTheDocument();
-    first.unmount();
+  });
 
-    setMockControl({ grass: 'identity' });
+  it('⑧ 판정 보류 중(서버 onHold): 경고 0 · 팀별 경고 대신 "확인 중" + 안내', async () => {
+    all['1']!.warning = { onHold: true, warningCount: null, penaltyTarget: null };
+    all['1']!.teamWarnings = { onHold: true, teams: [] };
     renderRoute('/profile/me');
-    const grass2 = await screen.findByRole('region', { name: 'GitHub 잔디' });
-    expect(within(grass2).getByText('GitHub 아이디가 바뀌었어요. 다시 로그인하면 잔디가 연결돼요.')).toBeInTheDocument();
+    const warning = await screen.findByRole('region', { name: '경고' });
+    expect(within(warning).getByText('확인 중')).toBeInTheDocument();
+    expect(within(warning).getByText('판정을 확인하는 중이에요. 확인이 끝나면 경고 수를 보여 드려요.')).toBeInTheDocument();
+    expect(within(warning).queryByText(/0\s*\/\s*3/)).not.toBeInTheDocument();
+    expect(within(warning).queryByText('받은 경고가 없어요. 잘하고 있어요.')).not.toBeInTheDocument();
   });
 });

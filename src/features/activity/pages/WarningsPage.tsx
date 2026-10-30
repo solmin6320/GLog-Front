@@ -90,7 +90,13 @@ function WarningsBody({ data }: { data: MyWarnings }) {
       <div className={s.summary}>
         {/* ① 누적 경고 */}
         <section aria-label="누적 경고">
-          {state.activeCount > 0 ? (
+          {state.isOnHold ? (
+            <>
+              <p className={s.label}>누적 경고</p>
+              <StatusBadge kind="judgment" status="HOLD" context="member" />
+              <p className={s.calm}>{WARNINGS_COPY.onHold}</p>
+            </>
+          ) : state.activeCount > 0 ? (
             <>
               <BigStat label="누적 경고" value={state.activeCount} unit="/ 3회" />
               <div className={s.gauge}>
@@ -114,7 +120,11 @@ function WarningsBody({ data }: { data: MyWarnings }) {
 
         {/* ② 연속 통과 */}
         <section aria-label="연속 통과">
-          <BigStat label="연속 통과" value={state.consecutivePasses} unit="/ 2주" />
+          {state.isOnHold ? (
+            <p className={s.label}>연속 통과</p>
+          ) : (
+            <BigStat label="연속 통과" value={state.consecutivePasses} unit="/ 2주" />
+          )}
           {state.isPenaltyTarget ? <p className={s.penaltyText}>{WARNINGS_COPY.penalty}</p> : null}
           {guide ? <p className={s.guide}>{guide}</p> : null}
         </section>

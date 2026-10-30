@@ -5,6 +5,7 @@ import { MSG, messageFor } from '@/domain/messages';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useSession, useViewer } from '@/session';
 import { uploadProfileImage, useAction } from '@/shared/api';
+import { isBridgeMode } from '@/shared/config/env';
 import { paths } from '@/shared/lib/paths';
 import { PROFILE_IMAGE, validateProfileImage } from '@/shared/lib/validators';
 import { Avatar, Button, Card, Hint, PageContainer, PageTitle, useConfirm } from '@/shared/ui';
@@ -161,7 +162,8 @@ export default function ProfileEditPage() {
             aria-label={C.pick}
             onChange={onPick}
           />
-          <div className={s.photoActions}>
+          {/* 서버에 사진 업로드가 아직 없다(S3 보류) — 실서버 연결 중에는 버튼 대신 안내만 */}
+          <div className={s.photoActions} hidden={isBridgeMode}>
             <Button
               variant="outline"
               size="sm"
@@ -184,7 +186,7 @@ export default function ProfileEditPage() {
               </Hint>
             </div>
           ) : (
-            <Hint id="profile-photo-hint">{C.pickHint}</Hint>
+            <Hint id="profile-photo-hint">{isBridgeMode ? '프로필 사진 바꾸기는 준비 중이에요. 지금은 GitHub 프로필 사진이 쓰여요.' : C.pickHint}</Hint>
           )}
         </div>
       </Card>

@@ -107,3 +107,20 @@
     margin-left: 0;
   }
 }
+
+/* 권한 칸: 관리자만 채워서 한눈에 구분한다 */
+.adminTag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--green);
+  color: var(--surface);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.memberTag {
+  font-size: 13px;
+  color: var(--ink-3);
+}

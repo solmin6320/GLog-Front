@@ -1,41 +1,30 @@
 /**
  * AD-01 ②-0 대시보드 · 판정 정정 · 보류 재시도 (화면설계서 5-1-10, 목업 W-15, A5 3-7 ACC-FIX · ACC-ADM-01).
- * 실제 라우터 · Apollo · 목 서버(msw/node)로 띄운다. member(한동관)는 관리자, plain(김철수)은 아니다.
+ * 실제 라우터 · Apollo · bridge 전송 + 가짜 백엔드(admin.graphqls)로 띄운다. member(한동관)는 관리자, plain(김철수)은 아니다.
  */
 import { screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { MSG } from '@/domain/messages';
-import { db, touch } from '@/mocks/db/store';
-import { server } from '@/mocks/node';
-import { renderRoute } from '@/test/render';
+import { backend } from '@/test/backend';
+import { HYUNWOO, installJudgments, judgmentIdOf, judgmentWorld, SEOYUN, type JudgmentWorld } from '@/test/fixtures/admin';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
 
 /* ---------- 도우미 ---------- */
 
-type Op = { name: string; mutation: boolean };
+let jw: JudgmentWorld;
+beforeEach(() => {
+  jw = installJudgments(judgmentWorld());
+});
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
 
-/** 이 테스트에서 나간 GraphQL 연산 기록 (미리보기는 쿼리만 · 뮤테이션 0건 확인용) */
-function trackOps() {
-  const ops: Op[] = [];
-  const listener = ({ request }: { request: Request }) => {
-    if (!request.url.includes('/graphql')) return;
-    request
-      .clone()
-      .json()
-      .then(
-        (b: { operationName?: string; query?: string }) => ops.push({ name: b.operationName ?? '', mutation: /^\s*mutation\b/.test(b.query ?? '') }),
-        () => undefined,
-      );
-  };
-  server.events.on('request:start', listener);
-  return { ops, mutations: () => ops.filter((o) => o.mutation).map((o) => o.name) };
-}
-
-afterEach(() => server.events.removeAllListeners());
-
-const judgmentOf = (memberId: string, weekStart = '2026-09-21') => {
-  const j = db.judgments.find((x) => x.memberId === memberId && x.weekStart === weekStart);
-  if (!j) throw new Error(`seed: ${memberId} ${weekStart}`);
-  return j;
+/** 백엔드로 나간 뮤테이션 (미리보기는 쿼리만 · 뮤테이션 0건 확인용) */
+const MUTATIONS = ['correctJudgment', 'retryJudgmentHold', 'retryAllJudgmentHolds'];
+const mutations = () => backend.calls().filter((c) => MUTATIONS.includes(c.field)).map((c) => c.field);
+const previews = () => backend.calls('previewJudgmentCorrection').length;
+const rowFx = (memberId: string, weekStart = '2026-09-21') => {
+  const r = jw.weeks.find((w) => w.weekStart === weekStart)?.rows.find((x) => x.member.id === memberId);
+  if (!r) throw new Error(`fixture: ${memberId} ${weekStart}`);
+  return r;
 };
 
 /** 표에서 그 회원의 행 */
@@ -74,7 +63,7 @@ describe('AD-01 대시보드 진입', () => {
     expect(kpi('fail')).toHaveTextContent(/지난 주 미달\s*4/);
     expect(kpi('penalty')).toHaveTextContent(/벌칙 대상\s*2/);
     expect(kpi('exemption')).toHaveTextContent(/면제 요청 대기\s*2/);
-    expect(kpi('pending')).toHaveAttribute('href', '/admin/members');
+    expect(kpi('pending')).toHaveAttribute('href', '/admin/members?status=pending');
     expect(kpi('penalty')).toHaveAttribute('href', '/admin/warnings');
     expect(kpi('exemption')).toHaveAttribute('href', '/admin/exemptions');
     expect(kpi('fail')).toHaveAttribute('href', '/admin?result=fail');
@@ -144,10 +133,9 @@ describe('AD-01 대시보드 진입', () => {
 
 describe('AD-01 ⑩ 판정 정정', () => {
   it('ACC-FIX-03 · 04 · 06 · 08 · 09: 박지훈 미달 → 통과 — 미리보기는 쿼리만, 확인 후 정정하고 요약 · 배지가 다시 계산된다', async () => {
-    const t = trackOps();
     const { user, router } = renderRoute('/admin');
     const p = await openPanelFor(user, '박지훈');
-    expect(router.state.location.search).toBe(`?fix=${judgmentOf('6').id}`);
+    expect(router.state.location.search).toBe(`?fix=${judgmentIdOf('6')}`);
 
     // 대상 · 주차 · 인증일 · 기록글 + 행은 '정정 중'(텍스트)
     expect(within(p).getByText('박지훈')).toBeInTheDocument();
@@ -177,20 +165,20 @@ describe('AD-01 ⑩ 판정 정정', () => {
     expect(submit).toBeDisabled();
     await user.type(within(p).getByRole('textbox', { name: /사유/ }), 'GitHub 비공개 기여 설정이 꺼져 있었던 것을 확인했어요');
     expect(submit).toBeEnabled();
-    expect(t.ops.map((o) => o.name)).toContain('AdminDashboardCorrectionPreviewQuery');
-    expect(t.mutations()).toEqual([]);
+    expect(previews()).toBeGreaterThan(0);
+    expect(mutations()).toEqual([]);
 
     await user.click(submit);
     const dialog = await screen.findByRole('dialog', { name: '판정을 정정할까요?' });
     expect(within(dialog).getByText('경고가 3개에서 2개로 바뀌어요.')).toBeInTheDocument();
     expect(within(dialog).getByText('이 회원은 벌칙 대상에서 빠져요.')).toBeInTheDocument();
-    expect(t.mutations()).toEqual([]);
+    expect(mutations()).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: '정정하기' }));
 
     expect(await screen.findByText('정정했어요.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('complementary', { name: '판정 정정' })).not.toBeInTheDocument());
     expect(router.state.location.search).toBe('');
-    expect(t.mutations()).toEqual(['AdminDashboardCorrectJudgment']);
+    expect(mutations()).toEqual(['correctJudgment']);
     // 판정 목록 · 요약 카드 · 메뉴 배지가 다시 계산된 값
     await waitFor(() => expect(kpi('penalty')).toHaveTextContent(/벌칙 대상\s*1/));
     expect(kpi('fail')).toHaveTextContent(/지난 주 미달\s*3/);
@@ -198,11 +186,11 @@ describe('AD-01 ⑩ 판정 정정', () => {
     const row = rowOf('박지훈');
     expect(row).toHaveTextContent(/통과\s*정정됨\s*2/);
     expect(within(row).queryByText('벌칙 대상')).not.toBeInTheDocument();
-    expect(db.judgmentCorrections.at(-1)).toMatchObject({ beforeStatus: 'FAIL', afterStatus: 'PASS' });
+    // 미리보기 때 본 현재 결과(FAIL)를 expectedStatus로 보낸다 (expectedBasis → expectedStatus)
+    expect(backend.calls('correctJudgment')[0]?.args.input).toMatchObject({ judgmentId: judgmentIdOf('6'), status: 'PASS', expectedStatus: 'FAIL' });
   });
 
   it('ACC-FIX-10: [취소]하면 패널이 닫히고 뮤테이션은 0건이다', async () => {
-    const t = trackOps();
     const { user, router } = renderRoute('/admin');
     const p = await openPanelFor(user, '박지훈');
     await user.click(within(p).getByRole('radio', { name: '면제로 정정' }));
@@ -210,26 +198,24 @@ describe('AD-01 ⑩ 판정 정정', () => {
     await user.click(within(p).getByRole('button', { name: '취소' }));
     await waitFor(() => expect(screen.queryByRole('complementary', { name: '판정 정정' })).not.toBeInTheDocument());
     expect(router.state.location.search).toBe('');
-    expect(t.mutations()).toEqual([]);
+    expect(mutations()).toEqual([]);
     expect(screen.getByRole('button', { name: '박지훈 판정 정정' })).toHaveFocus();
   });
 
   it('ACC-FIX-11: 미리보기 뒤 다른 변경이 먼저 반영되면 반영하지 않고 미리보기를 다시 받아 알린다', async () => {
-    const t = trackOps();
     const { user } = renderRoute('/admin');
     const p = await openPanelFor(user, '박지훈');
     await user.click(within(p).getByRole('radio', { name: '통과로 정정' }));
     await within(p).findByText('3회 → 2회');
     await user.type(within(p).getByRole('textbox', { name: /사유/ }), '사유');
-    const previews = () => t.ops.filter((o) => o.name === 'AdminDashboardCorrectionPreviewQuery').length;
     const before = previews();
 
-    touch(); // 다른 관리자가 먼저 무언가를 바꿨다 → basis가 달라진다
+    jw.changeBehindBack = true; // 다른 관리자가 먼저 바꿨다 → 서버가 JUDGMENT_CHANGED
     await user.click(within(p).getByRole('button', { name: '정정하고 재계산' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '정정하기' }));
 
     expect(await within(p).findByText(MSG.previewStale)).toBeInTheDocument();
-    expect(db.judgments.find((j) => j.id === judgmentOf('6').id)?.status).toBe('FAIL');
+    expect(rowFx('6').status).toBe('FAIL');
     await waitFor(() => expect(previews()).toBe(before + 1));
     expect(screen.queryByText('정정했어요.')).not.toBeInTheDocument();
 
@@ -239,11 +225,11 @@ describe('AD-01 ⑩ 판정 정정', () => {
     await user.click(submit);
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '정정하기' }));
     expect(await screen.findByText('정정했어요.')).toBeInTheDocument();
-    expect(t.mutations()).toEqual(['AdminDashboardCorrectJudgment', 'AdminDashboardCorrectJudgment']);
+    expect(mutations()).toEqual(['correctJudgment', 'correctJudgment']);
   });
 
   it('ACC-FIX-16: 첫 참가 행은 통과 · 미달 · 면제 3종으로만 정정한다 (다음 페이지 행도 ?fix=로 바로 연다)', async () => {
-    renderRoute(`/admin?fix=${judgmentOf('5').id}`);
+    renderRoute(`/admin?fix=${judgmentIdOf('5')}`);
     const p = await screen.findByRole('complementary', { name: '판정 정정' });
     expect(await within(p).findByText('서연')).toBeInTheDocument();
     expect(within(p).getByRole('radio', { name: '첫 참가' })).toBeChecked();
@@ -253,8 +239,8 @@ describe('AD-01 ⑩ 판정 정정', () => {
   });
 
   it('ACC-FIX-07: 이행 체크 이전 주차를 정정하면 미리보기가 고정점을 알린다 (E-58)', async () => {
-    db.penaltyFulfillments.push({ id: '1', memberId: '6', effectiveWeekStart: '2026-09-28', fulfilledAt: '2026-09-30T10:00:00+09:00', fulfilledById: '1' });
-    touch();
+    // 벌칙 이행(9/30) 이전 주라 서버는 기록만 바꾸고 경고 수는 비교하지 않는다(recordOnly)
+    jw.impacts[`${judgmentIdOf('6')}:PASS`] = { onHold: false, warningCountBefore: 0, warningCountAfter: 0, entersPenalty: false, leavesPenalty: false, recordOnly: true, affectedWeeks: 0 };
     const { user } = renderRoute('/admin');
     const p = await openPanelFor(user, '박지훈');
     await user.click(within(p).getByRole('radio', { name: '통과로 정정' }));
@@ -268,8 +254,7 @@ describe('AD-01 ⑩ 판정 정정', () => {
 describe('AD-01 ⑦⑧⑨ 보류', () => {
   /** 시드 보류(노현우 API_ERROR)에 백서윤을 아이디 변경 보류로 더한다 */
   function addIdentityHold() {
-    Object.assign(judgmentOf('30'), { status: 'HOLD', holdReason: 'IDENTITY_MISMATCH', verifiedDays: null, recordCount: null, judgedAt: null });
-    touch();
+    Object.assign(rowFx(SEOYUN.id), { status: 'HOLD', holdReason: 'IDENTITY_MISMATCH', verifiedDays: null, recordCount: null, warningCount: null });
   }
 
   it('ACC-FIX-12: 보류 2명 — 집계 옆 배지, 안내 문구, 행은 [재시도] 또는 재로그인 필요', async () => {
@@ -292,20 +277,19 @@ describe('AD-01 ⑦⑧⑨ 보류', () => {
 
   it('ACC-FIX-14: [전체 재시도] → 확인 → 보류 건만 다시 돌고 "{n}명 처리했어요."', async () => {
     addIdentityHold();
-    const t = trackOps();
     const { user } = renderRoute('/admin');
     await user.click(await screen.findByRole('button', { name: '전체 재시도' }));
     const dialog = await screen.findByRole('dialog', { name: '보류 1명을 다시 판정할까요?' });
-    expect(t.mutations()).toEqual([]);
+    expect(mutations()).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: '전체 재시도' }));
     expect(await screen.findByText('1명 처리했어요.')).toBeInTheDocument();
-    expect(t.mutations()).toEqual(['AdminDashboardRerunHeld']);
+    expect(mutations()).toEqual(['retryAllJudgmentHolds']);
     // 남은 보류는 아이디 변경 1명뿐 → 문구가 바뀌고 [전체 재시도]가 없다
     await waitFor(() => expect(screen.getByText('보류 1명').closest('p')).toHaveTextContent('보류 1명 · 본인이 다시 로그인해야 풀려요.'));
     expect(screen.queryByRole('button', { name: '전체 재시도' })).not.toBeInTheDocument();
     expect(within(rowOf('노현우')).queryByText('보류')).not.toBeInTheDocument();
-    expect(judgmentOf('29').status).not.toBe('HOLD');
-    expect(judgmentOf('30').status).toBe('HOLD');
+    expect(rowFx(HYUNWOO.id).status).not.toBe('HOLD');
+    expect(rowFx(SEOYUN.id).status).toBe('HOLD');
   });
 
   it('ACC-FIX-12: 행 [재시도]는 확인 없이 그 사람만 다시 판정한다', async () => {
@@ -318,8 +302,7 @@ describe('AD-01 ⑦⑧⑨ 보류', () => {
   });
 
   it('ACC-FIX-13: 보류 0명이면 배지 · 안내 · [전체 재시도]가 없고 빈 상태 문구도 없다', async () => {
-    Object.assign(judgmentOf('29'), { status: 'PASS', holdReason: null, verifiedDays: 3, recordCount: 1, judgedAt: '2026-09-28T07:00:00+09:00' });
-    touch();
+    Object.assign(rowFx(HYUNWOO.id), { status: 'PASS', holdReason: null, verifiedDays: 3, recordCount: 1, warningCount: 0 });
     renderRoute('/admin');
     const executed = await screen.findByText('9/28 07:00 실행');
     await waitFor(() => expect(kpi('pending')).toHaveTextContent('3'));

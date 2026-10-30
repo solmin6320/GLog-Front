@@ -1,5 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { renderRoute } from '@/test/render';
+import { beforeEach } from 'vitest';
+import { backend } from '@/test/backend';
+import { currentWeek, judgmentHistory, weeklyActivity } from '@/test/fixtures/activity';
+import { installHome } from '@/test/fixtures/home';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
+
+// bridge + 가짜 백엔드 (judgment.graphqls myWeeklyActivity · myJudgmentHistory)
+beforeEach(() => installHome());
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
 
 // AC-01 내 주간 활동 (화면설계서 5-1-21 · 목업 W-06). 기준 시각: 2026-10-01(목) 10:00 KST · 이번 주 9/28 ~ 10/4
 
@@ -106,6 +114,10 @@ describe('AC-01 내 주간 활동', () => {
   });
 
   it('팀 미소속: ④ 대신 "팀에 참가해야 판정이 시작돼요" · ②는 그대로', async () => {
+    backend
+      .on('myTeams', [])
+      .on('myWeeklyActivity', weeklyActivity(currentWeek({ inTeam: false, passExpected: null })))
+      .on('myJudgmentHistory', judgmentHistory([{ weekStart: '2026-09-21', weekEnd: '2026-09-27', status: 'EXCLUDED', skipReason: 'FIRST_WEEK', holdReason: null, verifiedDays: null, recordCount: null, corrected: false }]));
     renderRoute('/weekly', { as: 'noteam' });
     const card = await screen.findByRole('region', { name: '이번 주 판정' });
     expect(within(card).getByText('팀에 참가해야 판정이 시작돼요')).toBeInTheDocument();

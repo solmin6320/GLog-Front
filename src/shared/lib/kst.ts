@@ -70,8 +70,18 @@ const kstParts = new Intl.DateTimeFormat('en-CA', {
 
 export type KstParts = { date: DateString; year: number; month: number; day: number; hour: number; minute: number };
 
+/**
+ * 서버 시각 문자열 → epoch ms. 백엔드는 KST 시각을 오프셋 없이 보낸다(`2026-09-29T14:20:00`).
+ * 오프셋이 없으면 KST로 읽는다 — 브라우저 시간대와 무관하다. 오프셋 · Z가 있으면 그대로.
+ */
+export function parseServerDateTime(iso: DateTimeString): number {
+  const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(iso);
+  return Date.parse(hasZone || !iso.includes('T') ? iso : `${iso}+09:00`);
+}
+
 export function kstPartsOf(iso: DateTimeString | number): KstParts {
-  const parts = Object.fromEntries(kstParts.formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+  const ms = typeof iso === 'number' ? iso : parseServerDateTime(iso);
+  const parts = Object.fromEntries(kstParts.formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
   const year = Number(parts.year);
   const month = Number(parts.month);
   const day = Number(parts.day);

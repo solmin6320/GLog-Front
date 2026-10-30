@@ -10,19 +10,19 @@ import type { ApolloCache, Reference } from '@apollo/client';
 type StoredRow = { member: Reference; status: string } & Record<string, unknown>;
 type StoredConnection = { nodes?: StoredRow[]; totalCount?: number } & Record<string, unknown>;
 
-/** 'adminMembers:{"filter":"REJECTED","first":20}' → 'REJECTED'. filter가 없으면 서버 기본값 PENDING */
+/** 'adminMembers:{"filter":"REJECTED","first":20}' → 'REJECTED'. filter가 없으면 서버 기본값 ACTIVE */
 export function filterOfStoreFieldName(storeFieldName: string): string {
   const i = storeFieldName.indexOf(':');
-  if (i < 0) return 'PENDING';
+  if (i < 0) return 'ACTIVE';
   try {
     const args = JSON.parse(storeFieldName.slice(i + 1)) as { filter?: unknown };
-    return typeof args.filter === 'string' ? args.filter : 'PENDING';
+    return typeof args.filter === 'string' ? args.filter : 'ACTIVE';
   } catch {
-    return 'PENDING';
+    return 'ACTIVE';
   }
 }
 
-/** AdminMemberFilter: ALL = 승인 대기 + 거절 (스키마 설명) */
+/** AdminMemberFilter: ACTIVE = 활성 회원, ALL = 승인 대기 + 거절 (스키마 설명) */
 export function filterIncludes(filter: string, status: string): boolean {
   return filter === 'ALL' ? status === 'PENDING' || status === 'REJECTED' : filter === status;
 }
@@ -45,6 +45,21 @@ export function applyMemberStatus(cache: ApolloCache, memberId: string, status: 
           };
         }
         return { ...conn, nodes: nodes.map((n, i) => (i === index ? { ...n, status } : n)) };
+      },
+    },
+  });
+}
+
+/** 관리자 승격 결과를 저장된 목록마다 반영한다 (상태는 그대로, 권한만 바뀐다) */
+export function applyMemberRole(cache: ApolloCache, memberId: string, role: string): void {
+  cache.modify({
+    id: 'ROOT_QUERY',
+    fields: {
+      adminMembers(existing, { readField }) {
+        const conn = existing as StoredConnection;
+        const nodes = conn.nodes ?? [];
+        if (!nodes.some((n) => readField<string>('id', n.member) === memberId)) return existing;
+        return { ...conn, nodes: nodes.map((n) => (readField<string>('id', n.member) === memberId ? { ...n, role } : n)) };
       },
     },
   });

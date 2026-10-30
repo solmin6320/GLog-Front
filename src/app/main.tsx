@@ -1,15 +1,16 @@
 import '@/shared/styles/global.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { isMockMode } from '@/shared/config/env';
+import { setTransport } from '@/shared/api/client';
+import { isBridgeMode } from '@/shared/config/env';
 import { App } from './App';
 import { createAppRouter } from './router';
 
 async function bootstrap() {
-  // 목 모드: 첫 요청(세션 me)보다 MSW 워커가 먼저 떠 있어야 한다
-  if (isMockMode) {
-    const { startMockWorker } = await import('@/mocks/browser');
-    await startMockWorker();
+  // bridge 모드: 연결된 연산은 백엔드로, 나머지는 NOT_AVAILABLE (서비스 워커 없음)
+  if (isBridgeMode) {
+    const { bridgeFetch } = await import('@/mocks/bridge/transport');
+    setTransport(bridgeFetch);
   }
 
   const container = document.getElementById('root');

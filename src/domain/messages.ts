@@ -71,6 +71,7 @@ const BY_CODE: Record<string, string> = {
   UNAUTHENTICATED: MSG.expired, // E-03
   ACCOUNT_PENDING: '가입 승인을 기다리는 중이에요.', // E-01 (AU-03으로 이동)
   ACCOUNT_REJECTED: '가입이 승인되지 않았어요. 동아리 운영진에게 문의해 주세요.', // E-02
+  ACCOUNT_SUSPENDED: '이용이 정지된 계정이에요. 동아리 운영진에게 문의해 주세요.',
   FORBIDDEN: MSG.forbidden, // E-09
   NOT_FOUND: MSG.notFound, // E-53
   POST_DELETED: MSG.deletedPost, // E-31
@@ -89,6 +90,7 @@ const BY_CODE: Record<string, string> = {
   PREVIEW_STALE: MSG.previewStale,
   RECALC_BUSY: MSG.server, // E-52
   INTERNAL: MSG.server, // E-52
+  NOT_AVAILABLE: '아직 서버에 연결되지 않은 기능이에요. 저장되지 않았어요.', // bridge 모드 미연결 기능
   NETWORK: MSG.network, // E-51
 };
 

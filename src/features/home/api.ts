@@ -34,6 +34,7 @@ export const HomeQuery = graphql(`
     }
     myWarnings {
       state {
+        isOnHold
         activeCount
         isPenaltyTarget
         weeksUntilDeduction

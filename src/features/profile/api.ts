@@ -16,6 +16,7 @@ export const ProfileQuery = graphql(`
       grassCalendar {
         status
         updatedAt
+        totalContributions
         days {
           date
           count
@@ -24,6 +25,7 @@ export const ProfileQuery = graphql(`
         privateContributionSuspected
       }
       warningState {
+        isOnHold
         activeCount
         isPenaltyTarget
         byCategory {

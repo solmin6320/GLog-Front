@@ -71,6 +71,7 @@ export const WarningsQuery = graphql(`
   query WarningsQuery {
     myWarnings {
       state {
+        isOnHold
         activeCount
         isPenaltyTarget
         consecutivePasses

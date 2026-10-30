@@ -6,7 +6,7 @@ import styles from './DataTable.module.css';
 export type Column<T> = { key: string; header: ReactNode; render: (row: T) => ReactNode; align?: 'left' | 'right'; width?: string };
 
 /**
- * 흰 표(.tb). 좁은 화면에서는 가로 스크롤(넘칠 때만 키보드 포커스 가능).
+ * 흰 표(.tb). 767px 이하에서는 행마다 카드로 쌓는다 — 첫 칸은 제목 줄, 나머지는 "머리글 · 값" 줄(가로 스크롤 없음).
  * rowTone: 'me' → 초록 행(나), 'focus' → 파란 행(정정 중 등). caption은 스크린리더용.
  * footer는 표 상자 아래에 그대로 그린다(Foot · 페이지 이동 등).
  */
@@ -61,7 +61,11 @@ export function DataTable<T>({
                 return (
                   <tr key={rowKey(row)} className={cx(tone && styles[tone])} data-tone={tone}>
                     {columns.map((c) => (
-                      <td key={c.key} className={cx(c.align === 'right' && styles.r)}>
+                      <td
+                        key={c.key}
+                        className={cx(c.align === 'right' && styles.r)}
+                        data-label={typeof c.header === 'string' ? c.header : undefined}
+                      >
                         {c.render(row)}
                       </td>
                     ))}

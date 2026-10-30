@@ -39,7 +39,7 @@ export default function AuthCallbackPage() {
       (next) => {
         if (cancelled) return;
         if (next === 'ACTIVE') navigate(paths.home(), { replace: true });
-        else if (next === 'PENDING' || next === 'REJECTED') navigate(paths.pending(), { replace: true });
+        else if (next === 'PENDING' || next === 'REJECTED' || next === 'SUSPENDED') navigate(paths.pending(), { replace: true });
         else setExchangeError(FAILED);
       },
       (err: unknown) => {

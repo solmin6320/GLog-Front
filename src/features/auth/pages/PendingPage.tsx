@@ -19,9 +19,10 @@ export default function PendingPage() {
   const [checking, setChecking] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const rejected = session.status === 'REJECTED';
+  const suspended = session.status === 'SUSPENDED';
   const githubLogin = session.viewer?.githubLogin;
 
-  useDocumentTitle(rejected ? '가입 거절' : '승인 대기');
+  useDocumentTitle(suspended ? '이용 정지' : rejected ? '가입 거절' : '승인 대기');
 
   const check = async () => {
     setChecking(true);
@@ -47,6 +48,24 @@ export default function PendingPage() {
   };
 
   const account = githubLogin ? <p className={s.account}>@{githubLogin} 으로 신청했어요</p> : null;
+
+  if (suspended) {
+    return (
+      <div className={s.center}>
+        <span className={`${s.illust} ${s.illustBad}`} aria-hidden="true">
+          <Icon name="lock" size={30} />
+        </span>
+        <h1 className={s.title}>이용이 정지된 계정이에요</h1>
+        <p className={s.sub}>동아리 운영진에게 문의해 주세요.</p>
+        {githubLogin ? <p className={s.account}>@{githubLogin}</p> : null}
+        <div className={s.actions}>
+          <Button variant="outline" size="lg" onClick={signOut} disabled={leaving}>
+            로그아웃
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (rejected) {
     return (

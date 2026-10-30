@@ -265,9 +265,9 @@ describe('SessionProvider', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('loginUrl: 목 모드는 바로 콜백으로', () => {
+  it('loginUrl: bridge 모드는 백엔드 GitHub OAuth 시작 주소로 (페르소나는 무시)', () => {
     const { session } = setup();
-    expect(session().loginUrl()).toBe('/auth/callback?code=mock-member');
-    expect(session().loginUrl('plain')).toBe('/auth/callback?code=mock-plain');
+    expect(session().loginUrl()).toBe('http://localhost:8080/oauth2/authorization/github');
+    expect(session().loginUrl('plain')).toBe('http://localhost:8080/oauth2/authorization/github');
   });
 });

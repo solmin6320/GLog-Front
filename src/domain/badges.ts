@@ -86,6 +86,7 @@ export function toBadge(a: BadgeArgs): BadgeSpec | null {
       if (a.status === 'PENDING') return spec('warn', 'clock', '승인 대기');
       if (a.status === 'ACTIVE') return spec('ok', 'check', '승인됨');
       if (a.status === 'REJECTED') return spec('bad', 'x', '거절됨');
+      if (a.status === 'SUSPENDED') return spec('bad', 'x', '정지됨');
       return null;
     case 'exemptionRequest':
       if (a.status === 'PENDING') return spec('mute', 'clock', '대기');

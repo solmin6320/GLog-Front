@@ -45,18 +45,66 @@
   padding: 32px 16px !important;
 }
 
-/* 좁은 화면: 칸을 줄바꿈하지 않고 표 전체를 가로로 스크롤한다 */
+/* 좁은 화면: 행마다 카드 — 첫 칸은 제목 줄, 나머지는 "머리글  값" 줄. 숨은 열 없이 모든 값이 보인다 */
 @media (max-width: 767px) {
-  .table {
-    width: max-content;
-    min-width: 100%;
+  .tb {
+    overflow-x: visible;
+  }
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+  .table tr {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line-2);
+  }
+  .table tbody tr:last-child {
+    border-bottom: 0;
   }
   .table td {
-    white-space: nowrap;
+    padding: 4px 0;
+    border-bottom: 0;
+    text-align: left;
   }
-  .table th,
-  .table td {
-    padding-left: 12px;
-    padding-right: 12px;
+  .table .r {
+    text-align: left;
+  }
+  .table td:first-child {
+    padding-bottom: 8px;
+    font-weight: 600;
+  }
+  .table td[data-label]:not(:first-child) {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+  .table td[data-label]:not(:first-child)::before {
+    content: attr(data-label);
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .me {
+    background: var(--green-tint);
+  }
+  .focus {
+    background: var(--blue-row);
+  }
+  .me td,
+  .focus td {
+    background: transparent;
+  }
+  .empty {
+    padding: 24px 0 !important;
   }
 }

@@ -59,7 +59,35 @@ export function WeekProgress({ week, weeksUntilDeduction }: { week: Week; weeksU
           {deduction ? <span className={s.muted}>{deduction}</span> : null}
         </p>
       ) : null}
+      <NextAction week={week} />
     </section>
+  );
+}
+
+/**
+ * 이번 주 다음 할 일 버튼 — 홈에서 채워진 초록 버튼은 이것 하나다 (폰 레스토프 효과).
+ * 기록글이 모자랄 때만 나타나 진행 안내 바로 아래에 붙는다 (근접성). 모바일에서는 한 줄 전폭 52px (피츠).
+ * 통과 조건을 이미 채웠거나 면제 · 제외 주에는 그리지 않는다.
+ */
+function NextAction({ week }: { week: Week }) {
+  const live = week.live;
+  if (!live || live.status !== 'NOT_YET' || live.recordsNeeded <= 0) return null;
+  return (
+    <div className={s.next}>
+      <LinkButton to={paths.postNew({ type: 'devlog' })} size="lg" icon="pencil" className={s.nextBtn}>
+        기록글 쓰기
+      </LinkButton>
+    </div>
+  );
+}
+
+/** 판정 보류 중: 숫자 대신 '확인 중' 배지 + 안내 (M-05와 같은 표기) */
+function HoldNotice({ text }: { text: string }) {
+  return (
+    <div>
+      <StatusBadge kind="judgment" status="HOLD" context="member" />
+      <p className={s.noWarning}>{text}</p>
+    </div>
   );
 }
 
@@ -70,7 +98,9 @@ export function WarningSummary({ state }: { state: WarningState }) {
       <SectionHeader id="home-warning-title" title="내 경고" />
       <div className={s.warnRow}>
         <div className={s.warnMain}>
-          {state.activeCount > 0 ? (
+          {state.isOnHold ? (
+            <HoldNotice text={HOME_COPY.onHold} />
+          ) : state.activeCount > 0 ? (
             <>
               <BigStat label={<VisuallyHidden>누적 경고</VisuallyHidden>} value={state.activeCount} unit="/ 3" size="md" />
               <WarningGauge count={state.activeCount} />
@@ -79,9 +109,9 @@ export function WarningSummary({ state }: { state: WarningState }) {
             <p className={s.noWarning}>{HOME_COPY.noWarning}</p>
           )}
         </div>
-        <LinkButton to={paths.warnings()} variant="outline" size="sm">
+        <TextLink to={paths.warnings()} className={s.more}>
           자세히
-        </LinkButton>
+        </TextLink>
       </div>
       {state.isPenaltyTarget ? (
         <div className={s.penalty}>

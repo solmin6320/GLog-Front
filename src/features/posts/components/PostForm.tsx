@@ -5,7 +5,7 @@ import type { PostSectionKey, PostType } from '@/gql/graphql';
 import { useClock } from '@/session';
 import { useAction } from '@/shared/api';
 import { paths, postTypeFromEnum, postTypeToEnum, type PostTypeParam } from '@/shared/lib/paths';
-import { LIMITS, VALIDATION_MSG, validateCommitUrl, validateTitle } from '@/shared/lib/validators';
+import { LIMITS, VALIDATION_MSG, validateTitle } from '@/shared/lib/validators';
 import {
   Button,
   Divider,
@@ -30,12 +30,11 @@ export type PostFormValues = {
   title: string;
   sections: Partial<Record<PostSectionKey, string>>;
   tags: string[];
-  commit: string;
   teamId: string;
 };
 
-type Errors = { title: string | null; commit: string | null; tags: string | null };
-const NO_ERRORS: Errors = { title: null, commit: null, tags: null };
+type Errors = { title: string | null; tags: string | null };
+const NO_ERRORS: Errors = { title: null, tags: null };
 
 const TYPE_ITEMS: { value: PostTypeParam; label: string }[] = [
   { value: 'troubleshooting', label: POST_TYPE_LABEL.TROUBLESHOOTING },
@@ -47,7 +46,6 @@ function sameContent(a: PostFormValues, b: PostFormValues): boolean {
   const keys = REQUIRED_SECTIONS[a.type];
   return (
     a.title === b.title &&
-    a.commit === b.commit &&
     a.teamId === b.teamId &&
     a.tags.join('\n') === b.tags.join('\n') &&
     keys.every((k) => (a.sections[k] ?? '') === (b.sections[k] ?? ''))
@@ -117,7 +115,6 @@ export function PostForm({
         title: v.title.trim(),
         sections: keys.map((key) => ({ key, body: isFilled(v.sections[key]) ? (v.sections[key] ?? '').trim() : null })),
         tags: v.tags,
-        commitUrls: v.commit.trim() ? [v.commit.trim()] : [],
         teamId: v.teamId || null,
       };
       if (mode === 'new') {
@@ -138,10 +135,6 @@ export function PostForm({
           setErrors((x) => ({ ...x, title: VALIDATION_MSG.tooLong('제목', LIMITS.title) }));
           return true;
         }
-        if (e.code === 'VALIDATION_FAILED' && e.field === 'commitUrls') {
-          setErrors((x) => ({ ...x, commit: VALIDATION_MSG.commitUrl }));
-          return true;
-        }
         if (e.code === 'VALIDATION_FAILED' && e.field === 'tags') {
           setErrors((x) => ({ ...x, tags: '태그를 다시 확인해 주세요.' }));
           return true;
@@ -157,10 +150,8 @@ export function PostForm({
     e.preventDefault();
     if (save.pending) return;
     const titleError = validateTitle(values.title);
-    const commitError = validateCommitUrl(values.commit);
-    setErrors((x) => ({ ...x, title: titleError, commit: commitError }));
+    setErrors((x) => ({ ...x, title: titleError }));
     if (titleError) return focus(fieldId('title'));
-    if (commitError) return focus(fieldId('commit'));
     if (errors.tags) return focus(fieldId('tags'));
 
     const missing = required.find((k) => !isFilled(values.sections[k]));
@@ -296,23 +287,6 @@ export function PostForm({
           onChange={(tags) => set('tags', tags)}
           error={errors.tags}
           onError={(message) => setErrors((x) => ({ ...x, tags: message }))}
-        />
-
-        <TextField
-          id={fieldId('commit')}
-          label="관련 커밋"
-          optionalLabel="선택"
-          type="url"
-          inputMode="url"
-          autoComplete="off"
-          placeholder="https://github.com/소유자/저장소/commit/…"
-          value={values.commit}
-          error={errors.commit}
-          onChange={(e) => {
-            set('commit', e.target.value);
-            if (errors.commit) setErrors((x) => ({ ...x, commit: null }));
-          }}
-          onBlur={() => setErrors((x) => ({ ...x, commit: validateCommitUrl(values.commit) }))}
         />
 
         {teams.length > 1 ? (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { kstPartsOf, weekdayIndex } from '@/shared/lib/kst';
+import { kstPartsOf, parseServerDateTime, weekdayIndex } from '@/shared/lib/kst';
 
 /**
  * 서버 시각(clock.now)을 기준으로 흘러가는 지금(ms). 화면은 브라우저 시계로 날짜를 정하지 않는다 —
@@ -17,7 +17,7 @@ export function useServerNow(serverNow: string, tickMs = 30_000): number {
     const id = window.setInterval(() => setElapsed(Date.now() - startedAt), tickMs);
     return () => window.clearInterval(id);
   }, [serverNow, tickMs]);
-  return Date.parse(serverNow) + elapsed;
+  return parseServerDateTime(serverNow) + elapsed;
 }
 
 /** E-27: KST 일요일 23:30 이후 */

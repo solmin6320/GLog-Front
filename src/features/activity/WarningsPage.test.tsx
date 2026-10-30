@@ -1,6 +1,19 @@
 import { screen, within } from '@testing-library/react';
-import { db } from '@/mocks/db/store';
-import { renderRoute } from '@/test/render';
+import { beforeEach } from 'vitest';
+import { backend } from '@/test/backend';
+import { NO_WARNINGS, PENALTY_WARNINGS, warningHistory, warningItem } from '@/test/fixtures/activity';
+import { installHome } from '@/test/fixtures/home';
+import { installProfiles } from '@/test/fixtures/profile';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
+
+// bridge + 가짜 백엔드 (warning.graphqls myWarningSummary · warning-history.graphqls myWarningHistory)
+beforeEach(() => {
+  installHome();
+  installProfiles();
+});
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
+/** 박지훈: 경고 3 · 벌칙 대상 */
+const asPenalty = () => backend.on('myWarningSummary', PENALTY_WARNINGS).on('myWarningHistory', warningHistory([warningItem('2026-09-21', ['비공개 팀'], 'ACTIVE', 0, 0)]));
 
 // AC-02 내 경고 · 벌칙 (화면설계서 5-1-22 · 목업 W-07)
 
@@ -39,15 +52,15 @@ describe('AC-02 내 경고 · 벌칙', () => {
   });
 
   it('ACC-AC02-04: 카테고리가 하나도 남지 않은 경고는 "삭제된 팀"', async () => {
-    const w = db.warnings.find((x) => x.memberId === '1' && x.weekStart === '2026-09-14');
-    if (!w) throw new Error('seed warning missing');
-    w.teamIds = [];
+    // 서버가 카테고리를 표시 이름으로 준다 — 남은 팀이 없으면 '삭제된 팀'
+    backend.on('myWarningHistory', warningHistory([warningItem('2026-09-14', ['삭제된 팀'], 'ACTIVE')]));
     renderRoute('/warnings');
     const table = await screen.findByRole('table', { name: '경고 이력' });
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('삭제된 팀');
   });
 
   it('ACC-AC02-05: 누적 3 — "벌칙 대상" 배지 · ②가 E-40 · "벌칙까지" 문구 없음', async () => {
+    asPenalty();
     renderRoute('/warnings', { as: 'penalty' });
     const total = await screen.findByRole('region', { name: '누적 경고' });
     expect(total).toHaveTextContent(/3\s*\/\s*3회/);
@@ -57,6 +70,7 @@ describe('AC-02 내 경고 · 벌칙', () => {
   });
 
   it('ACC-AC02-06: 경고 0 · 이력 0 — "받은 경고가 없어요. 잘하고 있어요." · ③ 없음 · ④⑤ 그대로', async () => {
+    backend.on('myWarningSummary', NO_WARNINGS).on('myWarningHistory', warningHistory([]));
     renderRoute('/warnings', { as: 'plain' });
     const total = await screen.findByRole('region', { name: '누적 경고' });
     expect(within(total).getByText('받은 경고가 없어요. 잘하고 있어요.')).toBeInTheDocument();
@@ -66,6 +80,7 @@ describe('AC-02 내 경고 · 벌칙', () => {
   });
 
   it('ACC-AC02-02: ①의 누적 경고와 PR-01 ⑧이 같은 값이다', async () => {
+    asPenalty();
     const first = renderRoute('/warnings', { as: 'penalty' });
     expect(await screen.findByRole('region', { name: '누적 경고' })).toHaveTextContent(/3\s*\/\s*3회/);
     first.unmount();
@@ -73,5 +88,15 @@ describe('AC-02 내 경고 · 벌칙', () => {
     const warning = await screen.findByRole('region', { name: '경고' });
     expect(warning).toHaveTextContent(/3\s*\/\s*3/);
     expect(within(warning).getByText('벌칙 대상')).toBeInTheDocument();
+  });
+
+  it('판정 보류 중(서버 onHold): 숫자 대신 "확인 중" + 안내 · 경고 0 문구 없음', async () => {
+    backend.on('myWarningSummary', { onHold: true, holdWeeks: ['2026-09-21'], warningCount: null, streak: null, penaltyTarget: null, penaltyReachedWeek: null }).on('myWarningHistory', { onHold: true, items: [], nextCursor: null });
+    renderRoute('/warnings');
+    const total = await screen.findByRole('region', { name: '누적 경고' });
+    expect(within(total).getByText('확인 중')).toBeInTheDocument();
+    expect(within(total).getByText('판정을 확인하는 중이에요. 확인이 끝나면 경고 수를 보여 드려요.')).toBeInTheDocument();
+    expect(within(total).queryByText('받은 경고가 없어요. 잘하고 있어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '연속 통과' })).not.toHaveTextContent('0/ 2주');
   });
 });

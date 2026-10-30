@@ -43,6 +43,8 @@ function InvitationBanner({ count }: { count: number }) {
 /** ④~⑧ 팀 카드 한 장. 카드 전체가 TM-05 링크 */
 function TeamCard({ team }: { team: TeamItem }) {
   const { passCount, notYetCount } = team.currentWeekSummary;
+  // 첫 참가 주 · 면제 주라 판정하지 않는 팀원 (통과 · 아직에 세지 않는다)
+  const excluded = Math.max(0, team.memberCount - passCount - notYetCount);
   return (
     <li>
       <Link to={paths.team(team.id)} className={s.teamCard}>
@@ -61,6 +63,11 @@ function TeamCard({ team }: { team: TeamItem }) {
             <span>
               아직 <b>{notYetCount}명</b>
             </span>
+            {excluded > 0 ? (
+              <span>
+                제외 <b>{excluded}명</b>
+              </span>
+            ) : null}
           </p>
         </div>
         <span className={s.chev} aria-hidden="true">

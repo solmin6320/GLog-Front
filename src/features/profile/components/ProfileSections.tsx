@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ProfileHistoryQueryQuery, ProfileQueryQuery } from '@/gql/graphql';
-import { useClock } from '@/session';
+import { useClock, useSession } from '@/session';
 import type { PagedList } from '@/shared/api';
-import { asOfLabel, formatWeekRange } from '@/shared/lib/format';
+import { asOfLabel, formatStamp, formatWeekRange } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import {
   Avatar,
@@ -59,6 +59,7 @@ function SectionError({ message, onRetry }: { message: string; onRetry: () => vo
 
 /** ①~⑤ 사진 · 닉네임 · GitHub · [프로필 수정](본인) · [관리자 메뉴](본인 + 관리자) */
 export function ProfileHeader({ member, isOwn, isAdmin }: { member: Member; isOwn: boolean; isAdmin: boolean }) {
+  const { signOut } = useSession();
   return (
     <div className={s.head}>
       <Avatar name={member.nickname} imageUrl={member.profileImageUrl} size={88} />
@@ -84,6 +85,10 @@ export function ProfileHeader({ member, isOwn, isAdmin }: { member: Member; isOw
                 {PROFILE_COPY.adminMenu}
               </LinkButton>
             ) : null}
+            {/* 로그아웃은 여기 한 곳 — 헤더 · 드로어에서는 뺐다 (되돌릴 수 없는 동작이라 자주 쓰는 메뉴와 떨어뜨린다) */}
+            <Button variant="outline" size="sm" icon="logout" onClick={() => void signOut()}>
+              로그아웃
+            </Button>
           </div>
         ) : null}
       </div>
@@ -128,10 +133,14 @@ export function GrassSection({
       <Card>
         <EmptyState
           title={PROFILE_COPY.grassFailed}
+          body={isOwn ? undefined : '잔디는 매일 아침 다시 불러와요.'}
           action={
-            <Button variant="outline" size="sm" icon="refresh" onClick={onRetry}>
-              다시 시도
-            </Button>
+            // 남의 프로필에서 다시 눌러도 저장된 값을 다시 읽을 뿐이라 본인에게만 둔다
+            isOwn ? (
+              <Button variant="outline" size="sm" icon="refresh" onClick={onRetry}>
+                다시 시도
+              </Button>
+            ) : undefined
           }
         />
       </Card>
@@ -145,7 +154,16 @@ export function GrassSection({
   } else {
     body = (
       <Card padding={18}>
+        <p className={s.total}>
+          지난 1년 동안 기여 <strong>{grass.totalContributions.toLocaleString('ko-KR')}</strong>회
+        </p>
         <GrassHeatmap days={grass.days} />
+        {grass.updatedAt ? (
+          <p className={s.stamp}>
+            <Icon name="clock" size={14} />
+            마지막 갱신 {formatStamp(grass.updatedAt)}
+          </p>
+        ) : null}
       </Card>
     );
   }
@@ -185,6 +203,21 @@ export function WarningSection({ member }: { member: Member }) {
   return (
     <section aria-labelledby="profile-warning-title">
       <SectionHeader id="profile-warning-title" title="경고" />
+      {ws.isOnHold ? (
+        <>
+          <StatusBadge kind="judgment" status="HOLD" context="profile" />
+          <p className={s.empty}>{PROFILE_COPY.onHold}</p>
+        </>
+      ) : (
+        <WarningNumbers ws={ws} />
+      )}
+    </section>
+  );
+}
+
+function WarningNumbers({ ws }: { ws: Member['warningState'] }) {
+  return (
+    <>
       <div className={s.warnBig}>
         <BigStat label={<VisuallyHidden>누적 경고</VisuallyHidden>} value={ws.activeCount} unit="/ 3" size="md" />
         {ws.isPenaltyTarget ? <StatusBadge kind="penalty" /> : null}
@@ -204,7 +237,7 @@ export function WarningSection({ member }: { member: Member }) {
           <Foot>{PROFILE_COPY.doubleCount}</Foot>
         </>
       ) : null}
-    </section>
+    </>
   );
 }
 
@@ -232,7 +265,8 @@ export function HistorySection({ list }: { list: PagedList<ProfileHistoryQueryQu
     body = <SectionError message={PROFILE_COPY.historyFailed} onRetry={list.refetch} />;
   } else if (list.nodes.length === 0) {
     // 팀 미소속 · 첫 주 (EX-PR01-03)
-    body = <EmptyState title={PROFILE_COPY.noHistory} />;
+    // 경고 · 소속 팀의 빈 상태와 같은 모양(왼쪽 정렬, 위 구분선)으로 맞춘다
+    body = <p className={`${s.empty} ${s.emptyAligned}`}>{PROFILE_COPY.noHistory}</p>;
   } else {
     const current = list.data?.member?.currentWeek ?? null;
     const rows: HistoryRow[] = [

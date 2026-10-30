@@ -24,7 +24,7 @@ export function AdminLayout() {
         items={[
           { to: paths.admin(), label: '관리자 대시보드', end: true },
           { to: paths.adminWarnings(), label: '경고 복구 · 벌칙', count: summary?.penaltyTargetCount },
-          { to: paths.adminMembers(), label: '가입 승인', count: summary?.pendingMemberCount },
+          { to: paths.adminMembers(), label: '회원 · 관리자 권한', count: summary?.pendingMemberCount },
           { to: paths.adminExemptions(), label: '면제 관리', count: summary?.pendingExemptionRequestCount },
           { to: paths.adminNotices(), label: '공지 관리' },
           { to: paths.adminPosts(), label: '게시물 관리' },

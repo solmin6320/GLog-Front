@@ -1,0 +1,52 @@
+.bar {
+  flex: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: var(--w-xl);
+  min-height: 40px;
+  margin: 0 auto;
+  padding: 0 20px;
+  font-size: 13px;
+  color: var(--ink-3);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+
+.link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.sep {
+  display: inline-flex;
+  color: var(--ink-4);
+}
+
+/* 지금 있는 곳은 가장 진하게 */
+.here {
+  padding: 0 6px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+@media screen and (max-width: 767px) {
+  .list {
+    padding: 0 12px;
+  }
+}

@@ -8,6 +8,8 @@ export const HOME_COPY = {
   greetingTeamless: (nickname: string) => `${nickname}님, 환영해요`,
   /** ④ 경고 0 */
   noWarning: '받은 경고가 없어요',
+  /** 판정 보류가 남아 경고 수를 아직 셀 수 없을 때 (서버 onHold) */
+  onHold: '판정을 확인하는 중이에요. 확인이 끝나면 경고 수를 보여 드려요.',
   /** E-40 — ④ 카드 하단 */
   penalty: '벌칙을 이행해야 경고가 사라져요. 지금은 차감되지 않아요.',
   /** ⑨ 5-2-7 */

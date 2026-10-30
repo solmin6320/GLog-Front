@@ -71,11 +71,21 @@ export function createCache(): InMemoryCache {
   });
 }
 
+let transport: typeof fetch | undefined;
+/** 앱 시작 때 한 번. bridge 모드가 서비스 워커 대신 연산별 분기 전송을 꽂는 자리 */
+export function setTransport(f: typeof fetch): void {
+  transport = f;
+}
+
 /**
  * 앱 · 테스트 공용 생성기. `fetch`는 테스트에서 가짜 응답을 넣을 때만 쓴다(계약서 3장 시그니처의 선택 확장).
  */
 export function createApolloClient(opts: { uri?: string; fetch?: typeof fetch } = {}): ApolloClient {
-  const httpLink = new HttpLink({ uri: opts.uri ?? graphqlUrl, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+  const httpLink = new HttpLink({
+    uri: opts.uri ?? graphqlUrl,
+    // 기본 전송은 전역 fetch. bridge 모드는 setTransport로 앱 시작 때 갈아 끼운다
+    fetch: opts.fetch ?? ((input, init) => (transport ?? fetch)(input, init)),
+  });
   return new ApolloClient({
     link: ApolloLink.from([createErrorLink(), createAuthLink(), httpLink]),
     cache: createCache(),

@@ -3,7 +3,6 @@ import {
   normalizeGithubLogin,
   normalizeInviteCode,
   normalizeTag,
-  validateCommitUrl,
   validateGithubLogin,
   validateInviteCode,
   validateNewTag,
@@ -127,42 +126,6 @@ describe('태그 (E-30 · 5개 · 개당 20자)', () => {
     expect(validateNewTag('#REDIS', ['Redis'])).toBe(VALIDATION_MSG.tagDuplicate);
     expect(validateNewTag('x', ['a', 'b', 'c', 'd', 'e'])).toBe('태그는 5개까지 달 수 있어요.');
     expect(validateNewTag('a'.repeat(21), [])).toBe('태그는 20자까지 쓸 수 있어요.');
-  });
-});
-
-describe('validateCommitUrl (E-29)', () => {
-  it('비어 있으면 통과 (선택 항목)', () => {
-    expect(validateCommitUrl('')).toBeNull();
-    expect(validateCommitUrl('  ')).toBeNull();
-    expect(validateCommitUrl(null)).toBeNull();
-  });
-
-  it.each([
-    'https://github.com/handong-gwan/GLog-Front/commit/1a2b3c4',
-    'https://github.com/a/b/commit/0123456789abcdef0123456789abcdef01234567',
-    'https://github.com/JandiLog/glog.server_v2/commit/ABCDEF1234',
-    '  https://github.com/a/b/commit/1a2b3c4  ',
-    'https://github.com/a/b/commit/1a2b3c4/',
-  ])('형식 맞음: %s', (url) => {
-    expect(validateCommitUrl(url)).toBeNull();
-  });
-
-  it.each([
-    'github.com/a/b',
-    'github.com/a/b/commit/1a2b3c4',
-    'http://github.com/a/b/commit/1a2b3c4',
-    'https://gitlab.com/a/b/commit/1a2b3c4',
-    'https://github.com/a/b/commits/1a2b3c4',
-    'https://github.com/a/b/commit/1a2b3c',
-    'https://github.com/a/b/commit/0123456789abcdef0123456789abcdef012345678',
-    'https://github.com/a/b/commit/xyz1234',
-    'https://github.com/a/b/pull/12',
-    'https://github.com/-a/b/commit/1a2b3c4',
-    'https://github.com/a/../commit/1a2b3c4',
-    'https://github.com/a/b/commit/1a2b3c4?diff=split',
-    'https://github.com.evil.com/a/b/commit/1a2b3c4',
-  ])('형식 아님: %s', (url) => {
-    expect(validateCommitUrl(url)).toBe('GitHub 커밋 주소 형식이 아니에요.');
   });
 });
 

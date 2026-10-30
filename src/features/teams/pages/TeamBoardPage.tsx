@@ -224,7 +224,14 @@ export default function TeamBoardPage() {
       <PageTitle
         title={team.name}
         meta={<StatusBadge kind="visibility" isPublic={team.isPublic} />}
-        actions={isLeader ? <LeaderMenu teamId={team.id} /> : <LeaveButton teamId={team.id} />}
+        actions={
+          <div className={s.titleActions}>
+            <LinkButton to={paths.postNew({ team: team.id })} icon="pencil">
+              이 팀으로 글쓰기
+            </LinkButton>
+            {isLeader ? <LeaderMenu teamId={team.id} /> : <LeaveButton teamId={team.id} />}
+          </div>
+        }
       />
       <QueryBoundary
         loading={q.loading}

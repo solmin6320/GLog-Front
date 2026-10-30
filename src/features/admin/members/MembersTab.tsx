@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useNavigate, useSearchParams } from 'react-router';
-import type { AdminMemberFilter, AdminMembersQueryQuery, MemberStatus } from '@/gql/graphql';
+import type { AdminMemberFilter, AdminMembersQueryQuery, MemberRole, MemberStatus } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { DEFAULT_PAGE_SIZE, useAction, usePagedList } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
@@ -25,39 +25,56 @@ import {
 import {
   ADMIN_COUNTS_QUERY,
   AdminMembersApprove,
+  AdminMembersPromote,
   AdminMembersQuery,
   AdminMembersReject,
   AdminMembersRevert,
+  AdminMembersSuspend,
+  AdminMembersUnsuspend,
   AdminMembersSummaryQuery,
 } from './api';
-import { applyMemberStatus } from './cache';
+import { applyMemberRole, applyMemberStatus } from './cache';
 import s from './Members.module.css';
 
 type Row = AdminMembersQueryQuery['adminMembers']['nodes'][number];
 
-const FILTER: Record<AdminMemberStatusParam, AdminMemberFilter> = { pending: 'PENDING', rejected: 'REJECTED', all: 'ALL' };
+const FILTER: Record<AdminMemberStatusParam, AdminMemberFilter> = {
+  active: 'ACTIVE',
+  pending: 'PENDING',
+  rejected: 'REJECTED',
+  suspended: 'SUSPENDED',
+  all: 'ALL',
+};
 
 const STATUS_OPTIONS: { value: AdminMemberStatusParam; label: string }[] = [
+  { value: 'active', label: '전체 회원' },
   { value: 'pending', label: '승인 대기' },
   { value: 'rejected', label: '거절' },
+  { value: 'suspended', label: '정지' },
   { value: 'all', label: '전체' },
 ];
 
 const EMPTY: Record<AdminMemberStatusParam, string> = {
+  active: '아직 가입한 회원이 없어요.',
   pending: '승인 대기 중인 회원이 없어요.',
   rejected: '거절한 회원이 없어요.',
+  suspended: '정지한 회원이 없어요.',
   all: '승인 대기 · 거절 회원이 없어요.',
 };
+
+/** 가입 승인이 없어진 뒤 남은 계정 정리용 필터. 정리할 게 있거나 이미 그 필터에 있을 때만 보인다 */
+const LEGACY_STATUS: AdminMemberStatusParam[] = ['pending', 'rejected', 'all'];
 
 const isStatusParam = (v: string): v is AdminMemberStatusParam => STATUS_OPTIONS.some((o) => o.value === v);
 
 /**
- * AD-01 ②-2 가입 승인 (`/admin/members?status=&q=`). 필터 상태는 URL 하나뿐이다.
- * ⑤ 검색 · 상태 필터 · 전체 건수 / ⑥ 목록(회원 · 신청 · 상태) / ⑦ [승인] 즉시 / ⑧ [거절] 확인 뒤 · [승인 대기로] 즉시.
- * 승인 판단에 필요한 것만 보여 준다 — 팀 소속 · 활동 이력은 넣지 않는다.
+ * AD-01 ②-2 회원 · 관리자 권한 (`/admin/members?status=&q=`). 필터 상태는 URL 하나뿐이다.
+ * 가입은 승인 없이 바로 활성이다. 이 탭에서 하는 일은 관리자 승격과 이용 정지 —
+ * 일반 회원 행의 [관리자로 승격] · [정지]는 확인 뒤에만 실행한다(현재 관리자만). 정지는 필터 "정지"에서 [정지 해제]로 풀 수 있고, 승격은 되돌리는 화면이 없다.
+ * 이전에 쌓인 승인 대기 · 거절 계정은 필터에서 골라 [승인] · [거절] · [승인 대기로]로 정리한다.
  */
 export function MembersTab() {
-  useDocumentTitle('가입 승인');
+  useDocumentTitle('회원 · 관리자 권한');
   const titleId = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -72,8 +89,17 @@ export function MembersTab() {
 
   const columns: Column<Row>[] = [
     { key: 'member', header: '회원', render: (r) => <MemberCell row={r} /> },
-    { key: 'applied', header: '신청', render: (r) => <span className={s.applied}>{formatDateTime(r.appliedAt)}</span> },
-    { key: 'status', header: '상태', render: (r) => <StatusBadge kind="memberStatus" status={r.status} /> },
+    { key: 'applied', header: '가입', render: (r) => <span className={s.applied}>{formatDateTime(r.appliedAt)}</span> },
+    {
+      key: 'status',
+      header: '권한',
+      render: (r) =>
+        r.status === 'ACTIVE' ? (
+          r.role === 'ADMIN' ? <span className={s.adminTag}>관리자</span> : <span className={s.memberTag}>일반 회원</span>
+        ) : (
+          <StatusBadge kind="memberStatus" status={r.status} />
+        ),
+    },
     { key: 'actions', header: '처리', align: 'right', render: (r) => <MemberActions row={r} /> },
   ];
 
@@ -81,9 +107,9 @@ export function MembersTab() {
     <section aria-labelledby={titleId}>
       <div className={s.head}>
         <h2 id={titleId} className={s.title}>
-          가입 승인
+          회원 · 관리자 권한
         </h2>
-        {pending != null ? <span className={s.meta}>승인 대기 {pending}명</span> : null}
+        {pending ? <span className={s.meta}>정리할 승인 대기 {pending}명</span> : null}
       </div>
 
       <div className={s.toolbar}>
@@ -93,7 +119,7 @@ export function MembersTab() {
         <div className={s.filter}>
           <Select
             aria-label="상태"
-            options={STATUS_OPTIONS}
+            options={pending || LEGACY_STATUS.includes(status) ? STATUS_OPTIONS : STATUS_OPTIONS.filter((o) => !LEGACY_STATUS.includes(o.value))}
             value={status}
             onChange={(e) => {
               if (isStatusParam(e.target.value)) go({ status: e.target.value, q });
@@ -128,7 +154,7 @@ export function MembersTab() {
           ) : (
             <>
               <div className={s.table}>
-                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => r.member.id} caption="가입 신청 회원" />
+                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => r.member.id} caption="회원 목록" />
               </div>
               <LoadMore
                 hasMore={list.hasMore}
@@ -192,12 +218,16 @@ function MemberActions({ row }: { row: Row }) {
   const [approveMutation] = useMutation(AdminMembersApprove);
   const [rejectMutation] = useMutation(AdminMembersReject);
   const [revertMutation] = useMutation(AdminMembersRevert);
+  const [promoteMutation] = useMutation(AdminMembersPromote);
+  const [suspendMutation] = useMutation(AdminMembersSuspend);
+  const [unsuspendMutation] = useMutation(AdminMembersUnsuspend);
   const { member } = row;
   const memberId = member.id;
   const optimistic = (status: MemberStatus) => ({
     __typename: 'AdminMemberRow' as const,
     member: { ...member, __typename: 'Member' as const },
     status,
+    role: row.role,
     appliedAt: row.appliedAt,
   });
 
@@ -238,7 +268,104 @@ function MemberActions({ row }: { row: Row }) {
     { success: '승인 대기로 되돌렸어요.' },
   );
 
-  const busy = approve.pending || reject.pending || revert.pending;
+  const promote = useAction(
+    () =>
+      promoteMutation({
+        variables: { memberId },
+        optimisticResponse: { promoteToAdmin: { ...optimistic('ACTIVE'), role: 'ADMIN' as MemberRole } },
+        update: (cache, { data }) => {
+          if (data) applyMemberRole(cache, data.promoteToAdmin.member.id, data.promoteToAdmin.role);
+        },
+      }),
+    { success: '관리자로 승격했어요.' },
+  );
+
+  const suspend = useAction(
+    () =>
+      suspendMutation({
+        variables: { memberId },
+        optimisticResponse: { suspendMember: optimistic('SUSPENDED') },
+        update: (cache, { data }) => {
+          if (data) applyMemberStatus(cache, data.suspendMember.member.id, data.suspendMember.status);
+        },
+      }),
+    { success: '이용을 정지했어요.' },
+  );
+  const unsuspend = useAction(
+    () =>
+      unsuspendMutation({
+        variables: { memberId },
+        optimisticResponse: { unsuspendMember: optimistic('ACTIVE') },
+        update: (cache, { data }) => {
+          if (data) applyMemberStatus(cache, data.unsuspendMember.member.id, data.unsuspendMember.status);
+        },
+      }),
+    { success: '정지를 풀었어요.' },
+  );
+
+  const busy = approve.pending || reject.pending || revert.pending || promote.pending || suspend.pending || unsuspend.pending;
+
+  if (row.status === 'SUSPENDED') {
+    return (
+      <span className={s.actions}>
+        <Button
+          size="xs"
+          variant="outline"
+          loading={unsuspend.pending}
+          disabled={busy}
+          aria-label={`${member.nickname} 정지 해제`}
+          onClick={() => void unsuspend.run()}
+        >
+          정지 해제
+        </Button>
+      </span>
+    );
+  }
+
+  if (row.status === 'ACTIVE') {
+    if (row.role === 'ADMIN') return null;
+    return (
+      <span className={s.actions}>
+        <Button
+          size="xs"
+          variant="outline"
+          loading={promote.pending}
+          disabled={busy}
+          aria-label={`${member.nickname} 관리자로 승격`}
+          onClick={async () => {
+            // 관리자 권한은 가입자 정보 · 경고 · 벌칙을 다루므로 한 번 더 확인한다. 이 화면에서는 되돌릴 수 없다
+            const ok = await confirm({
+              title: `${member.nickname} 님을 관리자로 승격할까요?`,
+              body: '관리자는 회원 · 경고 · 벌칙 · 공지를 관리할 수 있어요. 승격은 이 화면에서 되돌릴 수 없어요.',
+              confirmLabel: '관리자로 승격',
+            });
+            if (ok) await promote.run();
+          }}
+        >
+          관리자로 승격
+        </Button>
+        <Button
+          size="xs"
+          variant="danger"
+          loading={suspend.pending}
+          disabled={busy}
+          aria-label={`${member.nickname} 이용 정지`}
+          onClick={async () => {
+            // 정지하면 로그인과 이미 받은 로그인 상태가 모두 막힌다. 해제는 필터 "정지"에서 할 수 있다
+            const ok = await confirm({
+              title: `${member.nickname} 님의 이용을 정지할까요?`,
+              body: '정지하면 로그인할 수 없고, 이미 로그인한 상태도 바로 끊겨요. 정지 필터에서 언제든 풀 수 있어요.',
+              confirmLabel: '이용 정지',
+              tone: 'danger',
+            });
+            if (ok) await suspend.run();
+          }}
+        >
+          정지
+        </Button>
+      </span>
+    );
+  }
 
   if (row.status === 'PENDING') {
     return (

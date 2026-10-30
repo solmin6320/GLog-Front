@@ -38,7 +38,8 @@ export function TagInput({
         if (next !== tags) onChange(next);
         return parts.slice(i).join(',');
       }
-      next = [...next, normalizeTag(raw)];
+      // 서버가 태그를 소문자로 저장하므로 입력 때부터 같은 모양으로 보여 준다
+      next = [...next, normalizeTag(raw).toLowerCase()];
     }
     onError(null);
     if (next !== tags) onChange(next);

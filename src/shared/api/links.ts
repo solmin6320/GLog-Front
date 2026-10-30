@@ -41,7 +41,7 @@ export function createErrorLink(): ApolloLink {
       if (!NOT_EXPIRY_OPERATIONS.has(operation.operationName ?? '') && sentWithCurrentToken(operation)) {
         sessionEvents.emit('expired');
       }
-    } else if (e.code === 'ACCOUNT_PENDING' || e.code === 'ACCOUNT_REJECTED') {
+    } else if (e.code === 'ACCOUNT_PENDING' || e.code === 'ACCOUNT_REJECTED' || e.code === 'ACCOUNT_SUSPENDED') {
       if (!NOT_STATUS_OPERATIONS.has(operation.operationName ?? '')) sessionEvents.emit('status-changed');
     }
   });

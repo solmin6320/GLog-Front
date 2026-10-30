@@ -1,13 +1,20 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { graphql, HttpResponse } from 'msw';
-import { seedPostId } from '@/mocks/db/seed';
-import { db } from '@/mocks/db/store';
-import { server } from '@/mocks/node';
-import { renderRoute } from '@/test/render';
+import { http, HttpResponse } from 'msw';
+import { beforeEach } from 'vitest';
+import { server } from '@/test/server';
+import { backend } from '@/test/backend';
+import { boardFixture, installBoard, POST_ID, serveBoardMutations, type BoardFixture } from '@/test/fixtures/posts';
+import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
 
-// BD-04 글 작성 · 수정 (ACC-BD04-*)
+// BD-04 글 작성 · 수정 (ACC-BD04-*) — bridge + 가짜 백엔드 (post.graphqls)
 
-const editPath = (key: string) => `/posts/${seedPostId(key) ?? 'missing'}/edit`;
+let board: BoardFixture;
+beforeEach(() => {
+  board = installBoard(boardFixture());
+  serveBoardMutations(board);
+});
+const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
+const editPath = (key: string) => `/posts/${POST_ID[key as keyof typeof POST_ID] ?? 'missing'}/edit`;
 const heading = (name: string) => screen.findByRole('heading', { level: 1, name });
 const field = (name: string | RegExp) => screen.getByRole('textbox', { name });
 const progress = () => screen.getByText(/필수 항목을 다 채/);
@@ -39,7 +46,6 @@ describe('BD-04 글쓰기', () => {
   });
 
   it('ACC-BD04-05 제목이 비면 인라인 "제목을 입력해 주세요." · 저장 요청 없음', async () => {
-    const before = db.posts.length;
     const { user, router } = renderRoute('/posts/new');
     await heading('글쓰기');
     await user.click(screen.getByRole('button', { name: '등록' }));
@@ -48,7 +54,7 @@ describe('BD-04 글쓰기', () => {
     await waitFor(() => expect(field(/^제목/)).toHaveFocus());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/posts/new');
-    expect(db.posts.length).toBe(before);
+    expect(backend.calls('createPost')).toHaveLength(0);
   });
 
   it('ACC-BD04-06 · 07 필수 칸이 비면 ⑭ 확인 → [더 쓰기]는 첫 빈 칸으로 · [그대로 올리기]는 저장 → BD-03 "인증 미포함"', async () => {
@@ -83,19 +89,16 @@ describe('BD-04 글쓰기', () => {
     await user.type(field(/^한 일/), '캐시 정책을 정리했어요.');
     await user.type(field(/^배운 점/), 'keyFields를 배웠어요.');
     await user.type(field(/^태그/), 'Apollo{Enter}#React,');
-    expect(screen.getByRole('button', { name: '#Apollo 태그 지우기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '#React 태그 지우기' })).toBeInTheDocument();
-    await user.type(field(/^관련 커밋/), 'https://github.com/jandilog/web/commit/abcdef1');
+    expect(screen.getByRole('button', { name: '#apollo 태그 지우기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '#react 태그 지우기' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '등록' }));
     await waitFor(() => expect(postIdIn(router.state.location.pathname)).toBeDefined());
     expect(await screen.findByText('등록했어요.')).toBeInTheDocument();
     expect(await heading('캐시 정리 일지')).toBeInTheDocument();
     expect(screen.queryByText('인증 미포함')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '#Apollo' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '#apollo' })).toBeInTheDocument();
     expect(screen.getByText('사이드 프로젝트 A팀')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /jandilog\/web · abcdef1/ })).toBeInTheDocument();
-    const saved = db.posts.find((p) => p.id === postIdIn(router.state.location.pathname));
-    expect(saved).toMatchObject({ type: 'DEVLOG', teamId: '1', tags: ['Apollo', 'React'] });
+    expect(backend.calls('createPost')[0]?.args.input).toMatchObject({ type: 'DEVLOG', teamId: '1', tags: ['apollo', 'react'] });
   });
 
   it('ACC-BD04-10 태그 5개면 입력칸이 막히고 "태그는 5개까지 달 수 있어요." · 21자는 입력이 막힌다', async () => {
@@ -110,22 +113,6 @@ describe('BD-04 글쓰기', () => {
     expect(input).toBeEnabled();
     await user.type(input, 'a{Enter}');
     expect(screen.getByText('이미 단 태그예요.')).toBeInTheDocument();
-  });
-
-  it('ACC-BD04-11 커밋 링크 형식 오류 → 포커스 아웃 때 인라인 오류, 저장 막힘', async () => {
-    const { user, router } = renderRoute('/posts/new');
-    await heading('글쓰기');
-    await user.type(field(/^제목/), '커밋 확인');
-    await user.type(field(/^관련 커밋/), 'github.com/a/b');
-    await user.tab();
-    expect(await screen.findByText('GitHub 커밋 주소 형식이 아니에요.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '등록' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/posts/new');
-    await user.clear(field(/^관련 커밋/));
-    await user.type(field(/^관련 커밋/), 'https://github.com/a/b/commit/abcdef1');
-    await user.tab();
-    expect(screen.queryByText('GitHub 커밋 주소 형식이 아니에요.')).not.toBeInTheDocument();
   });
 
   it('ACC-BD04-12 소속 팀: 팀 2개(하나는 비공개) → "연결 안 함"(기본) + 실제 이름 둘', async () => {
@@ -196,7 +183,13 @@ describe('BD-04 글쓰기', () => {
   });
 
   it('ACC-BD04-19 저장 중 연결이 끊기면 입력이 남고 버튼이 돌아오며 "인터넷 연결을 확인해 주세요."', async () => {
-    server.use(graphql.mutation('PostCreate', () => HttpResponse.error()));
+    server.use(
+      http.post('*/__backend/graphql', async ({ request }) => {
+        const body = (await request.clone().json()) as { query: string };
+        if (body.query.includes('createPost')) return HttpResponse.error();
+        return undefined;
+      }),
+    );
     const { user, router } = renderRoute('/posts/new?type=devlog');
     await heading('글쓰기');
     await user.type(field(/^제목/), '끊겨도 남는 글');
@@ -217,9 +210,8 @@ describe('BD-04 글 수정', () => {
     expect(screen.getByRole('tab', { name: '트러블슈팅' })).toBeDisabled();
     expect(screen.getByRole('tab', { name: '개발일지' })).toBeDisabled();
     expect(field(/^제목/)).toHaveValue('Redis TTL이 적용되지 않던 문제');
-    expect(field(/^관련 커밋/)).toHaveValue('https://github.com/jandilog/server/commit/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
     expect(screen.getByRole('combobox', { name: '소속 팀' })).toHaveValue('1');
-    expect(screen.getByRole('button', { name: '#Redis 태그 지우기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '#redis 태그 지우기' })).toBeInTheDocument();
     expect(progress()).toHaveTextContent('필수 항목을 다 채웠어요. 이 글은 인증에 들어가요');
     expect(screen.queryByText('이미 끝난 주의 인증 결과는 바뀌지 않아요.')).not.toBeInTheDocument();
     expect(screen.queryByText(/팀 글을 수정하고 있어요/)).not.toBeInTheDocument();
@@ -227,7 +219,7 @@ describe('BD-04 글 수정', () => {
     await user.clear(field(/^제목/));
     await user.type(field(/^제목/), 'Redis TTL 문제 (정리본)');
     await user.click(screen.getByRole('button', { name: '수정' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/posts/${seedPostId('redisTtl')}`));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/posts/${POST_ID.redisTtl}`));
     expect(await screen.findByText('수정했어요.')).toBeInTheDocument();
     expect(await heading('Redis TTL 문제 (정리본)')).toBeInTheDocument();
     expect(screen.getByText('9/29 14:20 (수정됨)')).toBeInTheDocument();
@@ -266,8 +258,7 @@ describe('BD-04 글 수정', () => {
   it('EX-BD04-02 고치는 중에 글이 지워지면 "삭제된 글이에요." + [목록으로], 입력은 남는다', async () => {
     const { user } = renderRoute(editPath('redisTtl'));
     await heading('글 수정');
-    const row = db.posts.find((p) => p.id === seedPostId('redisTtl'));
-    if (row) row.deletedAt = '2026-10-01T09:59:00+09:00';
+    board.deleted.add(POST_ID.redisTtl);
     await user.type(field(/^제목/), '!');
     await user.click(screen.getByRole('button', { name: '수정' }));
     const alert = await screen.findByRole('alert');

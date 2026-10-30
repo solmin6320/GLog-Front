@@ -8,7 +8,7 @@ import { isBigintId } from './ids';
 export type PostTypeParam = 'troubleshooting' | 'devlog';
 export type PostTypeEnum = 'TROUBLESHOOTING' | 'DEVLOG';
 export type AdminResultParam = 'all' | 'fail' | 'hold';
-export type AdminMemberStatusParam = 'pending' | 'rejected' | 'all';
+export type AdminMemberStatusParam = 'active' | 'pending' | 'rejected' | 'suspended' | 'all';
 export type AdminPostKindParam = 'all' | 'post' | 'comment';
 
 export const SEARCH_MIN = 2;
@@ -79,7 +79,7 @@ export const paths = {
     withQuery('/admin', { week: q.week, q: q.q, result: q.result === 'all' ? undefined : q.result, fix: q.fix }),
   adminWarnings: () => '/admin/warnings',
   adminMembers: (q: { status?: AdminMemberStatusParam; q?: string } = {}) =>
-    withQuery('/admin/members', { status: q.status === 'pending' ? undefined : q.status, q: q.q }),
+    withQuery('/admin/members', { status: q.status === 'active' ? undefined : q.status, q: q.q }),
   adminExemptions: () => '/admin/exemptions',
   adminNotices: (q: { editor?: 'new' | string } = {}) => withQuery('/admin/notices', { editor: q.editor }),
   adminPosts: (q: { kind?: AdminPostKindParam; q?: string } = {}) =>
@@ -122,7 +122,7 @@ export function parseAdminDashboardSearch(sp: URLSearchParams) {
 
 export function parseAdminMembersSearch(sp: URLSearchParams) {
   return {
-    status: oneOf<AdminMemberStatusParam>(sp.get('status'), ['pending', 'rejected', 'all'], 'pending'),
+    status: oneOf<AdminMemberStatusParam>(sp.get('status'), ['active', 'pending', 'rejected', 'suspended', 'all'], 'active'),
     q: (sp.get('q') ?? '').trim() || undefined,
   };
 }

@@ -89,7 +89,8 @@ export function HeaderSearch() {
 
   const go = (to: string) => {
     closeSearch(false);
-    void navigate(to);
+    // 게시판이 "결과가 없으면 결과 있는 탭으로" 옮길 수 있게 헤더 검색에서 왔다고 알린다(주소는 그대로)
+    void navigate(to, { state: { fromHeaderSearch: true } });
   };
 
   useEffect(() => {
