@@ -28,8 +28,9 @@ import { TeamExemptionQuery, TeamRequestExemptionMutation } from '../api';
 import { requestStatusBadge, TEAM_COPY } from '../lib';
 import s from './TeamPages.module.css';
 
-type ExemptionTeam = NonNullable<TeamExemptionQueryQuery['team']>;
-type ExemptionRequest = ExemptionTeam['exemptionRequests'][number];
+type ExemptionData = TeamExemptionQueryQuery;
+type TeamMemberOption = ExemptionData['teamMembers']['items'][number];
+type ExemptionRequest = ExemptionData['myPersonalExemptionRequests']['items'][number];
 
 const MEMBER_SELECT_ID = 'exemption-member';
 const validateExemptionReason = validateReason('사유', LIMITS.exemptionReason);
@@ -37,7 +38,7 @@ const validateExemptionReason = validateReason('사유', LIMITS.exemptionReason)
 type Errors = { member?: string | null; week?: string | null; reason?: string | null };
 
 /** ①~④ 요청 폼 */
-function RequestForm({ team }: { team: ExemptionTeam }) {
+function RequestForm({ members }: { members: TeamMemberOption[] }) {
   const { team: scopeTeam } = useTeamScope();
   const viewer = useViewer();
   const clock = useClock();
@@ -52,9 +53,9 @@ function RequestForm({ team }: { team: ExemptionTeam }) {
   // ① 이 팀 팀원 + 본인 (팀장도 팀원 목록에 있다)
   const memberOptions = [
     { value: '', label: '대상을 골라 주세요' },
-    ...team.members.map((x) => ({
-      value: x.member.id,
-      label: x.member.id === viewer.memberId ? `${x.member.nickname} (나)` : x.member.nickname,
+    ...members.map((x) => ({
+      value: x.id,
+      label: x.id === viewer.memberId ? `${x.nickname} (나)` : x.nickname,
     })),
   ];
   // ② 주 단위 · 이번 주와 다음 주 (서버 clock 기준)
@@ -67,7 +68,7 @@ function RequestForm({ team }: { team: ExemptionTeam }) {
   const request = useAction(
     (input: { memberId: string; weekStart: string; reason: string }) =>
       requestExemption({
-        variables: { input: { teamId: scopeTeam.id, ...input } },
+        variables: { teamId: scopeTeam.id, ...input },
         refetchQueries: ['TeamExemptionQuery'],
         awaitRefetchQueries: true,
       }),
@@ -75,7 +76,7 @@ function RequestForm({ team }: { team: ExemptionTeam }) {
       // E-44: 전체 면제 기간과 겹치면 안내 문구로 알린다 (요청 보관 여부는 서버 결과대로)
       success: (r) => (r.data?.requestPersonalExemption.overlapsExemptionPeriod ? TEAM_COPY.overlapsExemptionPeriod : TEAM_COPY.requested),
       onError: (e) => {
-        if (e.code === 'EXEMPTION_DUPLICATE') {
+        if (e.code === 'EXEMPTION_REQUEST_DUPLICATE') {
           setErrors({ week: '이미 요청한 주간이에요.' });
           return true;
         }
@@ -210,18 +211,22 @@ export default function TeamExemptionPage() {
       <QueryBoundary
         loading={q.loading}
         error={q.error}
-        data={q.data?.team}
+        data={q.data}
         onRetry={() => {
           q.refetch().catch(() => undefined);
         }}
         skeleton={<PageSkeleton />}
       >
-        {(t) => (
+        {(d) => {
+          // 요청에는 팀이 없어 이 팀 팀원을 대상으로 한 것만 보인다 (첫 페이지 20건 기준)
+          const memberIds = new Set(d.teamMembers.items.map((x) => x.id));
+          const requests = d.myPersonalExemptionRequests.items.filter((r) => memberIds.has(r.member.id));
+          return (
           <>
-            <RequestForm team={t} />
+            <RequestForm members={d.teamMembers.items} />
             <section className={s.section} aria-labelledby="exemption-list-heading">
               <SectionHeader id="exemption-list-heading" title="요청 목록" />
-              {t.exemptionRequests.length === 0 ? (
+              {requests.length === 0 ? (
                 <EmptyState
                   icon="calendar"
                   title="요청한 면제가 없어요."
@@ -233,14 +238,15 @@ export default function TeamExemptionPage() {
                 />
               ) : (
                 <RowList ariaLabel="요청 목록">
-                  {t.exemptionRequests.map((r) => (
+                  {requests.map((r) => (
                     <RequestRow key={r.id} request={r} />
                   ))}
                 </RowList>
               )}
             </section>
           </>
-        )}
+          );
+        }}
       </QueryBoundary>
     </PageContainer>
   );

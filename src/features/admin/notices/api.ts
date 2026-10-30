@@ -6,9 +6,9 @@ import { graphql } from '@/gql';
  */
 
 export const AdminNoticesQuery = graphql(`
-  query AdminNoticesQuery($first: Int, $after: String) {
-    notices(first: $first, after: $after) {
-      nodes {
+  query AdminNoticesQuery($after: String) {
+    notices(after: $after) {
+      items {
         id
         title
         isPinned
@@ -16,10 +16,7 @@ export const AdminNoticesQuery = graphql(`
         createdAt
         updatedAt
       }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+      nextCursor
     }
   }
 `);
@@ -73,8 +70,8 @@ export const AdminNoticesDelete = graphql(`
 
 /** ⑥ 고정 ON/OFF — Notice:{id}.isPinned만 바뀐다 */
 export const AdminNoticesSetPinned = graphql(`
-  mutation AdminNoticesSetPinned($id: ID!, $pinned: Boolean!) {
-    setNoticePinned(id: $id, pinned: $pinned) {
+  mutation AdminNoticesSetPinned($id: ID!, $isPinned: Boolean!) {
+    setNoticePinned(id: $id, isPinned: $isPinned) {
       id
       isPinned
     }

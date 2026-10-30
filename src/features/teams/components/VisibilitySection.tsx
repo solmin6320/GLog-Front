@@ -16,7 +16,7 @@ export function VisibilitySection() {
       const optimistic = { __typename: 'Team' as const, id: team.id, isPublic };
       return setVisibility({
         variables: { teamId: team.id, isPublic },
-        optimisticResponse: { setTeamVisibility: optimistic },
+        optimisticResponse: { updateTeam: optimistic },
       });
     },
     { success: TEAM_COPY.visibilityChanged },

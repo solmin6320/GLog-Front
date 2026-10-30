@@ -17,9 +17,9 @@ export type Viewer = {
   pendingInvitationCount: number;
 };
 
-/** 서버 기준 시각 (설계서 5장). 화면은 new Date()로 오늘을 정하지 않는다 */
+/** 기준 시각 (설계서 5장). 백엔드에 서버 시각 API가 없어 세션이 nowSource로 계산한다 — 화면은 new Date()를 직접 쓰지 않는다 */
 export type Clock = {
-  /** 마지막으로 세션을 조회한 순간의 서버 시각 (ISO +09:00) */
+  /** 마지막으로 세션을 계산한 순간의 시각 (ISO +09:00) */
   now: string;
   /** now의 KST 날짜 'YYYY-MM-DD' */
   today: string;
@@ -35,7 +35,7 @@ export type Session = {
   refresh(): Promise<SessionStatus>;
   /** 일회용 code 교환 → 토큰 저장 → 캐시 비우기 → me 재조회. 같은 code는 진행 중인 교환을 같이 쓴다(StrictMode) */
   completeLogin(code: string): Promise<SessionStatus>;
-  /** logout(실패해도 진행) → 토큰 삭제 → ANONYMOUS(viewer null 동시) → 캐시 비우기. 이동은 호출한 쪽 · 가드가 한다 */
+  /** 토큰 삭제 → ANONYMOUS(viewer null 동시) → 캐시 비우기 (백엔드 로그아웃 API 없음). 이동은 호출한 쪽 · 가드가 한다 */
   signOut(): Promise<void>;
   /** real: `${apiOrigin}/oauth2/authorization/github` · mock: `/auth/callback?code=mock-<persona>` */
   loginUrl(persona?: string): string;

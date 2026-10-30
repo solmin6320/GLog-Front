@@ -92,9 +92,14 @@ describe('TM-05 팀 현황판', () => {
     expect(router.state.location.pathname).toBe('/teams/1');
   });
 
-  it('ACC-TM05-01 관리자(member)도 소속 아닌 팀(B팀)은 403', async () => {
-    renderRoute('/teams/3');
+  it('ACC-TM05-01 일반 회원은 소속 아닌 팀(B팀)이 403', async () => {
+    renderRoute('/teams/3', { as: 'plain' });
     expect(await screen.findByText('이 페이지에 들어올 권한이 없어요.')).toBeInTheDocument();
+  });
+
+  it('시스템 관리자(member)는 소속 아닌 팀(B팀) 현황판도 본다 (백엔드 2026-10-19 결정)', async () => {
+    renderRoute('/teams/3');
+    expect(await screen.findByRole('table', { name: '이번 주 팀원 현황' })).toBeInTheDocument();
   });
 
   it('ACC-TM05-02 없는 teamId → 404', async () => {

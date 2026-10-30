@@ -14,7 +14,7 @@ const CANCELLED = '로그인이 취소됐어요.';
 /** 코드 교환 실패 문구: 재사용 · 만료(E-05 · E-06) · 네트워크(E-51)는 표준 문구, 그 밖은 AU-02 ② */
 function failureMessage(err: unknown): string {
   const e = normalizeError(err);
-  if (e.code === 'LOGIN_CODE_INVALID' || e.category === 'network') return messageFor(e);
+  if (e.code === 'AUTH_CODE_INVALID' || e.category === 'network') return messageFor(e);
   return FAILED;
 }
 

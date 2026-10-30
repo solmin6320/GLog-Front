@@ -1,75 +1,66 @@
 import { graphql } from '@/gql';
 
 /**
- * PR-01 프로필 (화면설계서 5-1-9). 본인 · 타인 공용 — 비공개 팀 마스킹은 서버가 해서 준다(TeamLabel · publicTeams).
+ * PR-01 프로필 (화면설계서 5-1-9, 백엔드 profile.graphqls). 본인 · 타인 공용 — 비공개 팀은 서버가 빼거나 가려서 준다.
  * 주간 판정 이력(⑩⑪)은 [더 보기] 때 잔디 1년치를 다시 받지 않게 ProfileHistoryQuery로 따로 부른다.
+ * myTeams는 ⑫ 소속 팀 중 내가 들어갈 수 있는 팀에만 현황판 링크를 달려고 받는다.
  */
 export const ProfileQuery = graphql(`
   query ProfileQuery($id: ID!) {
-    member(id: $id) {
+    profile(memberId: $id) {
       id
       nickname
       githubLogin
       profileImageUrl
+      isMine
       postCount
       commentCount
-      grassCalendar {
-        status
-        updatedAt
+      grass {
+        from
+        to
+        fetchedAt
         days {
           date
           count
-          level
         }
-        privateContributionSuspected
       }
-      warningState {
-        activeCount
-        isPenaltyTarget
-        byCategory {
-          label {
-            kind
-            name
-          }
+      warning {
+        onHold
+        warningCount
+        penaltyTarget
+      }
+      teamWarnings {
+        onHold
+        teams {
+          name
           count
         }
       }
-      publicTeams {
+      teams {
         id
         name
-        viewerRole
       }
     }
-    grassRuleNotice {
+    myTeams {
       id
     }
   }
 `);
 
-/** PR-01 ⑩⑪ — 첫 줄 '진행 중'(currentWeek) + 확정 · 보류된 주 8개씩 (usePagedList: $first · $after) */
+/** PR-01 ⑩⑪ — 첫 페이지 맨 위에 이번 주 IN_PROGRESS가 붙고, 확정 · 보류된 주를 20개씩 (커서) */
 export const ProfileHistoryQuery = graphql(`
-  query ProfileHistoryQuery($id: ID!, $first: Int, $after: String) {
-    member(id: $id) {
+  query ProfileHistoryQuery($id: ID!, $after: String) {
+    profile(memberId: $id) {
       id
-      currentWeek {
-        weekStart
-        verifiedDays
-        recordCount
-      }
-      judgmentHistory(first: $first, after: $after) {
-        nodes {
-          id
+      judgmentHistory(after: $after) {
+        items {
           weekStart
-          status
-          skipReason
+          weekEnd
+          result
           verifiedDays
           recordCount
-          hasActiveWarning
         }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
+        nextCursor
       }
     }
   }

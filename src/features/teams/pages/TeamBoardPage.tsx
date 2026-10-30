@@ -6,6 +6,7 @@ import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useClock } from '@/session';
 import { useAction } from '@/shared/api';
 import { asOfLabel, formatDateTimeMD, formatWeekRangeWithDay } from '@/shared/lib/format';
+import { kstDateOf } from '@/shared/lib/kst';
 import { paths } from '@/shared/lib/paths';
 import {
   Avatar,
@@ -34,23 +35,40 @@ import { removeFromMyTeams, useForgetTeam } from '../hooks';
 import { boardStatusLabel, postTypeLabel, TEAM_COPY } from '../lib';
 import s from './TeamPages.module.css';
 
-type BoardTeam = NonNullable<TeamBoardQueryQuery['team']>;
-type Board = BoardTeam['currentWeekBoard'];
-type Row = Board['rows'][number];
-type RecentPost = BoardTeam['recentPosts'][number];
+type Board = TeamBoardQueryQuery['teamBoard'];
+type Row = Board['members'][number];
+type RecentPost = Board['recentPosts'][number];
 
-/** ⑥ 팀원 행 — 경고는 이 팀 카테고리만(서버 teamWarningCount), 벌칙 대상 표시는 넣지 않는다 */
-const COLUMNS: Column<Row>[] = [
+/** 서버 칸(null = 알 수 없음)을 WeekStrip 칸으로. 오늘 · 앞으로 올 날은 서버 시각(clock) 기준 */
+function stripDays(days: Row['days'], today: string) {
+  return days.map((d) => ({
+    date: d.date,
+    grassCount: d.hasGrass == null ? null : d.hasGrass ? 1 : 0,
+    hasRecord: d.hasRecord,
+    verified: !!d.verified,
+    isToday: d.date === today,
+    isFuture: d.date > today,
+  }));
+}
+
+/** ⑥ 상태 칸: 진행 중이면 통과 / 아직 / 제외, 판정이 확정된 미달만 '미달' */
+function BoardStatus({ status }: { status: Row['status'] }) {
+  if (status === 'NOT_YET') return <StatusBadge kind="live" status="NOT_YET" />;
+  return <StatusBadge kind="judgment" context="member" status={status} label={boardStatusLabel(status)} />;
+}
+
+/** ⑥ 팀원 행 — 경고는 이 팀 카테고리만(서버 warningCount), 벌칙 대상 표시는 넣지 않는다 */
+const columns = (today: string): Column<Row>[] => [
   {
     key: 'name',
     header: '이름',
     render: (r) => (
       <div className={s.nameCell}>
-        <Avatar name={r.member.nickname} imageUrl={r.member.profileImageUrl} size={32} />
-        <Link to={paths.profile(r.member.id)} className={s.nameLink}>
-          {r.member.nickname}
+        <Avatar name={r.nickname} size={32} />
+        <Link to={paths.profile(r.memberId)} className={s.nameLink}>
+          {r.nickname}
         </Link>
-        {r.isViewer ? <span className={s.meMark}>나</span> : null}
+        {r.isMe ? <span className={s.meMark}>나</span> : null}
       </div>
     ),
   },
@@ -59,28 +77,29 @@ const COLUMNS: Column<Row>[] = [
     header: '인증일',
     render: (r) => (
       <div className={s.daysCell}>
-        <WeekStrip days={r.days} size={12} />
+        <WeekStrip days={stripDays(r.days, today)} size={12} />
         {/* E-32 잔디 미조회 · 판정 제외 주는 서버가 null → '—' */}
         <b className={s.dayCount}>{r.verifiedDays == null ? '—' : `${r.verifiedDays}일`}</b>
       </div>
     ),
   },
   { key: 'records', header: '기록글', render: (r) => `${r.recordCount}개` },
-  { key: 'warnings', header: '경고', render: (r) => r.teamWarningCount },
+  // 판정 보류가 남아 알 수 없으면 서버가 null → '—'
+  { key: 'warnings', header: '경고', render: (r) => (r.warningCount == null ? '—' : r.warningCount) },
   {
     key: 'status',
     header: '상태',
     // 진행 중인 주: 통과 / 아직 / 제외 — '미달'은 판정 확정 뒤에만 (TM-05 비고)
-    render: (r) => <StatusBadge kind="live" status={r.status} label={boardStatusLabel(r.status)} />,
+    render: (r) => <BoardStatus status={r.status} />,
   },
 ];
 
 /** ⑤ 이번 주 현황표 (+ ⑨ 빈 상태) */
 function WeekBoard({ board, teamId }: { board: Board; teamId: string }) {
   const clock = useClock();
-  const asOf = asOfLabel(board.grassUpdatedAt, clock.now);
-  const grassMissing = board.rows.some((r) => r.grassStatus !== 'OK');
-  const noActivity = board.rows.every((r) => r.recordCount === 0 && !r.days.some((d) => d.verified));
+  const today = kstDateOf(clock.now);
+  const asOf = asOfLabel(board.grassFetchedAt, clock.now);
+  const noActivity = board.members.every((r) => r.recordCount === 0 && !r.days.some((d) => d.verified));
 
   return (
     <section aria-labelledby="team-week-heading">
@@ -93,7 +112,7 @@ function WeekBoard({ board, teamId }: { board: Board; teamId: string }) {
         }
         right={asOf ? `인증일은 ${asOf}이에요` : undefined}
       />
-      {grassMissing ? (
+      {board.grassNotLoaded ? (
         <div className={s.block}>
           <InfoBox tone="warn" icon="alert" role="status">
             잔디를 아직 못 불러왔어요. 곧 다시 확인할게요.
@@ -115,10 +134,10 @@ function WeekBoard({ board, teamId }: { board: Board; teamId: string }) {
       ) : (
         <DataTable
           caption="이번 주 팀원 현황"
-          columns={COLUMNS}
-          rows={board.rows}
-          rowKey={(r) => r.member.id}
-          rowTone={(r) => (r.isViewer ? 'me' : undefined)}
+          columns={columns(today)}
+          rows={board.members}
+          rowKey={(r) => r.memberId}
+          rowTone={(r) => (r.isMe ? 'me' : undefined)}
           footer={<Foot>경고는 이 팀에서 받은 것만 세요. “아직”은 주가 끝나지 않아 만회할 수 있다는 뜻이에요.</Foot>}
         />
       )}
@@ -216,7 +235,7 @@ export default function TeamBoardPage() {
   const { team } = useTeamScope();
   useDocumentTitle(team.name);
   const q = useQuery(TeamBoardQuery, { variables: { id: team.id } });
-  const isLeader = team.viewerRole === 'LEADER';
+  const isLeader = team.isLeader;
 
   return (
     <PageContainer>
@@ -229,16 +248,16 @@ export default function TeamBoardPage() {
       <QueryBoundary
         loading={q.loading}
         error={q.error}
-        data={q.data?.team}
+        data={q.data?.teamBoard}
         onRetry={() => {
           q.refetch().catch(() => undefined);
         }}
         skeleton={<TableSkeleton rows={4} cols={5} />}
       >
-        {(t) => (
+        {(board) => (
           <>
-            <WeekBoard board={t.currentWeekBoard} teamId={team.id} />
-            <RecentPosts posts={t.recentPosts} />
+            <WeekBoard board={board} teamId={team.id} />
+            <RecentPosts posts={board.recentPosts} />
           </>
         )}
       </QueryBoundary>

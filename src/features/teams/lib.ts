@@ -16,7 +16,7 @@ export function postTypeLabel(type: string): string {
  * 첫 참가 · 면제처럼 판정에서 빠지는 주는 사유와 상관없이 '제외'.
  */
 export function boardStatusLabel(status: string): string | undefined {
-  return status === 'EXCLUDED' || status === 'EXEMPT' ? '제외' : undefined;
+  return status === 'EXCLUDED' ? '제외' : undefined;
 }
 
 /** TM-08 ⑤ 요청 상태 라벨 (A2 2-7: 대기 중 · 승인됨 · 거절됨). 색 · 아이콘은 공통 배지를 따른다 */

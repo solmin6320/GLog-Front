@@ -94,3 +94,10 @@ export function kstDateOf(iso: DateTimeString | number): DateString {
 export function kstIso(date: DateString, hour = 0, minute = 0): DateTimeString {
   return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`;
 }
+
+/** epoch ms → 'YYYY-MM-DDTHH:mm:ss+09:00' */
+export function kstIsoOf(ms: number): DateTimeString {
+  const k = new Date(ms + 9 * 3_600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${k.getUTCFullYear()}-${p(k.getUTCMonth() + 1)}-${p(k.getUTCDate())}T${p(k.getUTCHours())}:${p(k.getUTCMinutes())}:${p(k.getUTCSeconds())}+09:00`;
+}

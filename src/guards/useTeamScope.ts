@@ -4,7 +4,7 @@ export type TeamScopeTeam = {
   id: string;
   name: string;
   isPublic: boolean;
-  viewerRole: 'LEADER' | 'MEMBER' | null;
+  isLeader: boolean;
   memberCount: number;
 };
 

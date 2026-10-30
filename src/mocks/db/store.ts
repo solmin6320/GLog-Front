@@ -16,7 +16,6 @@ import type {
   PostSectionKey,
   PostType,
   SkipReason,
-  TeamRole,
   WarningDeleteReason,
   WarningStanding,
 } from '../__generated__/schema-types';
@@ -58,6 +57,8 @@ export type TeamRow = {
   deletedAt: DateTimeStr | null;
 };
 
+/** DB team_member.role (계약에는 팀장 여부만 Team.isLeader · TeamMember.isLeader로 나간다) */
+export type TeamRole = 'LEADER' | 'MEMBER';
 export type MembershipRow = { teamId: Id; memberId: Id; role: TeamRole; joinedAt: DateTimeStr };
 
 export type InvitationRow = {

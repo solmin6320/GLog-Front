@@ -11,6 +11,11 @@ import { getMockControl, setMockControl } from './control';
 import { touch } from './db/store';
 import { classificationOf } from './errors';
 import { executeMock } from './schema';
+import { setNowSource } from '@/shared/lib/nowSource';
+import { currentClock } from './clock';
+
+// 세션 시계가 목 기준 시각을 따르게 한다 (백엔드에는 서버 시각 API가 없다)
+setNowSource(() => currentClock().nowMs);
 
 const SLOW_MS = 3000;
 

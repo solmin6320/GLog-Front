@@ -12,7 +12,7 @@ import { TEAM_COPY } from '../lib';
 import s from './TeamPages.module.css';
 
 /** ③ 인라인으로 보여 줄 서버 오류 (E-10 · E-11 · E-12) */
-const INLINE_CODES = new Set(['INVITE_CODE_NOT_FOUND', 'ALREADY_TEAM_MEMBER', 'TEAM_JOIN_BLOCKED', 'VALIDATION_FAILED']);
+const INLINE_CODES = new Set(['TEAM_CODE_NOT_FOUND', 'TEAM_ALREADY_JOINED', 'TEAM_JOIN_BLOCKED', 'VALIDATION_FAILED']);
 
 type InlineError = { text: string; alreadyMember: boolean };
 
@@ -32,7 +32,7 @@ export default function TeamJoinPage() {
       onError: (e) => {
         if (!INLINE_CODES.has(e.code)) return false;
         // E-12는 차단 사유 · 남은 기간을 말하지 않는다 (문구 고정)
-        setError({ text: messageFor(e), alreadyMember: e.code === 'ALREADY_TEAM_MEMBER' });
+        setError({ text: messageFor(e), alreadyMember: e.code === 'TEAM_ALREADY_JOINED' });
         inputRef.current?.focus();
         return true;
       },
@@ -49,7 +49,7 @@ export default function TeamJoinPage() {
       return;
     }
     const res = await join.run(normalizeInviteCode(code));
-    const team = res?.data?.joinTeamByInviteCode;
+    const team = res?.data?.joinTeamByCode;
     if (team) navigate(paths.team(team.id));
   };
 

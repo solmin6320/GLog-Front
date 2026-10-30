@@ -12,8 +12,6 @@ import type {
   PostCommentsArgs,
   PostSectionKey,
   PostType,
-  TeamManagedContentsArgs,
-  TeamRecentPostsArgs,
 } from './__generated__/schema-types';
 import { grassUpdatedAt } from './clock';
 import {
@@ -106,6 +104,19 @@ export function paginate<T, N>(items: T[], args: PageArgs, map: (item: T) => N, 
   };
 }
 
+/** 백엔드 `{ items, nextCursor }` 목록 (Q-06, 20개) */
+export function itemsPage<T, N>(items: T[], after: string | null | undefined, map: (item: T) => N, size = 20) {
+  let start = 0;
+  if (after) {
+    const n = decodeCursor(after);
+    if (n === null) throw invalid('after');
+    start = n + 1;
+  }
+  const slice = items.slice(start, start + size);
+  const more = start + slice.length < items.length;
+  return { items: slice.map(map), nextCursor: more ? encodeCursor(start + slice.length - 1) : null };
+}
+
 /* ================================================================== */
 /* 권한                                                                  */
 /* ================================================================== */
@@ -123,6 +134,18 @@ export const isAdmin = (ctx: MockContext) => ctx.viewer?.role === 'ADMIN';
 export function requireTeamMember(ctx: MockContext, teamId: Id): void {
   const v = viewerId(ctx);
   if (!v || !membershipOf(teamId, v)) throw gqlError('FORBIDDEN', { message: 'mock: not a team member' });
+}
+
+/** 팀 조회 · 관리(백엔드 2026-10-19 결정): 그 팀 소속이거나 시스템 관리자. 아니면 FORBIDDEN */
+export function requireTeamViewer(ctx: MockContext, teamId: Id): void {
+  if (isAdmin(ctx)) return;
+  requireTeamMember(ctx, teamId);
+}
+
+/** 팀장 전용 조작: 그 팀 팀장이거나 시스템 관리자 */
+export function requireTeamManager(ctx: MockContext, teamId: Id): void {
+  if (isAdmin(ctx)) return;
+  requireTeamLeader(ctx, teamId);
 }
 
 /** 그 팀 팀장이 아니면 FORBIDDEN */
@@ -186,14 +209,14 @@ export function memberView(ctx: MockContext, m: MemberRow | Id) {
   };
 }
 
-export function meView(ctx: MockContext, m: MemberRow) {
+export function meView(_ctx: MockContext, m: MemberRow) {
   return {
     id: m.id,
-    member: memberView(ctx, m),
+    githubLogin: m.githubLogin,
+    nickname: m.nickname,
+    profileImageUrl: m.profileImageUrl,
     status: m.status,
     role: m.role,
-    hasTeam: teamsOfMember(m.id).length > 0,
-    pendingInvitationCount: () => pendingInvitationsFor(m.id).length,
   };
 }
 
@@ -255,85 +278,88 @@ export function warningRecordView(w: WarningRow, standing: string) {
 /* 팀                                                                    */
 /* ================================================================== */
 
+export function teamPersonView(_ctx: MockContext, id: Id) {
+  const m = memberRow(id);
+  return { id: m.id, nickname: m.nickname, githubLogin: m.githubLogin, profileImageUrl: m.profileImageUrl };
+}
+
+/** 백엔드 Team. isLeader · joinedAt은 조회자 기준 (비소속 관리자는 false · null) */
 export function teamView(ctx: MockContext, t: TeamRow) {
   const v = viewerId(ctx);
   const { clock } = ctx;
+  const mine = v ? membershipOf(t.id, v) : undefined;
   return {
     __typename: 'Team' as const,
     id: t.id,
     name: t.name,
     description: t.description,
     isPublic: t.isPublic,
+    leader: () => teamPersonView(ctx, t.leaderId),
+    isLeader: !!v && t.leaderId === v,
     memberCount: () => membershipsOfTeam(t.id).length,
-    viewerRole: v ? (membershipOf(t.id, v)?.role ?? null) : null,
-    leader: () => memberView(ctx, t.leaderId),
-    // [Q-01] A안: 팀장에게만 재열람 허용
-    inviteCode: v && t.leaderId === v ? t.inviteCode : null,
-    currentWeekSummary: () => {
-      requireTeamMember(ctx, t.id);
-      return teamWeekSummary(t.id, clock);
-    },
-    currentWeekBoard: () => {
-      requireTeamMember(ctx, t.id);
-      return teamWeekBoardView(ctx, t);
-    },
-    recentPosts: (args: TeamRecentPostsArgs) => {
-      const first = args.first ?? 5;
-      if (!Number.isInteger(first) || first < 0 || first > 100) throw invalid('first');
-      return visiblePosts(clock)
-        .filter((p) => p.teamId === t.id)
-        .slice(0, first)
-        .map((p) => postView(ctx, p));
-    },
-    members: () => {
-      requireTeamMember(ctx, t.id);
-      return membershipsOfTeam(t.id).map((m) => ({ member: memberView(ctx, m.memberId), role: m.role, joinedAt: m.joinedAt }));
-    },
-    pendingInvitations: () => {
-      requireTeamLeader(ctx, t.id);
-      return db.invitations
-        .filter((i) => i.teamId === t.id && i.status === 'PENDING')
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map((i) => sentInvitationView(ctx, i));
-    },
-    managedContents: (args: TeamManagedContentsArgs) => {
-      requireTeamLeader(ctx, t.id);
-      return paginate(contentItems(ctx, { teamId: t.id }), args, (c) => contentRowView(ctx, c));
-    },
-    exemptionRequests: () => {
-      requireTeamLeader(ctx, t.id);
-      // [DB 공백] 이 팀장이 요청했고 대상이 지금 이 팀 소속 (목은 teamId도 본다)
-      return db.personalExemptions
-        .filter((e) => e.teamId === t.id && e.requestedById === t.leaderId && !!membershipOf(t.id, e.memberId))
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map((e) => personalExemptionView(ctx, e));
+    joinedAt: mine?.joinedAt ?? null,
+    createdAt: t.createdAt,
+    weekSummary: () => {
+      requireTeamViewer(ctx, t.id);
+      return { weekStart: clock.currentWeekStart, ...teamWeekSummary(t.id, clock) };
     },
   };
 }
 
-export function teamWeekBoardView(ctx: MockContext, t: TeamRow) {
+/** 팀원 목록 한 줄: 팀장이 맨 앞, 나머지는 참가 순 */
+export function teamMembersOrdered(t: TeamRow) {
+  const rows = membershipsOfTeam(t.id);
+  return [...rows.filter((m) => m.memberId === t.leaderId), ...rows.filter((m) => m.memberId !== t.leaderId)];
+}
+
+export function teamMemberView(ctx: MockContext, t: TeamRow, m: { memberId: Id; joinedAt: string }) {
+  return { ...teamPersonView(ctx, m.memberId), isLeader: m.memberId === t.leaderId, joinedAt: m.joinedAt };
+}
+
+/** 진행 중 주 상태(LiveWeekStatus) → 백엔드 TeamBoardStatus. 면제도 판정 제외로 본다 */
+const BOARD_STATUS = { CONDITION_MET: 'PASS', NOT_YET: 'NOT_YET', EXCLUDED: 'EXCLUDED', EXEMPT: 'EXCLUDED' } as const;
+
+export function teamBoardView(ctx: MockContext, t: TeamRow) {
   const { clock } = ctx;
   const v = viewerId(ctx);
+  const rows = teamMembersOrdered(t).map((m) => ({ m, grassStatus: grassStatusOf(m.memberId, v) }));
   return {
     weekStart: clock.currentWeekStart,
     weekEnd: clock.currentWeekEnd,
-    grassUpdatedAt: grassUpdatedAt(clock),
-    rows: () =>
-      membershipsOfTeam(t.id).map((m) => {
-        const live = liveWeek(m.memberId, v, clock);
-        const grassStatus = grassStatusOf(m.memberId, v);
-        const skipped = live.status === 'EXCLUDED' || live.status === 'EXEMPT';
-        return {
-          member: memberView(ctx, m.memberId),
-          isViewer: m.memberId === v,
-          days: currentWeekDays(m.memberId, v, clock),
-          verifiedDays: grassStatus !== 'OK' || skipped ? null : live.verifiedDays,
-          recordCount: live.recordCount,
-          teamWarningCount: teamWarningCount(m.memberId, t.id, clock),
-          status: live.status,
-          grassStatus,
-        };
-      }),
+    grassFetchedAt: grassUpdatedAt(clock),
+    grassNotLoaded: rows.some((r) => r.grassStatus !== 'OK'),
+    members: rows.map(({ m, grassStatus }) => {
+      const live = liveWeek(m.memberId, v, clock);
+      const known = grassStatus === 'OK';
+      const member = memberRow(m.memberId);
+      return {
+        memberId: m.memberId,
+        nickname: member.nickname,
+        githubLogin: member.githubLogin,
+        isMe: m.memberId === v,
+        days: currentWeekDays(m.memberId, v, clock).map((d) => ({
+          date: d.date,
+          hasGrass: d.isFuture || !known ? null : d.hasGrass,
+          hasRecord: d.hasRecord,
+          verified: d.isFuture ? false : d.verified || (known ? false : null),
+        })),
+        verifiedDays: known ? live.verifiedDays : null,
+        recordCount: live.recordCount,
+        warningCount: teamWarningCount(m.memberId, t.id, clock),
+        status: BOARD_STATUS[live.status],
+      };
+    }),
+    recentPosts: visiblePosts(clock)
+      .filter((p) => p.teamId === t.id)
+      .slice(0, 5)
+      .map((p) => ({
+        id: p.id,
+        type: p.type,
+        title: p.title,
+        author: teamPersonView(ctx, p.authorId),
+        createdAt: p.createdAt,
+        isRecord: isRecord(p),
+      })),
   };
 }
 
@@ -342,15 +368,37 @@ export function receivedInvitationView(ctx: MockContext, i: InvitationRow) {
   if (!team) throw gqlError('INTERNAL', { message: 'mock: invitation team missing' });
   return {
     id: i.id,
-    team: teamView(ctx, team),
+    teamId: team.id,
+    teamName: team.name,
     // [DB 공백] 초대한 사람 = 지금 팀장
-    invitedBy: () => memberView(ctx, team.leaderId),
+    inviter: () => teamPersonView(ctx, team.leaderId),
     createdAt: i.createdAt,
   };
 }
 
 export function sentInvitationView(ctx: MockContext, i: InvitationRow) {
-  return { id: i.id, invitee: memberView(ctx, i.inviteeId), createdAt: i.createdAt };
+  return { id: i.id, invitee: teamPersonView(ctx, i.inviteeId), createdAt: i.createdAt };
+}
+
+/** 백엔드 PersonalExemption (TM-08). 팀 이름은 싣지 않는다 */
+export function teamPersonalExemptionView(_ctx: MockContext, e: PersonalExemptionRow) {
+  const brief = (id: Id) => {
+    const m = memberRow(id);
+    return { id: m.id, nickname: m.nickname, githubLogin: m.githubLogin };
+  };
+  return {
+    id: e.id,
+    member: brief(e.memberId),
+    requester: brief(e.requestedById),
+    weekStart: e.weekStart,
+    weekEnd: addDays(e.weekStart, 6),
+    status: e.status,
+    reason: e.reason,
+    rejectReason: e.rejectReason,
+    respondedAt: e.respondedAt,
+    createdAt: e.createdAt,
+    overlapsExemptionPeriod: !!exemptionPeriodOn(e.weekStart),
+  };
 }
 
 /* ================================================================== */
@@ -408,6 +456,7 @@ export function postLookupView(ctx: MockContext, id: Id) {
 export function commentView(ctx: MockContext, c: CommentRow) {
   return {
     id: c.id,
+    postId: c.postId,
     content: c.content,
     author: () => memberView(ctx, c.authorId),
     createdAt: c.createdAt,

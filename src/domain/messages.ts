@@ -66,7 +66,7 @@ export const MSG = {
   copied: '복사했어요.',
 };
 
-/** 코드별 기본 문구 (A3 7-2). 화면마다 다른 문구는 overrides로 덮는다 (예: ALREADY_TEAM_MEMBER의 E-16 · E-17) */
+/** 코드별 기본 문구 (A3 7-2). 화면마다 다른 문구는 overrides로 덮는다 (예: INVITEE_ALREADY_MEMBER의 E-16) */
 const BY_CODE: Record<string, string> = {
   UNAUTHENTICATED: MSG.expired, // E-03
   ACCOUNT_PENDING: '가입 승인을 기다리는 중이에요.', // E-01 (AU-03으로 이동)
@@ -74,16 +74,21 @@ const BY_CODE: Record<string, string> = {
   FORBIDDEN: MSG.forbidden, // E-09
   NOT_FOUND: MSG.notFound, // E-53
   POST_DELETED: MSG.deletedPost, // E-31
-  LOGIN_CODE_INVALID: '로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.', // E-05 · E-06
+  AUTH_CODE_INVALID: '로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.', // E-05 · E-06
   VALIDATION_FAILED: '입력한 내용을 다시 확인해 주세요.',
-  INVITE_CODE_NOT_FOUND: '그런 초대코드가 없어요. 다시 확인해 주세요.', // E-10
-  ALREADY_TEAM_MEMBER: '이미 참가한 팀이에요.', // E-11 (TM-06은 E-16, TM-04는 E-17로 덮는다)
+  TEAM_CODE_NOT_FOUND: '그런 초대코드가 없어요. 다시 확인해 주세요.', // E-10
+  TEAM_ALREADY_JOINED: '이미 참가한 팀이에요.', // E-11
   TEAM_JOIN_BLOCKED: '이 팀에는 참가할 수 없어요. 팀장에게 문의해 주세요.', // E-12
   INVITEE_NOT_FOUND: '그 아이디의 회원을 찾을 수 없어요. 먼저 가입해야 초대할 수 있어요.', // E-15
+  INVITEE_ALREADY_MEMBER: '이미 팀에 있는 회원이에요.', // E-16
+  INVITATION_DUPLICATE: '이미 초대를 보냈어요.',
+  INVITATION_ALREADY_JOINED: '이미 참가한 팀이에요. 초대는 정리했어요.', // E-17
   TEAM_GONE: '없어진 팀이에요.', // E-18
+  TEAM_MEMBER_NOT_FOUND: '그 팀원을 찾을 수 없어요.',
   LEADER_MUST_TRANSFER: '팀장은 다른 팀원에게 팀장을 넘긴 뒤에 나갈 수 있어요.', // E-19
-  LAST_MEMBER: '혼자 있는 팀이에요. 나가면 팀이 삭제돼요. 삭제할까요?', // E-20
-  EXEMPTION_DUPLICATE: '이미 요청한 주간이에요.', // E-47
+  LEADER_LAST_MEMBER: '혼자 있는 팀이에요. 나가면 팀이 삭제돼요. 삭제할까요?', // E-20
+  EXEMPTION_DUPLICATE: '이미 요청한 주간이에요.', // 관리자 면제 기간 (팀 요청은 EXEMPTION_REQUEST_DUPLICATE)
+  EXEMPTION_REQUEST_DUPLICATE: '이미 요청한 주간이에요.', // E-47
   JUDGMENT_NOT_CORRECTABLE: MSG.server, // 서버 오류 표준형 (A3 7-2)
   SYSTEM_NOTICE_UNDELETABLE: '이 공지는 판정 기준 안내라 삭제할 수 없어요.', // EX-AD01-02
   PREVIEW_STALE: MSG.previewStale,

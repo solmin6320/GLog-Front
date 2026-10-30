@@ -28,26 +28,24 @@ export default function TeamManagePage() {
       <QueryBoundary
         loading={q.loading}
         error={q.error}
-        data={q.data?.team}
+        data={q.data}
         onRetry={() => {
           q.refetch().catch(() => undefined);
         }}
         skeleton={<PageSkeleton />}
       >
-        {(t) => (
+        {(d) => (
           <>
-            {/* ① 계약 값이 있을 때만 (Q-01 기본값: 팀장 재열람 허용) */}
-            {t.inviteCode ? (
-              <section className={m.section} aria-labelledby="manage-code-heading">
-                <SectionHeader id="manage-code-heading" title="초대코드" />
-                <InviteCodeBox code={t.inviteCode} note="다시 발급할 수 없어요." />
-              </section>
-            ) : null}
-            <InviteMemberSection teamId={team.id} pending={t.pendingInvitations} />
-            <MembersSection teamId={team.id} members={t.members} viewerMemberId={viewer.memberId} />
+            {/* ① 팀장 재열람 (Q-01) */}
+            <section className={m.section} aria-labelledby="manage-code-heading">
+              <SectionHeader id="manage-code-heading" title="초대코드" />
+              <InviteCodeBox code={d.teamInviteCode} note="다시 발급할 수 없어요." />
+            </section>
+            <InviteMemberSection teamId={team.id} pending={d.sentTeamInvitations.items} />
+            <MembersSection teamId={team.id} viewerMemberId={viewer.memberId} />
             <VisibilitySection />
             <TeamContentsSection teamId={team.id} />
-            <DangerZoneSection teamId={team.id} alone={t.members.length <= 1} />
+            <DangerZoneSection teamId={team.id} alone={team.memberCount <= 1} />
           </>
         )}
       </QueryBoundary>

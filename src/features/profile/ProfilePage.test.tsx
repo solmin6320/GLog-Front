@@ -54,14 +54,14 @@ describe('PR-01 프로필', () => {
       '9/14 ~ 9/201일0개미달 (경고)',
       '9/7 ~ 9/13——면제',
       '8/31 ~ 9/63일2개통과',
-      '8/24 ~ 8/30——첫 참가',
+      '8/24 ~ 8/30——제외',
     ]);
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 
-  it('ACC-PR01-04 · ⑪: [더 보기]로 8주씩 이어 붙이고 끝이면 "여기까지예요."', async () => {
-    // 김철수(판정 5주)에게 지난 판정 6주를 더 넣어 11주로 만든다
-    for (let i = 1; i <= 6; i += 1) {
+  it('ACC-PR01-04 · ⑪: [더 보기]로 20주씩 이어 붙이고 끝이면 "여기까지예요." (백엔드 커서 20개)', async () => {
+    // 김철수(판정 5주)에게 지난 판정 20주를 더 넣어 25주로 만든다
+    for (let i = 1; i <= 20; i += 1) {
       const weekStart = addDays('2026-08-24', -7 * i);
       db.judgments.push({
         id: nextId('judgments'),
@@ -80,9 +80,9 @@ describe('PR-01 프로필', () => {
     }
     const { user } = renderRoute('/profile/2');
     const table = await screen.findByRole('table', { name: '주간 판정 이력' });
-    expect(rowsOf(table)).toHaveLength(9); // 진행 중 1 + 8주
+    expect(rowsOf(table)).toHaveLength(21); // 진행 중 1 + 20주
     await user.click(screen.getByRole('button', { name: '더 보기' }));
-    await waitFor(() => expect(rowsOf(screen.getByRole('table', { name: '주간 판정 이력' }))).toHaveLength(12));
+    await waitFor(() => expect(rowsOf(screen.getByRole('table', { name: '주간 판정 이력' }))).toHaveLength(26));
     expect(screen.getByText('여기까지예요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
@@ -96,7 +96,8 @@ describe('PR-01 프로필', () => {
     expect(within(warning).getByText('벌칙 대상')).toBeInTheDocument();
     expect(within(warning).getByText('벌칙을 이행해야 경고가 사라져요. 지금은 차감되지 않아요.')).toBeInTheDocument();
     const byTeam = within(warning).getByRole('list', { name: '팀별 경고' });
-    expect(within(byTeam).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['비공개 팀3회', '사이드 프로젝트 A팀2회']);
+    // 공개 팀(이름순) → 비공개 팀 → 삭제된 팀 순 (백엔드 profile-warning)
+    expect(within(byTeam).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['사이드 프로젝트 A팀2회', '비공개 팀3회']);
     // 박지훈의 소속 팀은 비공개 팀뿐 → 목록이 비어 있다 (EX-PR01-02)
     expect(within(screen.getByRole('region', { name: '소속 팀' })).getByText('공개된 소속 팀이 없어요.')).toBeInTheDocument();
     expect(screen.queryByText(/알고리즘 스터디/)).not.toBeInTheDocument();
@@ -141,18 +142,19 @@ describe('PR-01 프로필', () => {
     expect(await screen.findByRole('heading', { name: '찾는 내용이 없어요. 삭제됐을 수 있어요.' })).toBeInTheDocument();
   });
 
-  it('E-32: 잔디를 못 불러오면 ⑦ 빈 상태 + [다시 시도] · E-08은 배너', async () => {
+  it('E-32: 잔디 캐시가 없으면(grass null) ⑦ 빈 상태 + [다시 시도]', async () => {
     setMockControl({ grass: 'failed' });
-    const first = renderRoute('/profile/me');
-    const grass = await screen.findByRole('region', { name: 'GitHub 잔디' });
-    expect(within(grass).getByText('GitHub 잔디를 불러오지 못했어요.')).toBeInTheDocument();
-    expect(within(grass).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
-    expect(within(grass).getByText('어제 오전 6시 기준')).toBeInTheDocument();
-    first.unmount();
-
-    setMockControl({ grass: 'identity' });
     renderRoute('/profile/me');
-    const grass2 = await screen.findByRole('region', { name: 'GitHub 잔디' });
-    expect(within(grass2).getByText('GitHub 아이디가 바뀌었어요. 다시 로그인하면 잔디가 연결돼요.')).toBeInTheDocument();
+    const grass = await screen.findByRole('region', { name: 'GitHub 잔디' });
+    expect(within(grass).getByText('GitHub 잔디를 아직 못 불러왔어요. 곧 다시 확인할게요.')).toBeInTheDocument();
+    expect(within(grass).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+    expect(within(grass).queryByRole('region', { name: '잔디 기록' })).not.toBeInTheDocument();
+  });
+
+  it('⑦ 잔디는 1년치(오늘까지 365일)이고 색 단계는 기여가 있는 날의 사분위로 나눈다', async () => {
+    renderRoute('/profile/me');
+    const grass = await screen.findByRole('region', { name: 'GitHub 잔디' });
+    const cells = within(within(grass).getByRole('region', { name: '잔디 기록' })).getAllByRole('listitem');
+    expect(cells.filter((c) => !c.getAttribute('aria-hidden'))).toHaveLength(365);
   });
 });

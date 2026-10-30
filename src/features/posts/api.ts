@@ -154,17 +154,9 @@ export const PostDeleteComment = graphql(`
 
 /* ---------- BD-04 작성 · 수정 ---------- */
 
-/**
- * 소속 팀 셀렉트(⑨)와 E-27 배너용 서버 시각.
- * clock을 다시 받으면 세션 시계(useClock)도 같은 캐시 값으로 새로워진다 — 오래 켜 둔 탭에서도 배너가 맞게 뜬다.
- */
+/** 소속 팀 셀렉트(⑨). E-27 배너 시각은 세션 시계(useClock)를 쓴다 */
 export const PostEditorTeamsQuery = graphql(`
   query PostEditorTeamsQuery {
-    clock {
-      now
-      currentWeekStart
-      currentWeekEnd
-    }
     myTeams {
       id
       name

@@ -9,9 +9,9 @@ import { sessionEvents } from './sessionEvents';
 import { tokenStore } from './tokenStore';
 
 /** 이 연산들의 UNAUTHENTICATED는 '만료'가 아니다 — 교환은 토큰 없이 부르고, 로그아웃은 실패해도 진행한다 */
-const NOT_EXPIRY_OPERATIONS = new Set(['SessionExchangeLoginCode', 'SessionLogout']);
+const NOT_EXPIRY_OPERATIONS = new Set(['SessionExchangeAuthCode']);
 /** 세션 조회 자신은 계정 상태의 출처라 'status-changed'를 내지 않는다 (재조회 → 같은 오류 → 재조회 고리 방지) */
-const NOT_STATUS_OPERATIONS = new Set(['SessionQuery', 'SessionExchangeLoginCode', 'SessionLogout']);
+const NOT_STATUS_OPERATIONS = new Set(['SessionQuery', 'SessionExchangeAuthCode']);
 
 export const bearer = (token: string) => `Bearer ${token}`;
 

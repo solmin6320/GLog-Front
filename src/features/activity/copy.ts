@@ -29,6 +29,8 @@ export const WEEKLY_COPY = {
 
 export const WARNINGS_COPY = {
   title: '내 경고 · 벌칙',
+  /** 판정 보류가 남아 경고를 계산하지 않을 때 (백엔드 onHold) */
+  onHold: '확인 중인 주가 있어 경고를 계산하고 있어요. 잠시 뒤 다시 확인해 주세요.',
   sub: '경고는 사람 단위로 쌓이고, 어느 팀에서 받았는지는 카테고리로 붙어요',
   /** ① 경고 0 (PR-01과 같은 문구) */
   noWarning: '받은 경고가 없어요. 잘하고 있어요.',

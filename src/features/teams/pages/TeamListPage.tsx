@@ -20,8 +20,8 @@ function TopActions() {
   );
 }
 
-/** ③ 받은 초대 알림 — 0건이면 숨김 */
-function InvitationBanner({ count }: { count: number }) {
+/** ③ 받은 초대 알림 — 0건이면 숨김. 첫 페이지(20건)를 넘으면 '20건 이상' */
+function InvitationBanner({ count, more }: { count: number; more: boolean }) {
   if (count <= 0) return null;
   return (
     <div className={s.block}>
@@ -34,7 +34,7 @@ function InvitationBanner({ count }: { count: number }) {
           </LinkButton>
         }
       >
-        <b>받은 초대 {count}건</b>
+        <b>받은 초대 {count}건{more ? ' 이상' : ''}</b>
       </InfoBox>
     </div>
   );
@@ -42,14 +42,14 @@ function InvitationBanner({ count }: { count: number }) {
 
 /** ④~⑧ 팀 카드 한 장. 카드 전체가 TM-05 링크 */
 function TeamCard({ team }: { team: TeamItem }) {
-  const { passCount, notYetCount } = team.currentWeekSummary;
+  const { passCount, notYetCount } = team.weekSummary;
   return (
     <li>
       <Link to={paths.team(team.id)} className={s.teamCard}>
         <div className={s.teamMain}>
           <div className={s.teamHead}>
             <h2 className={s.teamName}>{team.name}</h2>
-            {team.viewerRole ? <StatusBadge kind="teamRole" role={team.viewerRole} /> : null}
+            {team.isLeader ? <StatusBadge kind="teamRole" role="LEADER" /> : null}
             <StatusBadge kind="visibility" isPublic={team.isPublic} />
           </div>
           {/* ⑧ 진행 중인 주에는 '미달'을 쓰지 않는다 — 통과 · 아직 두 값만 (M-06) */}
@@ -94,7 +94,7 @@ export default function TeamListPage() {
       <QueryBoundary loading={q.loading} error={q.error} data={q.data} onRetry={() => void q.refetch()} skeleton={<ListSkeleton />}>
         {(data) => (
           <>
-            <InvitationBanner count={data.me?.pendingInvitationCount ?? 0} />
+            <InvitationBanner count={data.receivedTeamInvitations.items.length} more={!!data.receivedTeamInvitations.nextCursor} />
             {data.myTeams.length === 0 ? (
               <EmptyState
                 icon="users"

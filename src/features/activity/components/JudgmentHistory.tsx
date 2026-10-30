@@ -7,7 +7,7 @@ import { WEEKLY_COPY } from '../copy';
 import s from '../activity.module.css';
 import { SectionError } from './SectionError';
 
-type Row = NonNullable<WeeklyHistoryQueryQuery['member']>['judgmentHistory']['nodes'][number];
+type Row = WeeklyHistoryQueryQuery['myJudgmentHistory']['items'][number];
 
 const COLUMNS: Column<Row>[] = [
   { key: 'week', header: '주차', width: '36%', render: (r) => formatWeekRange(r.weekStart) },
@@ -34,7 +34,7 @@ export function JudgmentHistory({ list }: { list: PagedList<WeeklyHistoryQueryQu
   } else {
     body = (
       <>
-        <DataTable caption="지난 판정" columns={COLUMNS} rows={list.nodes} rowKey={(r) => r.id} />
+        <DataTable caption="지난 판정" columns={COLUMNS} rows={list.nodes} rowKey={(r) => r.weekStart} />
         <LoadMore hasMore={list.hasMore} loading={list.loadingMore} error={list.loadMoreError} onLoadMore={list.loadMore} endText={null} />
         {list.nodes.some((r) => r.status === 'HOLD') ? <Foot>{WEEKLY_COPY.holdNote}</Foot> : null}
       </>

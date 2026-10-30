@@ -3,7 +3,7 @@ import { useMutation } from '@apollo/client/react';
 import { Link, useNavigate } from 'react-router';
 import { MSG } from '@/domain/messages';
 import type { AdminNoticesQueryQuery } from '@/gql/graphql';
-import { DEFAULT_PAGE_SIZE, useAction, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, useAction, usePagedList } from '@/shared/api';
 import { formatDotDate } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import { Button, DataTable, EmptyState, Icon, LoadMore, Pill, QueryBoundary, TableSkeleton, useConfirm, type Column } from '@/shared/ui';
@@ -11,12 +11,12 @@ import { AdminNoticesDelete, AdminNoticesQuery, AdminNoticesSetPinned } from './
 import { SYSTEM_NOTICE_HINT, sortNotices } from './order';
 import s from './Notices.module.css';
 
-type Notice = AdminNoticesQueryQuery['notices']['nodes'][number];
+type Notice = AdminNoticesQueryQuery['notices']['items'][number];
 
 /** ⑥ 공지 목록. 행마다 고정 토글 · [수정] · [삭제] */
 export function NoticeList() {
   const navigate = useNavigate();
-  const list = usePagedList(AdminNoticesQuery, { variables: {}, select: (d) => d.notices });
+  const list = usePagedList(AdminNoticesQuery, { variables: {}, select: (d) => toPaged(d.notices) });
 
   const columns: Column<Notice>[] = [
     {
@@ -90,7 +90,7 @@ function PinToggle({ notice }: { notice: Notice }) {
   const toggle = useAction(
     (pinned: boolean) =>
       setPinned({
-        variables: { id: notice.id, pinned },
+        variables: { id: notice.id, isPinned: pinned },
         // __typename이 있어야 Notice:{id}에 바로 반영된다 (생성 타입에는 없어서 변수로 넘긴다)
         optimisticResponse: { setNoticePinned: optimisticNotice(notice.id, pinned) },
         refetchQueries: [AdminNoticesQuery],

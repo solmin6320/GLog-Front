@@ -49,12 +49,10 @@ describe('TM-06 팀 관리', () => {
     expect(within(danger).queryByRole('button', { name: '팀 나가기' })).not.toBeInTheDocument();
   });
 
-  it('ACC-TM06-03 계약의 초대코드가 null이면 ① 영역이 없다', async () => {
-    const team = db.teams.find((t) => t.id === '1');
-    if (team) team.inviteCode = null;
+  it('ACC-TM06-03 팀장은 초대코드를 다시 본다 (Q-01, teamInviteCode)', async () => {
     renderRoute('/teams/1/manage');
-    expect(await screen.findByRole('heading', { name: '아이디로 초대' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '초대코드' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '초대코드' })).toBeInTheDocument();
+    expect(screen.getByText('JD7K-Q2MA')).toBeInTheDocument();
   });
 
   it('ACC-TM06-04 아이디 초대: 가입 안 함(E-15) · 이미 팀원(E-16) · 성공 시 입력칸 비우고 ③에 대기 중', async () => {
@@ -136,15 +134,18 @@ describe('TM-06 팀 관리', () => {
 
   it('ACC-TM06-09 팀 글 관리: 행마다 [수정]만 · 삭제 버튼 없음 · 안내 · 글 [수정] → 글 수정 화면', async () => {
     renderRoute('/teams/1/manage');
-    const list = await screen.findByRole('list', { name: '팀 글과 댓글' });
-    const rows = within(list).getAllByRole('listitem');
-    expect(rows.length).toBeGreaterThan(0);
+    const list = await screen.findByRole('list', { name: '팀 글' });
+    const comments = await screen.findByRole('list', { name: '팀 글 댓글' });
     // 글 행은 [수정]이 링크(BD-04로 이동), 댓글 행은 버튼(그 자리 편집)이다
-    for (const row of rows) {
-      const controls = [...within(row).queryAllByRole('button'), ...within(row).queryAllByRole('link')];
-      expect(controls.some((el) => /^수정/.test(el.textContent ?? ''))).toBe(true);
+    for (const box of [list, comments]) {
+      const rows = within(box).getAllByRole('listitem');
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        const controls = [...within(row).queryAllByRole('button'), ...within(row).queryAllByRole('link')];
+        expect(controls.some((el) => /^수정/.test(el.textContent ?? ''))).toBe(true);
+      }
+      expect(within(box).queryByRole('button', { name: /삭제/ })).not.toBeInTheDocument();
     }
-    expect(within(list).queryByRole('button', { name: /삭제/ })).not.toBeInTheDocument();
     expect(screen.getByText('삭제는 관리자에게 문의해 주세요.')).toBeInTheDocument();
 
     const postEdit = within(list).getAllByRole('link', { name: /^수정: / })[0];
@@ -153,7 +154,7 @@ describe('TM-06 팀 관리', () => {
 
   it('ACC-TM06-09 댓글 [수정] → 그 자리에서 편집 · 저장하면 목록이 바뀐다', async () => {
     const { user } = renderRoute('/teams/1/manage');
-    const list = await screen.findByRole('list', { name: '팀 글과 댓글' });
+    const list = await screen.findByRole('list', { name: '팀 글 댓글' });
     const editButtons = await within(list).findAllByRole('button', { name: /^수정: 댓글/ });
     await user.click(editButtons[0] as HTMLElement);
     const editor = await screen.findByRole('textbox', { name: '댓글 수정' });

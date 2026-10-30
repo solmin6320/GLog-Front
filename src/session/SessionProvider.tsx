@@ -1,6 +1,7 @@
 /**
  * 세션 (설계서 4장 · 요구사항 4장). ToastProvider · ApolloProvider 안쪽, 라우터 바깥에 둔다.
- * - 시작: 토큰이 없으면 바로 ANONYMOUS(시계만 받는다), 있으면 LOADING → SessionQuery → me.status
+ * - 시작: 토큰이 없으면 바로 ANONYMOUS, 있으면 LOADING → SessionQuery → me.status (ACTIVE면 SessionTeamsQuery도)
+ * - 시계: 백엔드에 서버 시각 API가 없어 nowSource(브라우저 · 목 기준 시각)로 조회할 때마다 계산한다
  * - 'expired' 사건: 토큰 폐기 → ANONYMOUS → 토스트 E-03(한 번만) → 캐시 비우기. 이동은 가드가 한다
  * - 'status-changed' 사건: SessionQuery 재조회 → 가드가 /pending으로
  * 이동 · 라우터를 직접 부르지 않는다.
@@ -8,39 +9,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { skipToken, useApolloClient, useQuery } from '@apollo/client/react';
 import { MSG } from '@/domain/messages';
-import type { SessionQueryQuery } from '@/gql/graphql';
+import type { SessionQueryQuery, SessionTeamsQueryQuery } from '@/gql/graphql';
 import { appError, normalizeError, type AppError } from '@/shared/api/errors';
 import { sessionEvents } from '@/shared/api/sessionEvents';
 import { tokenStore } from '@/shared/api/tokenStore';
-import { kstDateOf } from '@/shared/lib/kst';
+import { addDays, kstDateOf, kstIsoOf, mondayOf } from '@/shared/lib/kst';
+import { nowMs } from '@/shared/lib/nowSource';
 import { useToast } from '@/shared/ui';
-import { SessionExchangeLoginCode, SessionLogout, SessionQuery } from './api';
+import { SessionExchangeAuthCode, SessionQuery, SessionTeamsQuery } from './api';
 import { SessionContext } from './context';
 import { loginUrl } from './loginUrl';
 import type { Clock, Session, SessionStatus, Viewer } from './types';
 
-type MeData = NonNullable<SessionQueryQuery['me']>;
-type ClockData = SessionQueryQuery['clock'];
-type State = { status: SessionStatus; me: MeData | null; clock: Clock | null };
-type Loaded = { generation: number; next: SessionStatus; me: MeData | null; clock: Clock | null; failure: AppError | null };
+/** 세션 응답. 팀 · 초대는 활성 회원만 받는다 (대기 · 거절이면 null) */
+type SessionData = {
+  me: SessionQueryQuery['me'];
+  myTeams?: SessionTeamsQueryQuery['myTeams'] | null;
+  receivedTeamInvitations?: SessionTeamsQueryQuery['receivedTeamInvitations'] | null;
+};
+type State = { status: SessionStatus; me: SessionData | null; clock: Clock | null };
+type Loaded = { generation: number; next: SessionStatus; me: SessionData | null; clock: Clock | null; failure: AppError | null };
 
 /** 같은 일회용 code의 교환은 1번만 (StrictMode 이중 effect · A3 4-1). 끝나면 지운다 — 목은 같은 code를 다시 쓴다 */
 const exchanges = new Map<string, Promise<SessionStatus>>();
 
-function toClock(c: ClockData): Clock {
-  return { now: c.now, today: kstDateOf(c.now), currentWeekStart: c.currentWeekStart, currentWeekEnd: c.currentWeekEnd };
+/** 지금(KST)과 이번 주 월~일 */
+function currentClock(): Clock {
+  const now = kstIsoOf(nowMs());
+  const today = kstDateOf(now);
+  const currentWeekStart = mondayOf(today);
+  return { now, today, currentWeekStart, currentWeekEnd: addDays(currentWeekStart, 6) };
 }
 
-function toViewer(me: MeData): Viewer {
+function toViewer({ me, myTeams, receivedTeamInvitations }: SessionData): Viewer {
+  // 대기 · 거절 회원은 팀 · 초대를 볼 수 없다 (캐시에 남은 활성 시절 값은 쓰지 않는다)
+  const active = me.status === 'ACTIVE';
   return {
     id: me.id,
-    memberId: me.member.id,
-    nickname: me.member.nickname,
-    githubLogin: me.member.githubLogin,
-    profileImageUrl: me.member.profileImageUrl ?? null,
+    memberId: me.id,
+    nickname: me.nickname,
+    githubLogin: me.githubLogin,
+    profileImageUrl: me.profileImageUrl ?? null,
     role: me.role,
-    hasTeam: me.hasTeam,
-    pendingInvitationCount: me.pendingInvitationCount,
+    hasTeam: active && (myTeams?.length ?? 0) > 0,
+    pendingInvitationCount: active ? (receivedTeamInvitations?.items.length ?? 0) : 0,
   };
 }
 
@@ -60,12 +72,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(() => ({
     status: tokenStore.get() ? 'LOADING' : 'ANONYMOUS',
     me: null,
-    clock: null,
+    clock: currentClock(),
   }));
   /** 세대 번호 — 로그인 · 로그아웃 · 만료 뒤에 도착한 이전 조회 결과는 버린다 */
   const generation = useRef(0);
 
-  /** SessionQuery를 네트워크로 부르고 결과만 계산한다 (상태는 건드리지 않는다) */
+  /** SessionQuery(+ 활성이면 SessionTeamsQuery)를 네트워크로 부르고 결과만 계산한다 (상태는 건드리지 않는다) */
   const load = useCallback(async (): Promise<Loaded> => {
     const generationAtStart = ++generation.current;
     let result;
@@ -75,9 +87,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       throw normalizeError(err);
     }
     const { data, error } = result;
-    const me = data?.me ?? null;
-    const clock = data?.clock ? toClock(data.clock) : null;
-    let next: SessionStatus = me ? me.status : 'ANONYMOUS';
+    let me: SessionData | null = data?.me ? { me: data.me } : null;
+    if (me?.me.status === 'ACTIVE') {
+      try {
+        const teams = await client.query({ query: SessionTeamsQuery, fetchPolicy: 'network-only' });
+        me = { ...me, myTeams: teams.data?.myTeams ?? null, receivedTeamInvitations: teams.data?.receivedTeamInvitations ?? null };
+      } catch (err) {
+        throw normalizeError(err);
+      }
+    }
+    const clock = currentClock();
+    let next: SessionStatus = me ? me.me.status : 'ANONYMOUS';
     let failure: AppError | null = null;
     if (!me && error) {
       const e = normalizeError(error);
@@ -112,22 +132,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const p = (async (): Promise<SessionStatus> => {
         let payload;
         try {
-          const res = await client.mutate({ mutation: SessionExchangeLoginCode, variables: { code } });
-          payload = res.data?.exchangeLoginCode;
+          const res = await client.mutate({ mutation: SessionExchangeAuthCode, variables: { code } });
+          payload = res.data?.exchangeAuthCode;
         } catch (err) {
-          throw normalizeError(err);
+          const e = normalizeError(err);
+          // 거절 회원은 토큰 없이 ACCOUNT_REJECTED로 끝난다 (E-02 '토큰 미발급')
+          if (e.code !== 'ACCOUNT_REJECTED') throw e;
+          generation.current++;
+          tokenStore.clear();
+          setState((s) => ({ status: 'REJECTED', me: null, clock: s.clock ?? currentClock() }));
+          return 'REJECTED';
         }
         if (!payload) throw appError('INTERNAL');
         generation.current++;
-        if (payload.accessToken) tokenStore.set(payload.accessToken);
-        else tokenStore.clear();
+        tokenStore.set(payload.accessToken);
         await client.clearStore();
-        if (payload.accessToken) return refresh();
-        // 토큰 없이 끝나는 경우: 거절(E-02 '토큰 미발급') · 대기 제한 토큰을 안 주는 백엔드(B-01 안 B)
-        if (payload.status === 'ACTIVE') throw appError('INTERNAL');
-        const status: SessionStatus = payload.status;
-        setState((s) => ({ status, me: null, clock: s.clock }));
-        return status;
+        return refresh();
       })();
       exchanges.set(code, p);
       const forget = () => {
@@ -139,27 +159,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [client, refresh],
   );
 
+  // 백엔드는 무상태 JWT라 로그아웃 API가 없다 — 토큰을 버리고 캐시를 비운다
   const signOut = useCallback(async (): Promise<void> => {
-    if (tokenStore.get()) {
-      try {
-        await client.mutate({ mutation: SessionLogout });
-      } catch {
-        // 실패해도 로그아웃은 진행한다 (설계서 4장)
-      }
-    }
     tokenStore.clear();
     generation.current++;
     setState((s) => ({ status: 'ANONYMOUS', me: null, clock: s.clock }));
     await client.clearStore().catch(() => undefined);
   }, [client]);
 
-  // 시작 조회. 토큰이 없어도 부른다(시계는 공개 필드)
+  // 시작 조회. 토큰이 없으면 me를 부르지 않는다 (시계는 처음부터 있다)
   useEffect(() => {
+    if (!tokenStore.get()) return;
     load()
       .then(apply)
       .catch(() => {
         // 연결 · 서버 실패: 볼 수 있는 화면이 없으니 로그인 화면으로 (토큰은 남겨 다음 새로고침에 다시 시도)
-        setState((s) => (s.status === 'LOADING' ? { ...s, status: 'ANONYMOUS' } : s));
+        setState((s) => (s.status === 'LOADING' ? { ...s, status: 'ANONYMOUS', clock: s.clock ?? currentClock() } : s));
       });
   }, [load, apply]);
 
@@ -185,14 +200,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [client, refresh, toast]);
 
-  // viewer는 캐시를 지켜본다 — 다른 쿼리가 me { hasTeam pendingInvitationCount }를 다시 받으면 바로 바뀐다
+  // viewer는 캐시를 지켜본다 — 다른 쿼리가 세션 문서(REFRESH_SESSION)를 다시 받으면 팀 유무 · 초대 수가 바로 바뀐다
   const member = isMemberStatus(state.status) && state.me !== null;
-  const watched = useQuery(SessionQuery, member ? { fetchPolicy: 'cache-only', nextFetchPolicy: 'cache-only' } : skipToken);
-  const me = member ? (watched.data?.me ?? state.me) : null;
-  const watchedClock = member ? watched.data?.clock : undefined;
+  const cacheOnly = { fetchPolicy: 'cache-only', nextFetchPolicy: 'cache-only' } as const;
+  const watchedMe = useQuery(SessionQuery, member ? cacheOnly : skipToken).data?.me;
+  const active = member && state.status === 'ACTIVE';
+  const watchedData = useQuery(SessionTeamsQuery, active ? cacheOnly : skipToken).data;
+  const data = useMemo<SessionData | null>(() => {
+    if (!member || !state.me) return null;
+    // 캐시의 me가 지금 상태와 다르면(예전 활성 시절 값) 방금 받은 값을 쓴다
+    const me = watchedMe && watchedMe.status === state.me.me.status ? watchedMe : state.me.me;
+    if (!active) return { me };
+    return {
+      me,
+      myTeams: watchedData?.myTeams ?? state.me.myTeams,
+      receivedTeamInvitations: watchedData?.receivedTeamInvitations ?? state.me.receivedTeamInvitations,
+    };
+  }, [member, active, watchedMe, watchedData, state.me]);
 
-  const viewer = useMemo(() => (me ? toViewer(me) : null), [me]);
-  const clock = useMemo(() => (watchedClock ? toClock(watchedClock) : state.clock), [watchedClock, state.clock]);
+  const viewer = useMemo(() => (data ? toViewer(data) : null), [data]);
+  // 세션 문서를 다시 받을 때마다 지금 시각을 다시 계산한다 (오래 켜 둔 탭에서도 오늘 · 이번 주가 맞게)
+  const clock = useMemo(() => (state.clock && watchedData !== undefined ? currentClock() : state.clock), [state.clock, watchedData]);
 
   const session = useMemo<Session>(
     () => ({ status: state.status, viewer, clock, refresh, completeLogin, signOut, loginUrl }),

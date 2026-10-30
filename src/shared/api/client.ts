@@ -6,7 +6,7 @@ import { ApolloClient, ApolloLink, HttpLink, InMemoryCache } from '@apollo/clien
 import type { TypePolicies } from '@apollo/client';
 import { graphqlUrl } from '@/shared/config/env';
 import { createAuthLink, createErrorLink } from './links';
-import { nodesConnection } from './pagination';
+import { itemsPage, nodesConnection } from './pagination';
 
 /** id가 없는 값 객체 — 부모에 묻힌다. 같은 자리에 새 값이 오면 통째로 바꾼다 */
 const VALUE_OBJECTS = [
@@ -17,7 +17,10 @@ const VALUE_OBJECTS = [
   'LiveWeekState',
   'RecalcPreview',
   'ExemptionPeriodPreview',
-  'TeamWeekRow',
+  'TeamBoardMember',
+  'TeamBoardDay',
+  'TeamMember', // 같은 회원이라도 팀마다 isLeader · joinedAt이 다르다
+  'ProfileJudgmentWeek',
   'PostSection',
   'CategoryWarningCount',
   'TagCount',
@@ -32,27 +35,34 @@ const MERGED_VALUE_OBJECTS = [
   'WarningState',
   'GrassCalendar',
   'TeamWeekSummary',
-  'TeamWeekBoard',
-  'ServerClock',
+  'TeamBoard',
   'PostTypeCounts',
 ] as const;
 
 export function createTypePolicies(): TypePolicies {
   const policies: TypePolicies = {
-    Me: { keyFields: [] }, // 싱글턴 Me:{} — Member:{id}와 다른 객체
+    Me: { keyFields: [] }, // 싱글턴 Me:{} — 로그인한 본인은 하나뿐
     Query: {
       fields: {
         posts: nodesConnection(['filter', 'first']),
-        notices: nodesConnection(['first']),
+        notices: itemsPage(),
+        myJudgmentHistory: itemsPage(),
+        myWarningHistory: itemsPage(),
         adminMembers: nodesConnection(['filter', 'search', 'first']),
         adminContents: nodesConnection(['filter', 'search', 'first']),
         deletedWarnings: nodesConnection(['first']),
         exemptionPeriods: nodesConnection(['first']),
         personalExemptionRequests: nodesConnection(['status', 'first']),
+        teamMembers: itemsPage(['teamId']),
+        sentTeamInvitations: itemsPage(['teamId']),
+        receivedTeamInvitations: itemsPage(),
+        teamPosts: itemsPage(['teamId']),
+        teamComments: itemsPage(['teamId']),
+        myPersonalExemptionRequests: itemsPage(),
       },
     },
     Member: { fields: { judgmentHistory: nodesConnection(['first']) } },
-    Team: { fields: { managedContents: nodesConnection(['first']) } },
+    Profile: { fields: { judgmentHistory: itemsPage() } },
     Post: { fields: { comments: nodesConnection(['first']) } },
   };
   for (const t of VALUE_OBJECTS) policies[t] = { keyFields: false };

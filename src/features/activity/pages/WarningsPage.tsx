@@ -1,12 +1,15 @@
 import { useQuery } from '@apollo/client/react';
-import type { WarningsQueryQuery } from '@/gql/graphql';
+import { toWarningState, type WarningStateView } from '@/domain/weekView';
+import type { WarningHistoryQueryQuery } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
+import { toPaged, usePagedList, type PagedList } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import {
   BigStat,
   CardSkeleton,
   DataTable,
   Foot,
+  LoadMore,
   PageContainer,
   PageTitle,
   QueryBoundary,
@@ -16,27 +19,20 @@ import {
   WarningGauge,
   type Column,
 } from '@/shared/ui';
-import { WarningsQuery } from '../api';
+import { WarningHistoryQuery, WarningsQuery } from '../api';
 import { WARNINGS_COPY } from '../copy';
 import s from '../activity.module.css';
 
-type MyWarnings = WarningsQueryQuery['myWarnings'];
-type WarningState = MyWarnings['state'];
-type Row = MyWarnings['history'][number];
+type WarningState = WarningStateView;
+type Row = WarningHistoryQueryQuery['myWarningHistory']['items'][number];
+type HistoryList = PagedList<WarningHistoryQueryQuery, Row>;
 
 /** 벌칙까지 남은 횟수 — 표시용 산술(3 − n). 벌칙 대상 여부는 서버 플래그로 본다 */
 const PENALTY_AT = 3;
 
-/** ③ 팀 카테고리 — 비공개는 열람자와 무관하게 "비공개 팀"(서버 마스킹), 카테고리가 없으면 "삭제된 팀" */
+/** ③ 팀 카테고리 — 서버가 비공개 · 삭제된 팀을 "비공개 팀" · "삭제된 팀"으로 가려서 준다. 비었으면 "삭제된 팀" */
 function categoryText(categories: Row['categories']): string {
-  if (categories.length === 0) return WARNINGS_COPY.deletedTeam;
-  return categories
-    .map((c) => {
-      if (c.kind === 'PRIVATE') return WARNINGS_COPY.privateTeam;
-      if (c.kind === 'DELETED') return WARNINGS_COPY.deletedTeam;
-      return c.name ?? WARNINGS_COPY.deletedTeam;
-    })
-    .join(', ');
+  return categories.length === 0 ? WARNINGS_COPY.deletedTeam : categories.join(', ');
 }
 
 const COLUMNS: Column<Row>[] = [
@@ -48,7 +44,7 @@ const COLUMNS: Column<Row>[] = [
   },
   { key: 'teams', header: '팀 카테고리', render: (r) => categoryText(r.categories) },
   // 유효 · 차감됨 · 이행 완료(Q-13 A)
-  { key: 'standing', header: '상태', render: (r) => <StatusBadge kind="warning" standing={r.standing} /> },
+  { key: 'standing', header: '상태', render: (r) => <StatusBadge kind="warning" standing={r.status} /> },
 ];
 
 /** ② 다음 결과 안내 (A2 2-4) — 서버의 weeksUntilDeduction으로 고른다 */
@@ -65,24 +61,25 @@ function streakGuide(state: WarningState): string | null {
 export default function WarningsPage() {
   useDocumentTitle(WARNINGS_COPY.title);
   const q = useQuery(WarningsQuery);
+  const history = usePagedList(WarningHistoryQuery, { variables: {}, select: (d) => toPaged(d.myWarningHistory) });
   return (
     <PageContainer>
       <PageTitle title={WARNINGS_COPY.title} sub={WARNINGS_COPY.sub} />
       <QueryBoundary
         loading={q.loading}
         error={q.error}
-        data={q.data?.myWarnings}
+        data={q.data?.myWarningSummary}
         skeleton={<WarningsSkeleton />}
         onRetry={() => void q.refetch().catch(() => undefined)}
       >
-        {(data) => <WarningsBody data={data} />}
+        {(data) => <WarningsBody state={toWarningState(data)} history={history} />}
       </QueryBoundary>
     </PageContainer>
   );
 }
 
-function WarningsBody({ data }: { data: MyWarnings }) {
-  const { state, history } = data;
+function WarningsBody({ state, history }: { state: WarningState; history: HistoryList }) {
+  if (state.onHold) return <p className={s.calm}>{WARNINGS_COPY.onHold}</p>;
   const guide = streakGuide(state);
   const left = PENALTY_AT - state.activeCount;
   return (
@@ -121,10 +118,17 @@ function WarningsBody({ data }: { data: MyWarnings }) {
       </div>
 
       {/* ③ 경고 이력 — 0건이면 숨김 (제안) */}
-      {history.length > 0 ? (
+      {history.nodes.length > 0 ? (
         <section className={s.warnHistory} aria-labelledby="warnings-history-title">
           <SectionHeader id="warnings-history-title" title="경고 이력" />
-          <DataTable caption="경고 이력" columns={COLUMNS} rows={history} rowKey={(r) => r.id} />
+          <DataTable caption="경고 이력" columns={COLUMNS} rows={history.nodes} rowKey={(r) => r.weekStart} />
+          <LoadMore
+            hasMore={history.hasMore}
+            loading={history.loadingMore}
+            error={history.loadMoreError}
+            onLoadMore={history.loadMore}
+            endText={null}
+          />
           <Foot>{WARNINGS_COPY.historyNote.join(' ')}</Foot>
         </section>
       ) : null}

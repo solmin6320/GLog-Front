@@ -6,18 +6,15 @@ import { graphql } from '@/gql';
 
 /** 고정 공지가 먼저, 그다음 최신순 (서버 정렬) */
 export const NoticeListQuery = graphql(`
-  query NoticeListQuery($first: Int, $after: String) {
-    notices(first: $first, after: $after) {
-      nodes {
+  query NoticeListQuery($after: String) {
+    notices(after: $after) {
+      items {
         id
         title
         isPinned
         createdAt
       }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+      nextCursor
     }
   }
 `);

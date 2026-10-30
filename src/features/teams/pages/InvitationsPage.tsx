@@ -6,11 +6,11 @@ import { useAction } from '@/shared/api';
 import { formatDateTimeMD } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import { Button, Card, CardSkeleton, EmptyState, PageContainer, PageTitle, QueryBoundary } from '@/shared/ui';
-import { REFRESH_SESSION, TeamInvitationsQuery, TeamRespondInvitationMutation } from '../api';
+import { REFRESH_SESSION, TeamAcceptInvitationMutation, TeamDeclineInvitationMutation, TeamInvitationsQuery } from '../api';
 import { TEAM_COPY } from '../lib';
 import s from './TeamPages.module.css';
 
-type Invitation = TeamInvitationsQueryQuery['myInvitations'][number];
+type Invitation = TeamInvitationsQueryQuery['receivedTeamInvitations']['items'][number];
 
 function InvitationCard({
   invitation,
@@ -23,7 +23,7 @@ function InvitationCard({
   onAccept: () => void;
   onDecline: () => void;
 }) {
-  const teamName = invitation.team.name;
+  const teamName = invitation.teamName;
   return (
     <li>
       <Card className={s.inviteCard}>
@@ -31,7 +31,7 @@ function InvitationCard({
         <div className={s.inviteMain}>
           <h2 className={s.inviteTeam}>{teamName}</h2>
           <p className={s.inviteMeta}>
-            <span>{invitation.invitedBy.nickname} 님이 초대했어요</span>
+            <span>{invitation.inviter.nickname} 님이 초대했어요</span>
             <span className={s.dot} aria-hidden="true">
               ·
             </span>
@@ -56,23 +56,24 @@ export default function InvitationsPage() {
   useDocumentTitle('받은 초대');
   const navigate = useNavigate();
   const q = useQuery(TeamInvitationsQuery);
-  // 목록 쿼리에 me.pendingInvitationCount가 있어 다시 부르면 드로어 배지도 같이 바뀐다
+  // 드로어 배지(세션)는 수락 · 거절 뒤 REFRESH_SESSION으로 같이 바뀐다
   const reload = () => {
     q.refetch().catch(() => undefined);
   };
 
-  const [respond] = useMutation(TeamRespondInvitationMutation);
+  const [acceptInvitation] = useMutation(TeamAcceptInvitationMutation);
+  const [declineInvitation] = useMutation(TeamDeclineInvitationMutation);
   const accept = useAction(
     (invitationId: string) =>
-      respond({
-        variables: { invitationId, accept: true },
+      acceptInvitation({
+        variables: { invitationId },
         refetchQueries: [REFRESH_SESSION, 'TeamInvitationsQuery'],
         awaitRefetchQueries: true,
       }),
     {
       success: TEAM_COPY.joined,
       // E-17 이미 참가 · E-18 없어진 팀: 서버가 초대를 정리했으니 목록을 다시 받아 카드를 지운다
-      errorOverrides: { ALREADY_TEAM_MEMBER: TEAM_COPY.alreadyJoinedInvitation },
+      errorOverrides: { INVITATION_ALREADY_JOINED: TEAM_COPY.alreadyJoinedInvitation },
       onError: () => {
         reload();
         return false;
@@ -81,7 +82,11 @@ export default function InvitationsPage() {
   );
   const decline = useAction(
     (invitationId: string) =>
-      respond({ variables: { invitationId, accept: false }, refetchQueries: ['TeamInvitationsQuery'], awaitRefetchQueries: true }),
+      declineInvitation({
+        variables: { invitationId },
+        refetchQueries: [REFRESH_SESSION, 'TeamInvitationsQuery'],
+        awaitRefetchQueries: true,
+      }),
     {
       success: TEAM_COPY.declined,
       onError: () => {
@@ -94,7 +99,7 @@ export default function InvitationsPage() {
 
   const onAccept = async (invitationId: string) => {
     const res = await accept.run(invitationId);
-    const team = res?.data?.respondInvitation.team;
+    const team = res?.data?.acceptTeamInvitation;
     if (team) navigate(paths.team(team.id));
   };
 
@@ -114,11 +119,11 @@ export default function InvitationsPage() {
         }
       >
         {(data) =>
-          data.myInvitations.length === 0 ? (
+          data.receivedTeamInvitations.items.length === 0 ? (
             <EmptyState icon="users" title="받은 초대가 없어요." />
           ) : (
             <ul className={s.cardList} aria-label="받은 초대">
-              {data.myInvitations.map((inv) => (
+              {data.receivedTeamInvitations.items.map((inv) => (
                 <InvitationCard
                   key={inv.id}
                   invitation={inv}

@@ -303,13 +303,13 @@ export const adminManageResolvers: Resolvers = {
       if (n.isSystem) throw gqlError('SYSTEM_NOTICE_UNDELETABLE');
       n.deletedAt = ctx.clock.now;
       touch();
-      return n.id;
+      return true;
     },
 
     // 고정 ON/OFF 즉시 토글 (⑥). 본문을 고친 게 아니라 updatedAt은 그대로 둔다
-    setNoticePinned: (_: unknown, { id, pinned }: MutationSetNoticePinnedArgs) => {
+    setNoticePinned: (_: unknown, { id, isPinned }: MutationSetNoticePinnedArgs) => {
       const n = noticeOrThrow(id);
-      n.isPinned = pinned;
+      n.isPinned = isPinned;
       touch();
       return noticeView(n);
     },

@@ -8,9 +8,7 @@ export const PROFILE_COPY = {
   edit: '프로필 수정',
   adminMenu: '관리자 메뉴',
   /** ⑦ */
-  grassFailed: 'GitHub 잔디를 불러오지 못했어요.', // E-32
-  grassIdentity: 'GitHub 아이디가 바뀌었어요. 다시 로그인하면 잔디가 연결돼요.', // E-08
-  privateContribution: 'GitHub에서 비공개 기여 표시를 켜야 잔디가 반영돼요.', // E-39
+  grassFailed: 'GitHub 잔디를 아직 못 불러왔어요. 곧 다시 확인할게요.', // E-32 (잔디 캐시 없음)
   /** ⑧⑨ */
   penalty: '벌칙을 이행해야 경고가 사라져요. 지금은 차감되지 않아요.', // E-40
   noWarning: '받은 경고가 없어요. 잘하고 있어요.', // EX-PR01-01
@@ -22,6 +20,8 @@ export const PROFILE_COPY = {
   noHistory: '아직 판정 기록이 없어요.', // EX-PR01-03
   historyFailed: '판정 이력을 불러오지 못했어요.',
   holdNote: '확인 중인 주는 잔디를 아직 못 불러왔어요. 곧 다시 확인할게요.', // M-05 + E-32
+  /** ⑧ 판정 보류가 남아 경고를 계산하지 않을 때 */
+  warningOnHold: '확인 중인 주가 있어 경고를 계산하고 있어요.',
   /** ⑫ */
   noPublicTeams: '공개된 소속 팀이 없어요.', // EX-PR01-02
 } as const;

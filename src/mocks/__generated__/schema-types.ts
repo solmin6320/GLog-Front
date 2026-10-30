@@ -19,6 +19,29 @@ export type Scalars = {
   DateTime: { input: string; output: string; }
 };
 
+/** 이번 주 화면 상단 배너 후보. 동시에 해당하면 위에서부터 하나만 내려온다 */
+export type ActivityBanner =
+  /** GitHub 비공개 기여 표시가 꺼진 듯함 (E-39) */
+  | 'CONTRIBUTIONS_HIDDEN'
+  /** 면제 주간 (E-46) */
+  | 'EXEMPTION_WEEK'
+  /** 계정 생애 첫 팀 참가 주 (E-36) */
+  | 'FIRST_WEEK'
+  /** 잔디를 아직 못 불러옴 (E-32) */
+  | 'GRASS_NOT_LOADED';
+
+/** 날짜별 인증 한 행. null은 알 수 없음(안 불러왔거나 갱신 전이거나 저장하지 않은 값) */
+export type ActivityDay = {
+  __typename?: 'ActivityDay';
+  date: Scalars['String']['output'];
+  /** 잔디 기여 수. 판정이 끝난 주는 저장하지 않아 null */
+  grassCount: Maybe<Scalars['Int']['output']>;
+  hasGrass: Maybe<Scalars['Boolean']['output']>;
+  hasRecord: Scalars['Boolean']['output'];
+  /** 기록글 수. 판정이 끝난 주는 저장하지 않아 null */
+  recordCount: Maybe<Scalars['Int']['output']>;
+};
+
 /** AD-01 ②-5 ⑤ 종류 필터: 글 + 댓글 / 글만 / 댓글만 */
 export type AdminContentFilter =
   | 'ALL'
@@ -89,6 +112,13 @@ export type AdminJudgmentWeekRowsArgs = {
   search: InputMaybe<Scalars['String']['input']>;
 };
 
+export type AdminMemberBrief = {
+  __typename?: 'AdminMemberBrief';
+  githubLogin: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  nickname: Scalars['String']['output'];
+};
+
 export type AdminMemberConnection = {
   __typename?: 'AdminMemberConnection';
   nodes: Array<AdminMemberRow>;
@@ -120,19 +150,19 @@ export type AdminTeamLabel = {
   teamId: Scalars['ID']['output'];
 };
 
-/**
- * 일회용 코드 교환 결과 (기능명세서 1장 토큰 교환, AU-02, FC-03)
- * - ACTIVE  : accessToken 발급 → CM-01
- * - PENDING : 본인 상태 조회 전용 제한 토큰 발급 (제안 — FC-03은 승인 후에만 토큰 저장. 계약서 4장·9장 C-01)
- * - REJECTED: accessToken = null, 거절 안내 화면(E-02 '토큰 미발급')
- */
 export type AuthPayload = {
   __typename?: 'AuthPayload';
-  accessToken: Maybe<Scalars['String']['output']>;
-  expiresAt: Maybe<Scalars['DateTime']['output']>;
-  /** REJECTED면 null */
-  me: Maybe<Me>;
-  status: MemberStatus;
+  accessToken: Scalars['String']['output'];
+  /** 액세스 토큰 유효 시간(초) */
+  expiresIn: Scalars['Int']['output'];
+  me: Me;
+};
+
+export type BoardAuthor = {
+  __typename?: 'BoardAuthor';
+  id: Scalars['ID']['output'];
+  nickname: Scalars['String']['output'];
+  profileImageUrl: Maybe<Scalars['String']['output']>;
 };
 
 export type CategoryWarningCount = {
@@ -148,6 +178,8 @@ export type Comment = {
   content: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['ID']['output'];
+  /** 댓글이 달린 글 */
+  postId: Scalars['ID']['output'];
   updatedAt: Maybe<Scalars['DateTime']['output']>;
   /** 작성자 또는 관리자 */
   viewerCanDelete: Scalars['Boolean']['output'];
@@ -223,15 +255,15 @@ export type CreatePostInput = {
 };
 
 export type CreateTeamInput = {
-  /** 100자 이내(TM-02 ② 제안). DB는 200자 */
+  /** 100자 이내 (선택) */
   description?: InputMaybe<Scalars['String']['input']>;
-  /** 기본 공개(TM-02 ③) */
-  isPublic: Scalars['Boolean']['input'];
-  /** 1~20자(TM-02 ① 제안) */
+  /** 생략하면 공개 */
+  isPublic?: InputMaybe<Scalars['Boolean']['input']>;
+  /** 1~20자 */
   name: Scalars['String']['input'];
 };
 
-/** TM-02 ⑤ 초대코드는 이 응답에서만 반드시 온다(1회 발급, 재발급 불가 — 기능명세서 2장) */
+/** 팀 생성 결과. 초대코드는 이때 한 번 보여준다. 이후에는 팀장이 teamInviteCode로 다시 확인한다 */
 export type CreateTeamPayload = {
   __typename?: 'CreateTeamPayload';
   inviteCode: Scalars['String']['output'];
@@ -367,6 +399,37 @@ export type JudgmentCounts = {
   pass: Scalars['Int']['output'];
 };
 
+export type JudgmentHistoryItem = {
+  __typename?: 'JudgmentHistoryItem';
+  corrected: Scalars['Boolean']['output'];
+  holdReason: Maybe<JudgmentHoldReason>;
+  recordCount: Maybe<Scalars['Int']['output']>;
+  skipReason: Maybe<JudgmentSkipReason>;
+  status: JudgmentStatus;
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+  weekEnd: Scalars['String']['output'];
+  weekStart: Scalars['String']['output'];
+};
+
+export type JudgmentHistoryPage = {
+  __typename?: 'JudgmentHistoryPage';
+  items: Array<JudgmentHistoryItem>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
+};
+
+/** 보류 이유. API_ERROR는 재시도로 풀리고 IDENTITY_MISMATCH는 본인이 다시 로그인해야 풀린다 */
+export type JudgmentHoldReason =
+  | 'API_ERROR'
+  | 'IDENTITY_MISMATCH';
+
+/** 판정에서 빠진 이유. NO_TEAM·FIRST_WEEK은 제외, EXEMPTION_PERIOD·PERSONAL_EXEMPTION은 면제 */
+export type JudgmentSkipReason =
+  | 'EXEMPTION_PERIOD'
+  | 'FIRST_WEEK'
+  | 'NO_TEAM'
+  | 'PERSONAL_EXEMPTION';
+
 /** DB weekly_judgment.status (1-6). HOLD는 확정 상태가 아니다(E-35) */
 export type JudgmentStatus =
   | 'EXCLUDED'
@@ -398,19 +461,12 @@ export type LiveWeekStatus =
   | 'EXEMPT'
   | 'NOT_YET';
 
-/**
- * 로그인한 본인. 라우터 가드(5-2-3)와 공통 헤더 ④가 쓴다.
- * status · role은 토큰 클레임이 아니라 요청 시점 DB 값이어야 한다 (제안) — 승인 직후 재발급 없이 반영(AU-03 ⑤)
- */
 export type Me = {
   __typename?: 'Me';
-  /** 팀 미소속 여부(5-2-7). CM-01 ⑨ · AC-01 상태 분기 */
-  hasTeam: Scalars['Boolean']['output'];
-  /** Member.id와 같은 값 */
+  githubLogin: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  member: Member;
-  /** CM-01 ⑤ · TM-01 ③ · 드로어 '받은 초대' 배지(목업 W-03) */
-  pendingInvitationCount: Scalars['Int']['output'];
+  nickname: Scalars['String']['output'];
+  profileImageUrl: Maybe<Scalars['String']['output']>;
   role: MemberRole;
   status: MemberStatus;
 };
@@ -466,13 +522,15 @@ export type MemberStatus =
 
 export type Mutation = {
   __typename?: 'Mutation';
+  /** 받은 초대를 수락해 바로 참가한다 (TM-04). INVITATION_ALREADY_JOINED · TEAM_GONE */
+  acceptTeamInvitation: Team;
   /** BD-03 ⑫ */
   addComment: Comment;
   approveMember: AdminMemberRow;
   /** AD-01 ②-3 ⑦ [승인]. 소급이면 미리보기 후 (추측) */
   approvePersonalExemption: PersonalExemptionRequest;
-  /** TM-06 ③ [취소]. DB에 철회 상태값이 없어 행 삭제로 해석 (추측) */
-  cancelInvitation: Scalars['ID']['output'];
+  /** 보낸 초대를 철회한다 (팀장과 시스템 관리자만) */
+  cancelTeamInvitation: Scalars['Boolean']['output'];
   /** AD-01 ⑩ [정정하고 재계산]. 사유 필수. 연쇄 재계산(E-49 · E-50 · E-58 · E-60) */
   correctJudgment: RecalcPayload;
   /** 과거 주간이면 exemptionPeriodPreview를 먼저 거친다(AD-01 ②-3 ⑥, E-45) */
@@ -480,60 +538,63 @@ export type Mutation = {
   createNotice: Notice;
   /** BD-04 등록 */
   createPost: Post;
-  /** TM-02 */
+  /** 팀을 만든다. 만든 사람이 팀장이고, 초대코드가 이때 한 번 발급된다 (TM-02) */
   createTeam: CreateTeamPayload;
+  /** 받은 초대를 거절한다 */
+  declineTeamInvitation: Scalars['Boolean']['output'];
   /** BD-03 ⑪ · AD-01 ②-5 작성자 또는 관리자 */
   deleteComment: Scalars['ID']['output'];
   /** [미결] 이미 판정된 주의 면제 기간을 지우면 그 주를 어떻게 판정할지 명세에 없다(계약서 9장 C-05) */
   deleteExemptionPeriod: Scalars['ID']['output'];
   /** isSystem이면 SYSTEM_NOTICE_UNDELETABLE(EX-AD01-02) */
-  deleteNotice: Scalars['ID']['output'];
+  deleteNotice: Scalars['Boolean']['output'];
   /** BD-03 ④ 작성자 또는 관리자(AD-01 ②-5). 확정 판정 불변(E-28) */
   deletePost: Scalars['ID']['output'];
-  /** TM-06 ⑨. 글은 남고 팀 연결만 해제(E-21), 카테고리 제거(E-22). 마지막 1인 팀장의 '나가기'도 이것(E-20 추측) */
-  deleteTeam: Scalars['ID']['output'];
-  /** 비로그인 허용. 코드 재사용 · 만료 → LOGIN_CODE_INVALID(E-05 · E-06) */
-  exchangeLoginCode: AuthPayload;
+  /** 팀을 삭제한다 (팀장과 시스템 관리자만) */
+  deleteTeam: Scalars['Boolean']['output'];
+  /** GitHub 로그인 뒤 받은 일회용 코드를 액세스 토큰으로 바꾼다. 한 번만 쓸 수 있다. 재사용 · 만료 AUTH_CODE_INVALID, 거절 회원 ACCOUNT_REJECTED */
+  exchangeAuthCode: AuthPayload;
   /** AD-01 ②-1 ⑥ 되돌릴 수 없는 고정점(E-58). 경고 0 · 연속 0 [Q-10 ⓓ] */
   fulfillPenalty: RecalcPayload;
-  /** TM-06 ②. 가입 회원만(E-15), 이미 팀원(E-16), 추방자 재초대 허용(E-13) */
-  inviteMember: SentInvitation;
-  /** TM-03. E-10 · E-11 · E-12(차단 사유 · 남은 기간 미노출) */
-  joinTeamByInviteCode: Team;
-  /** TM-06 ⑤. 그 팀 경고 카테고리 제거 · 0이면 경고 소프트 삭제(E-22) */
-  kickMember: Team;
-  /** TM-05 ④ 팀원만. 팀장은 LEADER_MUST_TRANSFER(E-19). 자진 탈퇴는 경고 유지(기능명세서 6장) */
-  leaveTeam: Scalars['ID']['output'];
-  /** 무상태 JWT라 서버 처리는 없다 (제안). 클라이언트가 토큰 폐기 + 캐시 초기화 */
-  logout: Scalars['Boolean']['output'];
+  /** GitHub 아이디로 초대한다 (TM-06). INVITEE_NOT_FOUND · INVITEE_ALREADY_MEMBER · INVITATION_DUPLICATE */
+  inviteToTeam: SentTeamInvitation;
+  /** 초대코드로 참가한다 (TM-03). TEAM_CODE_NOT_FOUND · TEAM_ALREADY_JOINED · TEAM_JOIN_BLOCKED */
+  joinTeamByCode: Team;
+  /** 팀원을 추방한다 (팀장과 시스템 관리자만) */
+  kickTeamMember: Scalars['Boolean']['output'];
+  /** 팀에서 나간다. 팀장은 LEADER_MUST_TRANSFER, 혼자면 LEADER_LAST_MEMBER */
+  leaveTeam: Scalars['Boolean']['output'];
   /** 확인 다이얼로그 후. 감사 기록 대상(기능명세서 9장) */
   rejectMember: AdminMemberRow;
   /** 거절 사유 필수(E-48 제안) */
   rejectPersonalExemption: PersonalExemptionRequest;
-  /** TM-08 ④. E-44 · E-47 */
-  requestPersonalExemption: PersonalExemptionRequest;
+  /** 개인 면제를 요청한다 (그 팀의 팀장만, TM-08). EXEMPTION_REQUEST_DUPLICATE. weekStart는 월요일 yyyy-MM-dd */
+  requestPersonalExemption: PersonalExemption;
   /** AD-01 ⑦ [재시도] · ⑨ [전체 재시도]. judgmentIds 생략 = 재시도 가능한 보류 전부. 확정 건은 건드리지 않는다(E-35) */
   rerunHeldJudgments: RerunResult;
   /** PR-02 ③ 기본 이미지로. 파일 업로드는 REST(계약서 5장) */
   resetProfileImage: Member;
-  /** TM-04 ②③. E-17 · E-18 */
-  respondInvitation: RespondInvitationPayload;
   /** AD-01 ②-1 ⑧ */
   restoreWarning: RecalcPayload;
   /** 거절 → 승인 대기로 되돌리기(AD-01 ②-2 ⑧) */
   revertMemberToPending: AdminMemberRow;
   /** AD-01 ②-4 ⑥ 고정 ON/OFF 즉시 토글 */
   setNoticePinned: Notice;
-  /** TM-06 ⑦ 즉시 반영 */
-  setTeamVisibility: Team;
-  /** TM-06 ⑥ 되돌릴 수 없음. 성공 후 조회자는 TM-06 권한을 잃는다 */
-  transferLeadership: Team;
+  /** 팀장을 다른 팀원에게 넘긴다 (팀장과 시스템 관리자만). 되돌릴 수 없다 */
+  transferTeamLeadership: Team;
   /** BD-03 ⑪ · TM-06 ⑧ 작성자 또는 팀장 */
   updateComment: Comment;
   updateExemptionPeriod: ExemptionPeriod;
   updateNotice: Notice;
   /** BD-04 수정. 작성자 또는 연결 팀 팀장 */
   updatePost: Post;
+  /** 팀의 공개·비공개를 바꾼다 (팀장과 시스템 관리자만, TM-06 ⑦) */
+  updateTeam: Team;
+};
+
+
+export type MutationAcceptTeamInvitationArgs = {
+  invitationId: Scalars['ID']['input'];
 };
 
 
@@ -554,7 +615,7 @@ export type MutationApprovePersonalExemptionArgs = {
 };
 
 
-export type MutationCancelInvitationArgs = {
+export type MutationCancelTeamInvitationArgs = {
   invitationId: Scalars['ID']['input'];
 };
 
@@ -584,6 +645,11 @@ export type MutationCreateTeamArgs = {
 };
 
 
+export type MutationDeclineTeamInvitationArgs = {
+  invitationId: Scalars['ID']['input'];
+};
+
+
 export type MutationDeleteCommentArgs = {
   id: Scalars['ID']['input'];
 };
@@ -610,7 +676,7 @@ export type MutationDeleteTeamArgs = {
 };
 
 
-export type MutationExchangeLoginCodeArgs = {
+export type MutationExchangeAuthCodeArgs = {
   code: Scalars['String']['input'];
 };
 
@@ -620,18 +686,18 @@ export type MutationFulfillPenaltyArgs = {
 };
 
 
-export type MutationInviteMemberArgs = {
+export type MutationInviteToTeamArgs = {
   githubLogin: Scalars['String']['input'];
   teamId: Scalars['ID']['input'];
 };
 
 
-export type MutationJoinTeamByInviteCodeArgs = {
+export type MutationJoinTeamByCodeArgs = {
   code: Scalars['String']['input'];
 };
 
 
-export type MutationKickMemberArgs = {
+export type MutationKickTeamMemberArgs = {
   memberId: Scalars['ID']['input'];
   teamId: Scalars['ID']['input'];
 };
@@ -654,18 +720,15 @@ export type MutationRejectPersonalExemptionArgs = {
 
 
 export type MutationRequestPersonalExemptionArgs = {
-  input: RequestPersonalExemptionInput;
+  memberId: Scalars['ID']['input'];
+  reason: Scalars['String']['input'];
+  teamId: Scalars['ID']['input'];
+  weekStart: Scalars['String']['input'];
 };
 
 
 export type MutationRerunHeldJudgmentsArgs = {
   judgmentIds: InputMaybe<Array<Scalars['ID']['input']>>;
-};
-
-
-export type MutationRespondInvitationArgs = {
-  accept: Scalars['Boolean']['input'];
-  invitationId: Scalars['ID']['input'];
 };
 
 
@@ -682,18 +745,12 @@ export type MutationRevertMemberToPendingArgs = {
 
 export type MutationSetNoticePinnedArgs = {
   id: Scalars['ID']['input'];
-  pinned: Scalars['Boolean']['input'];
+  isPinned: Scalars['Boolean']['input'];
 };
 
 
-export type MutationSetTeamVisibilityArgs = {
-  isPublic: Scalars['Boolean']['input'];
-  teamId: Scalars['ID']['input'];
-};
-
-
-export type MutationTransferLeadershipArgs = {
-  memberId: Scalars['ID']['input'];
+export type MutationTransferTeamLeadershipArgs = {
+  newLeaderId: Scalars['ID']['input'];
   teamId: Scalars['ID']['input'];
 };
 
@@ -721,6 +778,12 @@ export type MutationUpdatePostArgs = {
   input: UpdatePostInput;
 };
 
+
+export type MutationUpdateTeamArgs = {
+  input: UpdateTeamInput;
+  teamId: Scalars['ID']['input'];
+};
+
 /** AC-02 화면 묶음 */
 export type MyWarnings = {
   __typename?: 'MyWarnings';
@@ -731,27 +794,31 @@ export type MyWarnings = {
 /** DB notice (1-15) */
 export type Notice = {
   __typename?: 'Notice';
-  /** 줄바꿈 유지, 댓글 없음(NT-02 ④) */
   content: Scalars['String']['output'];
-  createdAt: Scalars['DateTime']['output'];
+  /** 작성 시각 (KST, ISO-8601) */
+  createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   isPinned: Scalars['Boolean']['output'];
-  /** 잔디 인정 규칙 공지. 삭제 불가(EX-AD01-02) */
+  /** 잔디 인정 규칙 공지. 삭제할 수 없다 */
   isSystem: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
-  updatedAt: Maybe<Scalars['DateTime']['output']>;
-};
-
-export type NoticeConnection = {
-  __typename?: 'NoticeConnection';
-  nodes: Array<Notice>;
-  pageInfo: PageInfo;
+  /** 수정 시각 (KST, ISO-8601). 수정 전에는 null */
+  updatedAt: Maybe<Scalars['String']['output']>;
 };
 
 export type NoticeInput = {
   content: Scalars['String']['input'];
-  isPinned: Scalars['Boolean']['input'];
+  /** 상단 고정. 기본 false */
+  isPinned?: InputMaybe<Scalars['Boolean']['input']>;
+  /** 1~200자 */
   title: Scalars['String']['input'];
+};
+
+export type NoticePage = {
+  __typename?: 'NoticePage';
+  items: Array<Notice>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /** [Q-06] 커서 방식 초안. 오프셋으로 결정되면 이 타입과 각 Connection만 바뀌고, 프론트는 페이지 훅 안에서 흡수한다 */
@@ -776,6 +843,29 @@ export type PenaltyTarget = {
   /** DB penalty_fulfillment.reached_week 의미(그 주 월요일). 목업 W-16 '도달 9/28'은 판정일로 보인다(계약서 9장 C-14) */
   reachedWeekStart: Scalars['Date']['output'];
   teams: Array<AdminTeamLabel>;
+};
+
+/** 개인 면제 요청 한 건 (TM-08). 팀 이름은 싣지 않는다 */
+export type PersonalExemption = {
+  __typename?: 'PersonalExemption';
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  member: AdminMemberBrief;
+  overlapsExemptionPeriod: Scalars['Boolean']['output'];
+  reason: Scalars['String']['output'];
+  rejectReason: Maybe<Scalars['String']['output']>;
+  requester: AdminMemberBrief;
+  respondedAt: Maybe<Scalars['String']['output']>;
+  status: PersonalExemptionStatus;
+  weekEnd: Scalars['String']['output'];
+  weekStart: Scalars['String']['output'];
+};
+
+export type PersonalExemptionPage = {
+  __typename?: 'PersonalExemptionPage';
+  items: Array<PersonalExemption>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /** DB personal_exemption (1-13). 관리자 목록에는 팀 이름을 넣지 않는다(AD-01 ②-3 ⑦) */
@@ -923,6 +1013,109 @@ export type PostTypeCounts = {
   troubleshooting: Scalars['Int']['output'];
 };
 
+export type Profile = {
+  __typename?: 'Profile';
+  commentCount: Scalars['Int']['output'];
+  githubLogin: Scalars['String']['output'];
+  /** GitHub 잔디 1년치. 캐시가 없으면 null (E-32). 하루 한 번 갱신한 캐시다 */
+  grass: Maybe<ProfileGrass>;
+  id: Scalars['ID']['output'];
+  /** 내 프로필인가 (프로필 수정 · 관리자 메뉴 버튼 노출 판단) */
+  isMine: Scalars['Boolean']['output'];
+  /** 주간 판정 이력 (PR-01 ⑩). 최근 주부터 커서 기반 20개. 첫 페이지 맨 위에 이번 주 IN_PROGRESS 행이 하나 더 붙을 수 있다 */
+  judgmentHistory: ProfileJudgmentPage;
+  /** GitHub 계정 이름. 수정할 수 없다 */
+  nickname: Scalars['String']['output'];
+  postCount: Scalars['Int']['output'];
+  /** null이면 기본 이미지 */
+  profileImageUrl: Maybe<Scalars['String']['output']>;
+  /** 팀별 경고 (PR-01 ⑨). 중복 집계 */
+  teamWarnings: ProfileTeamWarnings;
+  /** 소속 팀. 공개 팀만 나오고 비공개 팀은 빠진다 */
+  teams: Array<ProfileTeam>;
+  /** 경고 합계 카드 (n / 3) */
+  warning: ProfileWarning;
+};
+
+
+export type ProfileJudgmentHistoryArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ProfileGrass = {
+  __typename?: 'ProfileGrass';
+  /** 날짜 오름차순, 날짜마다 기여 수 (0이면 잔디 없음) */
+  days: Array<ProfileGrassDay>;
+  /** 갱신 기준 시각 (KST, ISO-8601). '오늘 오전 6시 기준'에 쓴다 */
+  fetchedAt: Scalars['String']['output'];
+  /** 캐시가 덮는 첫 날 (yyyy-MM-dd) */
+  from: Scalars['String']['output'];
+  /** 캐시가 덮는 마지막 날 (yyyy-MM-dd) */
+  to: Scalars['String']['output'];
+};
+
+export type ProfileGrassDay = {
+  __typename?: 'ProfileGrassDay';
+  count: Scalars['Int']['output'];
+  date: Scalars['String']['output'];
+};
+
+export type ProfileJudgmentPage = {
+  __typename?: 'ProfileJudgmentPage';
+  items: Array<ProfileJudgmentWeek>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
+};
+
+/** PASS 통과 / FAIL 미달(경고) / EXEMPT 면제 / EXCLUDED 제외 / IN_PROGRESS 진행 중(이번 주와 아직 확정되지 않은 보류 주) */
+export type ProfileJudgmentResult =
+  | 'EXCLUDED'
+  | 'EXEMPT'
+  | 'FAIL'
+  | 'IN_PROGRESS'
+  | 'PASS';
+
+/** 면제 · 제외 주와 보류 주는 인증일 · 기록글이 null */
+export type ProfileJudgmentWeek = {
+  __typename?: 'ProfileJudgmentWeek';
+  recordCount: Maybe<Scalars['Int']['output']>;
+  result: ProfileJudgmentResult;
+  /** 인증일 수. 진행 중인 이번 주는 잔디 캐시가 없으면 null */
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+  weekEnd: Scalars['String']['output'];
+  weekStart: Scalars['String']['output'];
+};
+
+export type ProfileTeam = {
+  __typename?: 'ProfileTeam';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+};
+
+/** 비공개 팀은 '비공개 팀', 삭제된 팀은 '삭제된 팀'으로 나온다 */
+export type ProfileTeamWarning = {
+  __typename?: 'ProfileTeamWarning';
+  count: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type ProfileTeamWarnings = {
+  __typename?: 'ProfileTeamWarnings';
+  onHold: Scalars['Boolean']['output'];
+  /** 공개 팀(이름순) → 비공개 팀 → 삭제된 팀 순 */
+  teams: Array<ProfileTeamWarning>;
+};
+
+/** 보류 주가 남아 있으면 onHold만 true이고 나머지는 null */
+export type ProfileWarning = {
+  __typename?: 'ProfileWarning';
+  onHold: Scalars['Boolean']['output'];
+  /** 경고 3개 이상이면 벌칙 대상 (E-40) */
+  penaltyTarget: Maybe<Scalars['Boolean']['output']>;
+  /** 벌칙 이행 이후 살아 있고 차감되지 않은 경고 수. 3을 넘을 수 있다 */
+  warningCount: Maybe<Scalars['Int']['output']>;
+};
+
 export type Query = {
   __typename?: 'Query';
   /** AD-01 ②-5. 검색: 제목 · 내용 · 작성자 */
@@ -932,35 +1125,36 @@ export type Query = {
   adminJudgmentWeek: AdminJudgmentWeek;
   /** AD-01 ②-2 */
   adminMembers: AdminMemberConnection;
-  /** 서버 시각 · 이번 주 경계 (제안). 비로그인 허용 */
-  clock: ServerClock;
   /** AD-01 ②-1 ⑦ */
   deletedWarnings: DeletedWarningConnection;
   /** AD-01 ②-3 ⑥ 과거 주간 등록 · 수정 · 삭제 전 미리보기 (제안). 수정이면 periodId, 삭제면 removing: true */
   exemptionPeriodPreview: ExemptionPeriodPreview;
   /** AD-01 ②-3 ⑤ */
   exemptionPeriods: ExemptionPeriodConnection;
-  /** 잔디 인정 규칙 공지(isSystem). CM-01 ⑥ · PR-01 E-39 [설정 방법] → NT-02 (제안) */
-  grassRuleNotice: Maybe<Notice>;
   /** AD-01 ⑨ 주차와 무관한 미해결 보류 전체 (인수인계 5-1 명칭 유지, 제안: 지난 주차 보류가 묻히지 않게) */
   heldJudgments: Array<AdminJudgmentRow>;
   /** AD-01 ⑩ (인수인계 5-1 명칭) */
   judgmentCorrectionPreview: RecalcPreview;
-  /** 본인. 토큰이 없으면 null. 승인 대기 제한 토큰으로도 조회 가능(AU-03 ④⑤) */
-  me: Maybe<Me>;
-  /** 없는 회원 → null(E-53) */
+  /** 내 계정 정보. 승인 대기·거절 계정도 호출할 수 있다 */
+  me: Me;
+  /** 없는 회원 → null(E-53). 프로필 화면은 profile을 쓴다 (다른 영역이 아직 쓴다) */
   member: Maybe<Member>;
-  /** TM-04 */
-  myInvitations: Array<ReceivedInvitation>;
-  /** TM-01 참가 순서(오래된 순, 제안) · BD-04 ⑨ 셀렉트 · TM-04 이후 갱신 */
+  /** 내 지난 판정 목록 (AC-01 ⑤). 최근 주부터 커서 기반 20개 */
+  myJudgmentHistory: JudgmentHistoryPage;
+  /** 내가 보낸 개인 면제 요청 목록 (TM-08 ⑤). 최신순 커서 기반 20개 */
+  myPersonalExemptionRequests: PersonalExemptionPage;
+  /** 내 팀 목록 (TM-01). 참가한 순서(오래된 순). 커서 없이 전부 */
   myTeams: Array<Team>;
-  /** AC-02 · CM-01 ④ */
-  myWarnings: MyWarnings;
-  /** AC-01 · CM-01 ②③. weekStart 생략 = 이번 주. 미래 주는 VALIDATION_FAILED */
-  myWeek: WeekActivity;
-  notice: Maybe<Notice>;
-  /** 고정 공지가 먼저, 그다음 최신순(NT-01 ①②). CM-01 ⑦은 first: 3 */
-  notices: NoticeConnection;
+  /** 내 경고 이력 (AC-02 ③). 최근 주부터 커서 기반 20개 */
+  myWarningHistory: WarningHistoryPage;
+  /** 내 경고 요약. 판정 보류가 남아 있으면 onHold만 true이고 숫자는 null */
+  myWarningSummary: WarningSummary;
+  /** 내 주간 활동. weekStart는 월요일(yyyy-MM-dd), 생략하면 이번 주, 미래 주는 INVALID_INPUT */
+  myWeeklyActivity: WeeklyActivity;
+  /** 공지 상세. 없는 공지는 NOT_FOUND */
+  notice: Notice;
+  /** 공지 목록. 고정 공지가 위, 그 아래 최신순. 커서 기반 20개 (백엔드 notice.graphqls) */
+  notices: NoticePage;
   /** AD-01 ②-1 ⑤ */
   penaltyTargets: Array<PenaltyTarget>;
   /** AD-01 ②-3 ⑦ 이미 판정된 주의 승인(소급) 미리보기. 소급이 아니면 null (추측) */
@@ -975,10 +1169,26 @@ export type Query = {
   postTypeCounts: PostTypeCounts;
   /** 최신순 고정(BD-01 비고 제안). 20개씩(BD-01 ⑪ 제안) [Q-06] */
   posts: PostConnection;
+  /** 프로필 (승인된 회원 누구나, 본인 · 타인 같은 모양). 없는 회원이나 승인되지 않은 회원은 NOT_FOUND */
+  profile: Profile;
+  /** 받은 초대 목록 (TM-04). 최신순, 커서 기반 20개 */
+  receivedTeamInvitations: ReceivedTeamInvitationPage;
   /** AD-01 ②-1 ⑧ (인수인계 5-1 명칭). E-42 · E-43 · E-59 */
   restoreWarningPreview: RecalcPreview;
-  /** TM-05 · TM-06 · TM-08. 없는 팀 → null(E-53), 비소속 → FORBIDDEN(E-09), 관리자도 예외 없음 */
-  team: Maybe<Team>;
+  /** 보낸 초대 중 대기 중인 목록 (TM-06). 팀장과 시스템 관리자만. 최신순, 커서 기반 20개 */
+  sentTeamInvitations: SentTeamInvitationPage;
+  /** 팀 기본 정보. 그 팀의 팀원·팀장과 시스템 관리자만. 없는/삭제된 팀 NOT_FOUND, 비소속 FORBIDDEN */
+  team: Team;
+  /** 팀 현황판 (TM-05). 그 팀의 팀원·팀장과 시스템 관리자만 */
+  teamBoard: TeamBoard;
+  /** 팀에 연결된 글에 달린 댓글 목록 (TM-06 ⑧). 팀장만. 최신순, 커서 기반 20개 */
+  teamComments: TeamCommentPage;
+  /** 초대코드 다시 확인 (TM-06). 그 팀의 팀장과 시스템 관리자만 */
+  teamInviteCode: Scalars['String']['output'];
+  /** 팀원 목록 (TM-06). 팀장이 맨 앞, 나머지는 참가한 순서. 커서 기반 20개 */
+  teamMembers: TeamMemberPage;
+  /** 팀에 연결된 글 목록 (TM-06 ⑧). 팀장만. 최신순, 커서 기반 20개 */
+  teamPosts: TeamPostPage;
 };
 
 
@@ -1033,8 +1243,23 @@ export type QueryMemberArgs = {
 };
 
 
-export type QueryMyWeekArgs = {
-  weekStart: InputMaybe<Scalars['Date']['input']>;
+export type QueryMyJudgmentHistoryArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryMyPersonalExemptionRequestsArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryMyWarningHistoryArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryMyWeeklyActivityArgs = {
+  weekStart: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1045,7 +1270,6 @@ export type QueryNoticeArgs = {
 
 export type QueryNoticesArgs = {
   after: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -1084,13 +1308,57 @@ export type QueryPostsArgs = {
 };
 
 
+export type QueryProfileArgs = {
+  memberId: Scalars['ID']['input'];
+};
+
+
+export type QueryReceivedTeamInvitationsArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryRestoreWarningPreviewArgs = {
   warningId: Scalars['ID']['input'];
 };
 
 
+export type QuerySentTeamInvitationsArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['ID']['input'];
+};
+
+
 export type QueryTeamArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryTeamBoardArgs = {
+  teamId: Scalars['ID']['input'];
+};
+
+
+export type QueryTeamCommentsArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['ID']['input'];
+};
+
+
+export type QueryTeamInviteCodeArgs = {
+  teamId: Scalars['ID']['input'];
+};
+
+
+export type QueryTeamMembersArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['ID']['input'];
+};
+
+
+export type QueryTeamPostsArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['ID']['input'];
 };
 
 /** 판정 정정 · 경고 복구 · 이행 체크 · 소급 면제 후 영향받은 회원의 새 상태. 프론트는 이 결과로 부분 패치하지 않고 관련 쿼리를 재조회한다 */
@@ -1125,24 +1393,21 @@ export type RecalcPreview = {
   warningCountBefore: Scalars['Int']['output'];
 };
 
-/** TM-04 받은 초대 한 건. 비공개 팀이어도 초대받은 당사자에게는 실명(TM-04 ①) */
-export type ReceivedInvitation = {
-  __typename?: 'ReceivedInvitation';
-  createdAt: Scalars['DateTime']['output'];
+export type ReceivedTeamInvitation = {
+  __typename?: 'ReceivedTeamInvitation';
+  createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  /** [DB 공백] team_invitation에 초대한 사람 컬럼이 없다 → 조회 시점 팀장 (추측) */
-  invitedBy: Member;
-  team: Team;
+  /** 초대한 팀장 */
+  inviter: TeamPerson;
+  teamId: Scalars['ID']['output'];
+  teamName: Scalars['String']['output'];
 };
 
-export type RequestPersonalExemptionInput = {
-  /** 이 팀 팀원 또는 본인(TM-08 ①) */
-  memberId: Scalars['ID']['input'];
-  /** 200자 이내(TM-08 ③ 제안). DB는 500자 */
-  reason: Scalars['String']['input'];
-  teamId: Scalars['ID']['input'];
-  /** 이번 주 · 다음 주(TM-08 ② 제안) */
-  weekStart: Scalars['Date']['input'];
+export type ReceivedTeamInvitationPage = {
+  __typename?: 'ReceivedTeamInvitationPage';
+  items: Array<ReceivedTeamInvitation>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /** 보류 재실행 결과 → 토스트 '{n}명 처리했어요.'(E-35) */
@@ -1153,27 +1418,18 @@ export type RerunResult = {
   stillHeldCount: Scalars['Int']['output'];
 };
 
-/** 수락이면 team이 있고 TM-05로 이동, 거절이면 null */
-export type RespondInvitationPayload = {
-  __typename?: 'RespondInvitationPayload';
-  invitationId: Scalars['ID']['output'];
-  team: Maybe<Team>;
-};
-
-/** TM-06 ③ 보낸 초대 */
-export type SentInvitation = {
-  __typename?: 'SentInvitation';
-  createdAt: Scalars['DateTime']['output'];
+export type SentTeamInvitation = {
+  __typename?: 'SentTeamInvitation';
+  createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  invitee: Member;
+  invitee: TeamPerson;
 };
 
-/** 서버 기준 시각 (제안). 주차·E-27 배너·이번 주 판단을 브라우저 시계로 하지 않기 위해 둔다 */
-export type ServerClock = {
-  __typename?: 'ServerClock';
-  currentWeekEnd: Scalars['Date']['output'];
-  currentWeekStart: Scalars['Date']['output'];
-  now: Scalars['DateTime']['output'];
+export type SentTeamInvitationPage = {
+  __typename?: 'SentTeamInvitationPage';
+  items: Array<SentTeamInvitation>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /**
@@ -1194,58 +1450,86 @@ export type TagCount = {
   tag: Scalars['String']['output'];
 };
 
-/**
- * 팀 (DB team 1-2). 실명 객체다 — 조회자가 볼 자격이 있을 때만 이 타입으로 내려간다.
- * (내 팀 목록, 팀 현황판, 받은 초대, 공개 팀 배지, 공개 팀 글의 팀 이름)
- */
 export type Team = {
   __typename?: 'Team';
-  /** TM-05 ⑤⑥ 이번 주 현황표. 소속자만(E-09) */
-  currentWeekBoard: TeamWeekBoard;
-  /** TM-01 ⑧ 이번 주 요약. 소속자만 */
-  currentWeekSummary: TeamWeekSummary;
+  createdAt: Scalars['String']['output'];
   description: Maybe<Scalars['String']['output']>;
-  /**
-   * TM-08 ⑤ 개인 면제 요청 목록. 팀장만.
-   * [DB 공백] personal_exemption에 team_id가 없다 → '이 팀장(requested_by)이 요청했고 대상이 지금 이 팀 소속'으로 거른다 (추측)
-   */
-  exemptionRequests: Array<PersonalExemptionRequest>;
   id: Scalars['ID']['output'];
-  /** [Q-01] A안(재열람 가능)이면 팀장에게만 값, B안(해시 저장)이면 항상 null. 생성 직후 값은 CreateTeamPayload.inviteCode */
-  inviteCode: Maybe<Scalars['String']['output']>;
+  /** 내가 이 팀의 팀장인가 */
+  isLeader: Scalars['Boolean']['output'];
   isPublic: Scalars['Boolean']['output'];
-  leader: Member;
-  /** TM-06 ⑧ 팀 글 · 댓글 관리. 팀장만. 삭제 버튼 없음(수정만) */
-  managedContents: ContentRowConnection;
+  /** 내가 이 팀에 참가한 시각 (KST, ISO-8601). 팀원이 아닌 시스템 관리자는 null */
+  joinedAt: Maybe<Scalars['String']['output']>;
+  leader: TeamPerson;
   memberCount: Scalars['Int']['output'];
-  /** TM-06 ④ · TM-08 ① 팀원 목록. 소속자만 */
-  members: Array<TeamMembership>;
   name: Scalars['String']['output'];
-  /** TM-06 ③ 보낸 초대(대기 중). 팀장만 */
-  pendingInvitations: Array<SentInvitation>;
-  /** TM-05 ⑦ 이 팀에 연결된 글 최신순. 5건(제안) */
-  recentPosts: Array<Post>;
-  /** 조회자의 이 팀 역할. 비소속이면 null. TM-01 ⑤ · TM-05 ③④ 노출 조건 */
-  viewerRole: Maybe<TeamRole>;
+  /** 이번 주 요약 (TM-01 ⑧) */
+  weekSummary: TeamWeekSummary;
 };
 
-
-/**
- * 팀 (DB team 1-2). 실명 객체다 — 조회자가 볼 자격이 있을 때만 이 타입으로 내려간다.
- * (내 팀 목록, 팀 현황판, 받은 초대, 공개 팀 배지, 공개 팀 글의 팀 이름)
- */
-export type TeamManagedContentsArgs = {
-  after: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Int']['input']>;
+export type TeamBoard = {
+  __typename?: 'TeamBoard';
+  /** 잔디 갱신 기준 시각 (KST, ISO-8601). 하나도 없으면 null */
+  grassFetchedAt: Maybe<Scalars['String']['output']>;
+  /** 잔디를 못 불러온 팀원이 있는가 (E-32 배너) */
+  grassNotLoaded: Scalars['Boolean']['output'];
+  /** 팀장이 맨 앞, 나머지는 참가한 순서 */
+  members: Array<TeamBoardMember>;
+  /** 이 팀에 연결된 글 최신 5건 */
+  recentPosts: Array<TeamBoardPost>;
+  /** 이번 주 일요일 (yyyy-MM-dd) */
+  weekEnd: Scalars['String']['output'];
+  /** 이번 주 월요일 (yyyy-MM-dd) */
+  weekStart: Scalars['String']['output'];
 };
 
+/** 날짜별 한 칸. null은 알 수 없음 */
+export type TeamBoardDay = {
+  __typename?: 'TeamBoardDay';
+  date: Scalars['String']['output'];
+  hasGrass: Maybe<Scalars['Boolean']['output']>;
+  hasRecord: Scalars['Boolean']['output'];
+  verified: Maybe<Scalars['Boolean']['output']>;
+};
 
-/**
- * 팀 (DB team 1-2). 실명 객체다 — 조회자가 볼 자격이 있을 때만 이 타입으로 내려간다.
- * (내 팀 목록, 팀 현황판, 받은 초대, 공개 팀 배지, 공개 팀 글의 팀 이름)
- */
-export type TeamRecentPostsArgs = {
-  first?: InputMaybe<Scalars['Int']['input']>;
+export type TeamBoardMember = {
+  __typename?: 'TeamBoardMember';
+  /** 월~일 7행 */
+  days: Array<TeamBoardDay>;
+  githubLogin: Scalars['String']['output'];
+  isMe: Scalars['Boolean']['output'];
+  memberId: Scalars['ID']['output'];
+  nickname: Scalars['String']['output'];
+  recordCount: Scalars['Int']['output'];
+  status: TeamBoardStatus;
+  /** 인증일 수. 잔디를 못 불러와 알 수 없으면 null */
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+  /** 이 팀 카테고리가 붙은 지금 경고 수. 판정 보류가 남아 알 수 없으면 null */
+  warningCount: Maybe<Scalars['Int']['output']>;
+};
+
+export type TeamBoardPost = {
+  __typename?: 'TeamBoardPost';
+  author: BoardAuthor;
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isRecord: Scalars['Boolean']['output'];
+  title: Scalars['String']['output'];
+  type: PostType;
+};
+
+/** 팀 현황판 상태 칸. 미달은 주가 끝나고 판정이 확정된 뒤에만 나온다 */
+export type TeamBoardStatus =
+  | 'EXCLUDED'
+  | 'FAIL'
+  | 'NOT_YET'
+  | 'PASS';
+
+export type TeamCommentPage = {
+  __typename?: 'TeamCommentPage';
+  items: Array<Comment>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /**
@@ -1268,57 +1552,50 @@ export type TeamLabelKind =
   | 'PRIVATE'
   | 'PUBLIC';
 
-export type TeamMembership = {
-  __typename?: 'TeamMembership';
-  joinedAt: Scalars['DateTime']['output'];
-  member: Member;
-  role: TeamRole;
+export type TeamMember = {
+  __typename?: 'TeamMember';
+  githubLogin: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  isLeader: Scalars['Boolean']['output'];
+  /** 이 팀에 참가한 시각 (KST, ISO-8601) */
+  joinedAt: Scalars['String']['output'];
+  nickname: Scalars['String']['output'];
+  profileImageUrl: Maybe<Scalars['String']['output']>;
 };
 
-/** 팀 단위 역할. 권한 판정은 항상 (회원, 팀) 쌍이다(화면설계서 5-2-1) */
-export type TeamRole =
-  | 'LEADER'
-  | 'MEMBER';
-
-/** TM-05 ⑤ 이번 주 현황표 */
-export type TeamWeekBoard = {
-  __typename?: 'TeamWeekBoard';
-  /** '인증일은 오늘 오전 6시 기준이에요'(TM-05 ⑤, 5-2-6) */
-  grassUpdatedAt: Maybe<Scalars['DateTime']['output']>;
-  rows: Array<TeamWeekRow>;
-  weekEnd: Scalars['Date']['output'];
-  weekStart: Scalars['Date']['output'];
+export type TeamMemberPage = {
+  __typename?: 'TeamMemberPage';
+  items: Array<TeamMember>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
-/**
- * TM-05 ⑥ 팀원 행.
- * 누적 경고 · 벌칙 대상 여부는 넣지 않는다 — 다른 팀 경고가 새어나간다(기능명세서 2장, 확정)
- */
-export type TeamWeekRow = {
-  __typename?: 'TeamWeekRow';
-  days: Array<DayActivity>;
-  grassStatus: GrassFetchStatus;
-  /** 본인 행 배경 강조, '나' 표시(목업 W-09) */
-  isViewer: Scalars['Boolean']['output'];
-  member: Member;
-  recordCount: Scalars['Int']['output'];
-  status: LiveWeekStatus;
-  /** 이 팀 카테고리가 붙은 살아 있는 경고만 센다(기능명세서 2장, DB 1-10 warning_team) */
-  teamWarningCount: Scalars['Int']['output'];
-  /** E-32 잔디 미조회면 null → '—' */
-  verifiedDays: Maybe<Scalars['Int']['output']>;
+/** 이름만 보여주는 회원 정보 */
+export type TeamPerson = {
+  __typename?: 'TeamPerson';
+  githubLogin: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  nickname: Scalars['String']['output'];
+  profileImageUrl: Maybe<Scalars['String']['output']>;
 };
 
-/**
- * TM-01 ⑧ '이번 주 통과 n명 · 미달 n명 · 아직 n명'
- * [충돌] TM-05 비고는 '미달은 판정 확정 뒤에만' → 진행 중인 주에는 failCount가 항상 0이다(목업 W-08도 0명)
- */
+export type TeamPostPage = {
+  __typename?: 'TeamPostPage';
+  items: Array<Post>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
+};
+
+/** 이번 주 요약. 판정 제외·면제인 팀원은 어느 쪽에도 세지 않는다 */
 export type TeamWeekSummary = {
   __typename?: 'TeamWeekSummary';
-  excludedCount: Scalars['Int']['output'];
+  /** 판정이 미달로 확정된 인원. 주가 끝나기 전에는 0 */
   failCount: Scalars['Int']['output'];
+  /** 아직 못 채웠지만 주가 진행 중인 인원 */
   notYetCount: Scalars['Int']['output'];
   passCount: Scalars['Int']['output'];
+  /** 이번 주 월요일 (yyyy-MM-dd) */
+  weekStart: Scalars['String']['output'];
 };
 
 /**
@@ -1334,6 +1611,10 @@ export type UpdatePostInput = {
   title: Scalars['String']['input'];
 };
 
+export type UpdateTeamInput = {
+  isPublic: Scalars['Boolean']['input'];
+};
+
 /**
  * DB warning.delete_reason (1-9).
  * [충돌] FC-04는 정정·소급 면제로 '회수'된 경고를 사유를 구분해 저장한다고 적었으나 DB에는 이 두 값뿐이다.
@@ -1342,6 +1623,40 @@ export type UpdatePostInput = {
 export type WarningDeleteReason =
   | 'KICKED'
   | 'TEAM_DELETED';
+
+/** 경고 이력 표 한 행 */
+export type WarningHistoryItem = {
+  __typename?: 'WarningHistoryItem';
+  /** 팀 카테고리 표시 이름. 공개 팀은 이름, 비공개 팀은 '비공개 팀', 삭제된 팀은 '삭제된 팀'. 열람자를 구분하지 않는다 */
+  categories: Array<Scalars['String']['output']>;
+  /** 사유: 기록글 수. 알 수 없으면 null */
+  recordCount: Maybe<Scalars['Int']['output']>;
+  status: WarningHistoryStatus;
+  /** 사유: 인증일 수. 알 수 없으면 null */
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+  /** 그 주 일요일 (yyyy-MM-dd) */
+  weekEnd: Scalars['String']['output'];
+  /** 경고를 받은 주 월요일 (yyyy-MM-dd) */
+  weekStart: Scalars['String']['output'];
+};
+
+export type WarningHistoryPage = {
+  __typename?: 'WarningHistoryPage';
+  items: Array<WarningHistoryItem>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
+  /** 판정 보류가 남아 있어 계산을 미룬 상태 */
+  onHold: Scalars['Boolean']['output'];
+};
+
+/** 경고 이력의 상태 (Q-13) */
+export type WarningHistoryStatus =
+  /** 벌칙 이행 이후 살아 있고 차감되지 않아 현재 경고 수에 들어간다 (유효) */
+  | 'ACTIVE'
+  /** 2주 연속 통과로 차감됐다 (차감됨) */
+  | 'DEDUCTED'
+  /** 벌칙 이행 체크 이전에 받았다. 기록만 남고 현재 경고 수에는 넣지 않는다 (이행 완료) */
+  | 'FULFILLED';
 
 /** AC-02 ③ 경고 이력 한 줄. 소프트 삭제된 경고는 나오지 않는다 */
 export type WarningRecord = {
@@ -1386,6 +1701,21 @@ export type WarningState = {
   weeksUntilDeduction: Maybe<Scalars['Int']['output']>;
 };
 
+export type WarningSummary = {
+  __typename?: 'WarningSummary';
+  /** 보류 중인 주차 월요일 목록 (yyyy-MM-dd) */
+  holdWeeks: Array<Scalars['String']['output']>;
+  onHold: Scalars['Boolean']['output'];
+  /** 경고가 3개에 도달한 주 월요일 (yyyy-MM-dd). 벌칙 대상일 때만 */
+  penaltyReachedWeek: Maybe<Scalars['String']['output']>;
+  /** 경고 3개 이상이면 벌칙 대상. 이 상태에서는 연속 통과해도 차감되지 않는다 */
+  penaltyTarget: Maybe<Scalars['Boolean']['output']>;
+  /** 지금 연속 통과 수. 2가 되면 경고 1개를 차감하고 0으로 돌아간다. 벌칙 대상이면 쌓지 않아 0 */
+  streak: Maybe<Scalars['Int']['output']>;
+  /** 벌칙 이행 이후 살아 있고 차감되지 않은 경고 수. 3을 넘을 수 있다 */
+  warningCount: Maybe<Scalars['Int']['output']>;
+};
+
 /**
  * 한 주의 활동 (CM-01 ②③, AC-01 ②④⑤, PR-01 ⑩ 첫 줄)
  * 이번 주면 live가, 지난 주면 judgment가 채워진다.
@@ -1408,6 +1738,48 @@ export type WeekActivity = {
   verifiedDays: Maybe<Scalars['Int']['output']>;
   weekEnd: Scalars['Date']['output'];
   weekStart: Scalars['Date']['output'];
+};
+
+/** 한 주의 판정 결과. 제외·면제·보류 주는 인증일·기록글이 null */
+export type WeekJudgment = {
+  __typename?: 'WeekJudgment';
+  /** 관리자 정정을 거쳤는가 */
+  corrected: Scalars['Boolean']['output'];
+  holdReason: Maybe<JudgmentHoldReason>;
+  /** 확정 시각 (KST, ISO-8601) */
+  judgedAt: Maybe<Scalars['String']['output']>;
+  recordCount: Maybe<Scalars['Int']['output']>;
+  skipReason: Maybe<JudgmentSkipReason>;
+  status: JudgmentStatus;
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+};
+
+export type WeeklyActivity = {
+  __typename?: 'WeeklyActivity';
+  /** 이번 주를 볼 때 배너 하나. 없으면 null */
+  banner: Maybe<ActivityBanner>;
+  currentWeek: Scalars['Boolean']['output'];
+  /** 월~일 7행 */
+  days: Array<ActivityDay>;
+  /** 잔디 캐시가 있는가 */
+  grassAvailable: Scalars['Boolean']['output'];
+  /** 잔디 갱신 기준 시각 (KST, ISO-8601). 저장된 판정을 보여줄 때는 null */
+  grassFetchedAt: Maybe<Scalars['String']['output']>;
+  /** 지금 소속된 팀이 있는가. 없으면 판정 대상이 아니다 */
+  inTeam: Scalars['Boolean']['output'];
+  /** 그 주의 판정 결과. 아직 판정 전이면 null */
+  judgment: Maybe<WeekJudgment>;
+  /** 이번 주 통과 예정인가. 이번 주를 볼 때만 있고 인증일을 모르면 null */
+  passExpected: Maybe<Scalars['Boolean']['output']>;
+  recordCount: Scalars['Int']['output'];
+  requiredRecordCount: Scalars['Int']['output'];
+  requiredVerifiedDays: Scalars['Int']['output'];
+  /** 인증일 수. 잔디를 못 불러와 알 수 없으면 null */
+  verifiedDays: Maybe<Scalars['Int']['output']>;
+  /** 그 주 일요일 (yyyy-MM-dd) */
+  weekEnd: Scalars['String']['output'];
+  /** 그 주 월요일 (yyyy-MM-dd) */
+  weekStart: Scalars['String']['output'];
 };
 
 /** DB weekly_judgment (1-6) */

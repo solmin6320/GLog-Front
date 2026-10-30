@@ -1,8 +1,9 @@
 import { skipToken, useQuery } from '@apollo/client/react';
 import { pickHomeBanner } from '@/domain/banner';
+import { toWarningState, toWeekView } from '@/domain/weekView';
 import type { HomeQueryQuery } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { useViewer } from '@/session';
+import { useClock, useViewer } from '@/session';
 import { PageContainer, PageTitle, QueryBoundary } from '@/shared/ui';
 import { HomeNoticesQuery, HomeQuery } from '../api';
 import {
@@ -70,8 +71,9 @@ export default function HomePage() {
 }
 
 function Dashboard({ data, invitationCount }: { data: HomeQueryQuery; invitationCount: number }) {
-  const week = data.myWeek;
-  const state = data.myWarnings.state;
+  const clock = useClock();
+  const week = toWeekView(data.myWeeklyActivity, clock.today);
+  const state = toWarningState(data.myWarningSummary);
   // ⑥ E-39 → E-32 → E-36 → E-46 중 1개 (E-40은 ④ 하단)
   const banner = pickHomeBanner({
     grassStatus: week.grassStatus,
@@ -89,7 +91,7 @@ function Dashboard({ data, invitationCount }: { data: HomeQueryQuery; invitation
           <InvitationNotice count={invitationCount} />
         </div>
       </div>
-      {banner ? <StatusBanner banner={banner} ruleNoticeId={data.grassRuleNotice?.id ?? null} /> : null}
+      {banner ? <StatusBanner banner={banner} /> : null}
     </>
   );
 }

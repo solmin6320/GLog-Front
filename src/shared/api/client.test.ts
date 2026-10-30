@@ -6,8 +6,8 @@ import { normalizeError } from './errors';
 import { sessionEvents } from './sessionEvents';
 import { tokenStore } from './tokenStore';
 
-const Ping = parse('query Ping { clock { now } }');
-const Exchange = parse('mutation SessionExchangeLoginCode($code: String!) { exchangeLoginCode(code: $code) { status } }');
+const Ping = parse('query Ping { me { id } }');
+const Exchange = parse('mutation SessionExchangeAuthCode($code: String!) { exchangeAuthCode(code: $code) { accessToken } }');
 const SessionQ = parse('query SessionQuery { me { id status } }');
 
 function setup(handler: FakeHandler) {
@@ -35,7 +35,7 @@ describe('Apollo 링크', () => {
     const seen: (string | null)[] = [];
     const { client } = setup(({ headers }) => {
       seen.push(headers.get('authorization'));
-      return jsonResponse({ data: { clock: { __typename: 'ServerClock', now: '2026-10-01T10:00:00+09:00' } } });
+      return jsonResponse({ data: { me: { __typename: 'Me', id: '1' } } });
     });
     await client.query({ query: Ping, fetchPolicy: 'network-only' });
     tokenStore.set('t1');
@@ -106,15 +106,14 @@ describe('Apollo 링크', () => {
 });
 
 describe('캐시 정책', () => {
-  it('Me는 싱글턴(Me:{}) — Member:{id}와 섞이지 않는다', () => {
+  it('Me는 싱글턴(Me:{}) — 로그인한 본인 하나', () => {
     const { client } = setup(() => jsonResponse({}));
     client.writeQuery({
-      query: parse('query A { me { id hasTeam member { id nickname } } }'),
-      data: { me: { __typename: 'Me', id: '1', hasTeam: true, member: { __typename: 'Member', id: '1', nickname: '한동관' } } },
+      query: parse('query A { me { id nickname } }'),
+      data: { me: { __typename: 'Me', id: '1', nickname: '한동관' } },
     });
     const store = client.cache.extract() as Record<string, unknown>;
     expect(store['Me:{}']).toBeDefined();
-    expect(store['Member:1']).toBeDefined();
     expect(store['Me:1']).toBeUndefined();
   });
 

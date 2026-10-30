@@ -1,6 +1,6 @@
 import { pickHomeBanner } from '@/domain/banner';
 import { liveProgressText } from '@/domain/weekly';
-import type { WeeklyQueryQuery } from '@/gql/graphql';
+import type { WeekDayView, WeekView } from '@/domain/weekView';
 import { useClock } from '@/session';
 import { asOfLabel, formatMDW } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
@@ -21,8 +21,8 @@ import {
 import { WEEKLY_COPY } from '../copy';
 import s from '../activity.module.css';
 
-type Week = WeeklyQueryQuery['myWeek'];
-type Day = Week['days'][number];
+type Week = WeekView;
+type Day = WeekDayView;
 
 /**
  * 지난 주 잔디는 판정 때 저장한 있음/없음뿐이라 단계가 없다(B-03) → 단색으로 칠한다(M-17).
@@ -164,7 +164,7 @@ function ThisWeekCard({ week }: { week: Week }) {
 }
 
 /** ②③④ + 이번 주 상태 배너(E-39 → E-32 → E-36 → E-46, ② 위 — A2 7-4 제안) */
-export function WeekDetail({ week, ruleNoticeId }: { week: Week; ruleNoticeId: string | null }) {
+export function WeekDetail({ week }: { week: Week }) {
   const clock = useClock();
   const current = week.isCurrentWeek;
   const banner = current
@@ -192,7 +192,7 @@ export function WeekDetail({ week, ruleNoticeId }: { week: Week; ruleNoticeId: s
             role="status"
             action={
               banner.key === 'privateContribution' ? (
-                <LinkButton to={ruleNoticeId ? paths.notice(ruleNoticeId) : paths.notices()} variant="outline" size="sm">
+                <LinkButton to={paths.notices()} variant="outline" size="sm">
                   설정 방법
                 </LinkButton>
               ) : undefined

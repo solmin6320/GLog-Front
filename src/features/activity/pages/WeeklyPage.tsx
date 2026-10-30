@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useQuery } from '@apollo/client/react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { toWeekView } from '@/domain/weekView';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { useClock, useViewer } from '@/session';
-import { usePagedList } from '@/shared/api';
+import { useClock } from '@/session';
+import { toPaged, usePagedList } from '@/shared/api';
 import { formatWeekLabel } from '@/shared/lib/format';
 import { addDays } from '@/shared/lib/kst';
 import { parseWeekParam, paths } from '@/shared/lib/paths';
@@ -14,9 +15,6 @@ import { WeekDetail } from '../components/WeekDetail';
 import { WEEKLY_COPY } from '../copy';
 import s from '../activity.module.css';
 
-/** PR-01 ⑩과 같은 8주씩 */
-const HISTORY_PAGE = 8;
-
 /**
  * AC-01 내 주간 활동 · 판정 (화면설계서 5-1-21, 목업 W-06).
  * ① ?week=YYYY-MM-DD(월요일) — "이번 주"는 서버 clock으로 정하고 미래 주로는 가지 않는다.
@@ -24,7 +22,6 @@ const HISTORY_PAGE = 8;
  */
 export default function WeeklyPage() {
   useDocumentTitle(WEEKLY_COPY.title);
-  const viewer = useViewer();
   const clock = useClock();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -41,15 +38,12 @@ export default function WeeklyPage() {
   }, [hasParam, isThisWeek, navigate]);
 
   const week = useQuery(WeeklyQuery, { variables: { weekStart } });
-  const history = usePagedList(WeeklyHistoryQuery, {
-    variables: { memberId: viewer.memberId },
-    select: (d) => d.member?.judgmentHistory,
-    pageSize: HISTORY_PAGE,
-  });
+  const history = usePagedList(WeeklyHistoryQuery, { variables: {}, select: (d) => toPaged(d.myJudgmentHistory) });
 
   const goTo = (w: string) => void navigate(w >= thisWeek ? paths.weekly() : paths.weekly(w));
   // 주차를 옮기는 중에는 이전 주 데이터를 다른 주 라벨 아래 보여 주지 않는다
-  const current = week.data?.myWeek.weekStart === weekStart ? week.data : undefined;
+  const raw = week.data?.myWeeklyActivity;
+  const current = raw && raw.weekStart === weekStart ? toWeekView(raw, clock.today) : undefined;
 
   return (
     <PageContainer>
@@ -75,7 +69,7 @@ export default function WeeklyPage() {
         skeleton={<WeekSkeleton />}
         onRetry={() => void week.refetch().catch(() => undefined)}
       >
-        {(d) => <WeekDetail week={d.myWeek} ruleNoticeId={d.grassRuleNotice?.id ?? null} />}
+        {(w) => <WeekDetail week={w} />}
       </QueryBoundary>
 
       <JudgmentHistory list={history} />

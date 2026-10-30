@@ -1,4 +1,4 @@
-import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, usePagedList } from '@/shared/api';
 import { formatDateTimeMD } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import {
@@ -21,7 +21,7 @@ import s from './NoticeListPage.module.css';
  * 읽기 전용 · 댓글 없음. 20개씩 [더 보기](③).
  */
 export default function NoticeListPage() {
-  const list = usePagedList(NoticeListQuery, { variables: {}, select: (d) => d.notices });
+  const list = usePagedList(NoticeListQuery, { variables: {}, select: (d) => toPaged(d.notices) });
   return (
     <PageContainer>
       <PageTitle title="공지사항" />

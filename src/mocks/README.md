@@ -26,7 +26,7 @@ POST /api/members/me/profile-image ──▶ handlers.ts (multipart · 5MB · jp
 
 ## 페르소나 (설계서 8-2)
 
-로그인 코드 `mock-<key>` → 토큰 `mock.<memberId>`. 같은 코드 재사용 가능, 모르는 코드만 `LOGIN_CODE_INVALID`.
+로그인 코드 `mock-<key>` → 토큰 `mock.<memberId>`. 같은 코드 재사용 가능, 모르는 코드만 `AUTH_CODE_INVALID`.
 
 | key | id | 회원 | 상태 |
 |---|---|---|---|

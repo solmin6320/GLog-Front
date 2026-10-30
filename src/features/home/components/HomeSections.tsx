@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { HomeBanner } from '@/domain/banner';
 import { deductionText, liveProgressText } from '@/domain/weekly';
-import type { HomeNoticesQueryQuery, HomeQueryQuery } from '@/gql/graphql';
+import type { WarningStateView, WeekView } from '@/domain/weekView';
+import type { HomeNoticesQueryQuery } from '@/gql/graphql';
 import { useClock } from '@/session';
 import { asOfLabel, formatDateTimeMD, formatWeekRangeWithDay } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
@@ -28,8 +29,8 @@ import {
 import { HOME_COPY } from '../copy';
 import s from '../home.module.css';
 
-type Week = HomeQueryQuery['myWeek'];
-type WarningState = HomeQueryQuery['myWarnings']['state'];
+type Week = WeekView;
+type WarningState = WarningStateView;
 
 /** ② 이번 주 진행 + ③ 진행 안내(+ E-41 다음 차감). 인증일 옆 갱신 기준은 서버 시각으로 만든다(M-15) */
 export function WeekProgress({ week, weeksUntilDeduction }: { week: Week; weeksUntilDeduction: number | null }) {
@@ -70,7 +71,9 @@ export function WarningSummary({ state }: { state: WarningState }) {
       <SectionHeader id="home-warning-title" title="내 경고" />
       <div className={s.warnRow}>
         <div className={s.warnMain}>
-          {state.activeCount > 0 ? (
+          {state.onHold ? (
+            <p className={s.noWarning}>{HOME_COPY.warningOnHold}</p>
+          ) : state.activeCount > 0 ? (
             <>
               <BigStat label={<VisuallyHidden>누적 경고</VisuallyHidden>} value={state.activeCount} unit="/ 3" size="md" />
               <WarningGauge count={state.activeCount} />
@@ -113,11 +116,11 @@ export function InvitationNotice({ count }: { count: number }) {
   );
 }
 
-/** ⑥ 상태 배너 1개 (pickHomeBanner가 고른 것). E-39만 [설정 방법] → 잔디 인정 규칙 공지 */
-export function StatusBanner({ banner, ruleNoticeId }: { banner: HomeBanner; ruleNoticeId: string | null }) {
+/** ⑥ 상태 배너 1개 (pickHomeBanner가 고른 것). E-39만 [설정 방법] → 공지 목록(잔디 인정 규칙 공지가 맨 위에 고정) */
+export function StatusBanner({ banner }: { banner: HomeBanner }) {
   const action =
     banner.key === 'privateContribution' ? (
-      <LinkButton to={ruleNoticeId ? paths.notice(ruleNoticeId) : paths.notices()} variant="outline" size="sm">
+      <LinkButton to={paths.notices()} variant="outline" size="sm">
         설정 방법
       </LinkButton>
     ) : undefined;
@@ -186,7 +189,7 @@ export function NoticePreview({ data, loading, error, onRetry }: NoticeProps) {
   let body: ReactNode = null;
   if (data) {
     // 캐시에 더 긴 목록이 있어도 3건만 (CM-01 ⑦)
-    const nodes = data.notices.nodes.slice(0, 3);
+    const nodes = data.notices.items.slice(0, 3);
     body =
       nodes.length > 0 ? (
         <RowList ariaLabel="최근 공지">

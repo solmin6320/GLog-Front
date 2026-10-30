@@ -7,8 +7,8 @@
  * "Cannot use GraphQLSchema from another module or realm" 오류가 난다. 동작은 같다.
  *
  * 루트 필드 접근 규칙 (가드):
- * - 공개: clock · exchangeLoginCode · logout
- * - me: 토큰 없음 → null, 잘못된 토큰 → UNAUTHENTICATED, 대기 · 거절 회원도 허용
+ * - 공개: exchangeAuthCode
+ * - me: 토큰 없음 · 잘못된 토큰 → UNAUTHENTICATED, 대기 · 거절 회원도 허용
  * - 그 밖: 토큰 없음/잘못됨 → UNAUTHENTICATED · PENDING → ACCOUNT_PENDING · REJECTED → ACCOUNT_REJECTED
  * - admin* 등 관리자 필드: MEMBER면 FORBIDDEN
  */
@@ -55,7 +55,7 @@ const AREAS: Record<string, Resolvers> = {
 
 type Policy = 'public' | 'self' | 'active' | 'admin';
 
-const PUBLIC_FIELDS = new Set(['Query.clock', 'Mutation.exchangeLoginCode', 'Mutation.logout']);
+const PUBLIC_FIELDS = new Set(['Mutation.exchangeAuthCode']);
 const SELF_FIELDS = new Set(['Query.me']);
 
 /** admin.ts · adminManage.ts에 있는 루트 필드는 전부 관리자 전용 */
@@ -70,7 +70,10 @@ function policyOf(type: string, field: string, area: string): Policy {
 function assertAccess(policy: Policy, ctx: MockContext): 'skip-null' | void {
   if (policy === 'public') return;
   if (ctx.auth === 'invalid') throw gqlError('UNAUTHENTICATED', { message: 'mock: invalid token' });
-  if (policy === 'self') return ctx.auth === 'none' ? 'skip-null' : undefined;
+  if (policy === 'self') {
+    if (ctx.auth === 'none' || !ctx.viewer) throw gqlError('UNAUTHENTICATED', { message: 'mock: login required' });
+    return;
+  }
   if (ctx.auth === 'none' || !ctx.viewer) throw gqlError('UNAUTHENTICATED', { message: 'mock: login required' });
   if (ctx.viewer.status === 'PENDING') throw gqlError('ACCOUNT_PENDING');
   if (ctx.viewer.status === 'REJECTED') throw gqlError('ACCOUNT_REJECTED');

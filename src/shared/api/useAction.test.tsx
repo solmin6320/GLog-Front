@@ -43,9 +43,9 @@ describe('useAction', () => {
     const { result } = renderHook(() =>
       useAction(
         async () => {
-          throw appError('ALREADY_TEAM_MEMBER');
+          throw appError('TEAM_ALREADY_JOINED');
         },
-        { errorOverrides: { ALREADY_TEAM_MEMBER: '이미 팀에 있는 회원이에요.' } },
+        { errorOverrides: { TEAM_ALREADY_JOINED: '이미 팀에 있는 회원이에요.' } },
       ),
     );
     let out: unknown = 'x';
@@ -54,7 +54,7 @@ describe('useAction', () => {
     });
     expect(out).toBeUndefined();
     expect(toast.error).toHaveBeenCalledWith('이미 팀에 있는 회원이에요.');
-    expect(result.current.error).toEqual({ code: 'ALREADY_TEAM_MEMBER', category: 'validation' });
+    expect(result.current.error).toEqual({ code: 'TEAM_ALREADY_JOINED', category: 'validation' });
     act(() => result.current.reset());
     expect(result.current.error).toBeNull();
   });
@@ -63,13 +63,13 @@ describe('useAction', () => {
     const onError = vi.fn(() => true);
     const { result } = renderHook(() =>
       useAction(async () => {
-        throw appError('INVITE_CODE_NOT_FOUND');
+        throw appError('TEAM_CODE_NOT_FOUND');
       }, { onError }),
     );
     await act(async () => {
       await result.current.run();
     });
-    expect(onError).toHaveBeenCalledWith({ code: 'INVITE_CODE_NOT_FOUND', category: 'validation' });
+    expect(onError).toHaveBeenCalledWith({ code: 'TEAM_CODE_NOT_FOUND', category: 'validation' });
     expect(toast.error).not.toHaveBeenCalled();
   });
 

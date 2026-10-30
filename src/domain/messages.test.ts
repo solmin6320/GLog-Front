@@ -3,8 +3,9 @@ import { josa, messageFor, MSG } from './messages';
 
 const ALL_CODES = [
   'UNAUTHENTICATED', 'ACCOUNT_PENDING', 'ACCOUNT_REJECTED', 'FORBIDDEN', 'NOT_FOUND', 'POST_DELETED',
-  'LOGIN_CODE_INVALID', 'VALIDATION_FAILED', 'INVITE_CODE_NOT_FOUND', 'ALREADY_TEAM_MEMBER', 'TEAM_JOIN_BLOCKED',
-  'INVITEE_NOT_FOUND', 'TEAM_GONE', 'LEADER_MUST_TRANSFER', 'LAST_MEMBER', 'EXEMPTION_DUPLICATE',
+  'AUTH_CODE_INVALID', 'VALIDATION_FAILED', 'TEAM_CODE_NOT_FOUND', 'TEAM_ALREADY_JOINED', 'TEAM_JOIN_BLOCKED',
+  'INVITEE_NOT_FOUND', 'INVITEE_ALREADY_MEMBER', 'INVITATION_DUPLICATE', 'INVITATION_ALREADY_JOINED', 'TEAM_GONE',
+  'TEAM_MEMBER_NOT_FOUND', 'LEADER_MUST_TRANSFER', 'LEADER_LAST_MEMBER', 'EXEMPTION_DUPLICATE', 'EXEMPTION_REQUEST_DUPLICATE',
   'JUDGMENT_NOT_CORRECTABLE', 'SYSTEM_NOTICE_UNDELETABLE', 'PREVIEW_STALE', 'RECALC_BUSY', 'INTERNAL', 'NETWORK',
 ];
 
@@ -73,8 +74,8 @@ describe('MSG', () => {
 });
 
 describe('messageFor', () => {
-  it('22개 코드 모두 문구가 있고 규칙을 지킨다', () => {
-    expect(ALL_CODES).toHaveLength(22);
+  it('27개 코드 모두 문구가 있고 규칙을 지킨다', () => {
+    expect(ALL_CODES).toHaveLength(27);
     for (const code of ALL_CODES) {
       const text = messageFor({ code });
       expect(text, code).toBeTruthy();
@@ -83,10 +84,10 @@ describe('messageFor', () => {
   });
 
   it('A3 7-2 문구', () => {
-    expect(messageFor({ code: 'LOGIN_CODE_INVALID' })).toBe('로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.');
-    expect(messageFor({ code: 'INVITE_CODE_NOT_FOUND' })).toBe('그런 초대코드가 없어요. 다시 확인해 주세요.');
+    expect(messageFor({ code: 'AUTH_CODE_INVALID' })).toBe('로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.');
+    expect(messageFor({ code: 'TEAM_CODE_NOT_FOUND' })).toBe('그런 초대코드가 없어요. 다시 확인해 주세요.');
     expect(messageFor({ code: 'TEAM_JOIN_BLOCKED' })).toBe('이 팀에는 참가할 수 없어요. 팀장에게 문의해 주세요.');
-    expect(messageFor({ code: 'EXEMPTION_DUPLICATE' })).toBe('이미 요청한 주간이에요.');
+    expect(messageFor({ code: 'EXEMPTION_REQUEST_DUPLICATE' })).toBe('이미 요청한 주간이에요.');
     expect(messageFor({ code: 'PREVIEW_STALE' })).toBe(MSG.previewStale);
     expect(messageFor({ code: 'NETWORK' })).toBe(MSG.network);
     expect(messageFor({ code: 'RECALC_BUSY' })).toBe(MSG.server);
@@ -94,7 +95,7 @@ describe('messageFor', () => {
   });
 
   it('화면별 덮어쓰기 · field별 문구 · 모르는 코드', () => {
-    expect(messageFor({ code: 'ALREADY_TEAM_MEMBER' }, { ALREADY_TEAM_MEMBER: '이미 팀에 있는 회원이에요.' })).toBe('이미 팀에 있는 회원이에요.');
+    expect(messageFor({ code: 'TEAM_ALREADY_JOINED' }, { TEAM_ALREADY_JOINED: '이미 팀에 있는 회원이에요.' })).toBe('이미 팀에 있는 회원이에요.');
     expect(messageFor({ code: 'VALIDATION_FAILED', field: 'file.size' })).toBe('5MB 이하 이미지만 올릴 수 있어요.');
     expect(messageFor({ code: 'VALIDATION_FAILED', field: 'title' })).toBe('입력한 내용을 다시 확인해 주세요.');
     expect(messageFor({ code: 'WHAT_IS_THIS' })).toBe(MSG.server);

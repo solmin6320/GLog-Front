@@ -6,21 +6,22 @@ import { parse } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import { createApolloClient } from './client';
 import { fakeFetch, jsonResponse, networkFailure } from './fakeFetch.testutil';
+import { toPaged } from './pagination';
 import { usePagedList } from './usePagedList';
 
 type Notice = { __typename: 'Notice'; id: string; title: string };
-type NoticesData = {
-  notices: { nodes: Notice[]; pageInfo: { hasNextPage: boolean; endCursor: string | null }; totalCount: number };
-};
-type NoticesVars = { first?: number; after?: string | null };
+type NoticesData = { notices: { items: Notice[]; nextCursor: string | null } };
+type NoticesVars = { after?: string | null };
 
 const Notices = parse(`
-  query PagedNotices($first: Int, $after: String) {
-    notices(first: $first, after: $after) { nodes { id title } pageInfo { hasNextPage endCursor } totalCount }
+  query PagedNotices($after: String) {
+    notices(after: $after) { items { id title } nextCursor }
   }
 `) as TypedDocumentNode<NoticesData, NoticesVars>;
 
 const ALL = ['1', '2', '3', '4', '5'];
+// 백엔드처럼 페이지 크기는 서버가 정한다 (Apollo는 문서에 없는 first 변수를 보내지 않는다)
+const PAGE = 2;
 
 function server(opts: { failAfter?: string } = {}) {
   const state = { failOnce: opts.failAfter ?? null, calls: [] as NoticesVars[] };
@@ -32,15 +33,14 @@ function server(opts: { failAfter?: string } = {}) {
       return networkFailure();
     }
     const start = v.after ? ALL.indexOf(v.after) + 1 : 0;
-    const ids = ALL.slice(start, start + (v.first ?? 20));
+    const ids = ALL.slice(start, start + PAGE);
     const last = ids[ids.length - 1] ?? null;
     return jsonResponse({
       data: {
         notices: {
-          __typename: 'NoticeConnection',
-          nodes: ids.map((id) => ({ __typename: 'Notice', id, title: `공지 ${id}` })),
-          pageInfo: { __typename: 'PageInfo', hasNextPage: start + ids.length < ALL.length, endCursor: last },
-          totalCount: ALL.length,
+          __typename: 'NoticePage',
+          items: ids.map((id) => ({ __typename: 'Notice', id, title: `공지 ${id}` })),
+          nextCursor: start + ids.length < ALL.length ? last : null,
         },
       },
     });
@@ -50,22 +50,21 @@ function server(opts: { failAfter?: string } = {}) {
   return { state, wrapper };
 }
 
-const usePaged = () => usePagedList(Notices, { variables: {}, select: (d) => d.notices, pageSize: 2 });
+const usePaged = () => usePagedList(Notices, { variables: {}, select: (d) => toPaged(d.notices) });
 
 describe('usePagedList', () => {
-  it('first는 pageSize · [더 보기]는 after로 이어 붙이고 끝에서 hasMore=false', async () => {
+  it('[더 보기]는 after로 이어 붙이고 끝에서 hasMore=false', async () => {
     const { state, wrapper } = server();
     const { result } = renderHook(usePaged, { wrapper });
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.nodes.map((n) => n.id)).toEqual(['1', '2']));
-    expect(result.current.totalCount).toBe(5);
     expect(result.current.hasMore).toBe(true);
-    expect(state.calls[0]).toEqual({ first: 2 });
+    expect(state.calls[0]).toEqual({});
 
     act(() => result.current.loadMore());
     expect(result.current.loadingMore).toBe(true);
     await waitFor(() => expect(result.current.nodes.map((n) => n.id)).toEqual(['1', '2', '3', '4']));
-    expect(state.calls[1]).toEqual({ first: 2, after: '2' });
+    expect(state.calls[1]).toEqual({ after: '2' });
     expect(result.current.loading).toBe(false);
 
     act(() => result.current.loadMore());
@@ -101,7 +100,7 @@ describe('usePagedList', () => {
 
   it('skip이면 요청하지 않는다', async () => {
     const { state, wrapper } = server();
-    const { result } = renderHook(() => usePagedList(Notices, { variables: {}, select: (d) => d.notices, skip: true }), { wrapper });
+    const { result } = renderHook(() => usePagedList(Notices, { variables: {}, select: (d) => toPaged(d.notices), skip: true }), { wrapper });
     await new Promise((r) => setTimeout(r, 20));
     expect(state.calls).toHaveLength(0);
     expect(result.current.nodes).toEqual([]);

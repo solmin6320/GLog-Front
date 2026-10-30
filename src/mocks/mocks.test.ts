@@ -29,8 +29,6 @@ const MEMBER_FIELDS = `
   publicTeams { id name }
 `;
 
-const DAY = 'date grassCount grassLevel hasGrass recordCount hasRecord verified isFuture isToday';
-
 const POST_FIELDS = `
   id type title sections { key body } tags commitUrls author { id nickname } publicTeam { id name }
   isRecord writtenDate inFinalizedWeek createdAt updatedAt commentCount
@@ -42,41 +40,43 @@ const PREVIEW = 'member { id nickname } warningCountBefore warningCountAfter pen
 
 const EVERY_QUERY_FIELD = /* GraphQL */ `
   query Everything($postId: ID!, $warningId: ID!) {
-    clock { now currentWeekStart currentWeekEnd }
-    me { id status role hasTeam pendingInvitationCount member { ${MEMBER_FIELDS} } }
-    myWeek {
-      weekStart weekEnd isCurrentWeek verifiedDays recordCount grassStatus grassUpdatedAt privateContributionSuspected
-      days { ${DAY} }
-      live { status skipReason verifiedDaysNeeded recordsNeeded }
-      judgment { id status }
+    me { id githubLogin nickname profileImageUrl status role }
+    myWeeklyActivity {
+      weekStart weekEnd currentWeek inTeam verifiedDays recordCount requiredVerifiedDays requiredRecordCount passExpected
+      grassAvailable grassFetchedAt banner days { date hasGrass grassCount hasRecord recordCount }
+      judgment { status skipReason holdReason verifiedDays recordCount corrected judgedAt }
     }
-    lastWeek: myWeek(weekStart: "2026-09-21") { verifiedDays recordCount days { ${DAY} } judgment { id status verifiedDays recordCount } }
-    myWarnings {
-      state { activeCount isPenaltyTarget consecutivePasses weeksUntilDeduction byCategory { label { kind name } count } }
-      history { id weekStart weekEnd verifiedDays recordCount categories { kind name } standing }
-    }
+    lastWeek: myWeeklyActivity(weekStart: "2026-09-21") { verifiedDays recordCount judgment { status verifiedDays recordCount } }
+    myJudgmentHistory { items { weekStart weekEnd status skipReason holdReason verifiedDays recordCount corrected } nextCursor }
+    myWarningSummary { onHold holdWeeks warningCount streak penaltyTarget penaltyReachedWeek }
+    myWarningHistory { onHold items { weekStart weekEnd verifiedDays recordCount categories status } nextCursor }
     myTeams {
-      id name description isPublic memberCount viewerRole inviteCode leader { nickname }
-      currentWeekSummary { passCount failCount notYetCount excludedCount }
+      id name description isPublic memberCount isLeader joinedAt createdAt leader { nickname githubLogin }
+      weekSummary { weekStart passCount failCount notYetCount }
     }
-    myInvitations { id team { id name isPublic } invitedBy { nickname } createdAt }
-    team(id: "1") {
-      id name viewerRole inviteCode memberCount
-      currentWeekBoard { weekStart weekEnd grassUpdatedAt rows { member { nickname } isViewer days { ${DAY} } verifiedDays recordCount teamWarningCount status grassStatus } }
-      recentPosts { id title author { nickname } }
-      members { member { nickname githubLogin } role joinedAt }
-      pendingInvitations { id invitee { githubLogin } createdAt }
-      managedContents(first: 5) { nodes { kind targetId postId postType title author { nickname } createdAt } pageInfo { hasNextPage } totalCount }
-      exemptionRequests { id member { nickname } requestedBy { nickname } weekStart status rejectReason overlapsExemptionPeriod isRetroactive }
+    receivedTeamInvitations { items { id teamId teamName inviter { nickname } createdAt } nextCursor }
+    team(id: "1") { id name isLeader memberCount joinedAt }
+    teamMembers(teamId: "1") { items { id nickname githubLogin profileImageUrl isLeader joinedAt } nextCursor }
+    teamInviteCode(teamId: "1")
+    sentTeamInvitations(teamId: "1") { items { id invitee { githubLogin } createdAt } nextCursor }
+    teamBoard(teamId: "1") {
+      weekStart weekEnd grassFetchedAt grassNotLoaded
+      members { memberId nickname githubLogin isMe days { date hasGrass hasRecord verified } verifiedDays recordCount warningCount status }
+      recentPosts { id type title author { nickname } createdAt isRecord }
+    }
+    teamPosts(teamId: "1") { items { id title author { nickname } } nextCursor }
+    teamComments(teamId: "1") { items { id postId content author { nickname } } nextCursor }
+    myPersonalExemptionRequests {
+      items { id member { nickname } requester { nickname } weekStart weekEnd status reason rejectReason respondedAt createdAt overlapsExemptionPeriod }
+      nextCursor
     }
     member(id: "1") { ${MEMBER_FIELDS} }
     posts(filter: { type: TROUBLESHOOTING }) { nodes { ${POST_FIELDS} } pageInfo { hasNextPage endCursor } totalCount }
     postTypeCounts(filter: { query: "Redis" }) { troubleshooting devlog }
     popularTags(type: TROUBLESHOOTING) { tag count }
     post(id: $postId) { __typename ... on Post { ${POST_FIELDS} } ... on DeletedPost { id deletedAt } }
-    notices(first: 3) { nodes { id title content isPinned isSystem createdAt updatedAt } pageInfo { hasNextPage endCursor } }
+    notices { items { id title content isPinned isSystem createdAt updatedAt } nextCursor }
     notice(id: "6") { id title }
-    grassRuleNotice { id title isSystem }
     adminDashboardSummary { pendingMemberCount latestWeekFailCount latestJudgedWeekStart penaltyTargetCount pendingExemptionRequestCount heldJudgmentCount }
     adminJudgmentWeek {
       weekStart weekEnd executedAt counts { pass fail exempt firstWeek noTeam hold }
@@ -108,43 +108,39 @@ describe('목 스키마', () => {
   it('member 페르소나로 모든 Query 필드를 오류 없이 실행한다', async () => {
     const warningId = db.warnings.find((w) => w.deleted)?.id;
     const data = await ok<Json>(EVERY_QUERY_FIELD, 'member', { postId: seedPostId('redisTtl'), warningId });
-    expect(data.clock).toEqual({ now: '2026-10-01T10:00:00+09:00', currentWeekStart: '2026-09-28', currentWeekEnd: '2026-10-04' });
+    expect(data.me).toMatchObject({ id: '1', nickname: '한동관', status: 'ACTIVE', role: 'ADMIN' });
   });
 });
 
 describe('한동관 (member) — 목업 숫자', () => {
   it('이번 주: 월 잔디 3 · 화 잔디 1 + 기록글 · 인증일 2/3 · 기록글 1/1 → 아직', async () => {
-    const d = await ok<{ myWeek: Json & { days: Json[] } }>(`{ myWeek { verifiedDays recordCount grassUpdatedAt live { status skipReason verifiedDaysNeeded recordsNeeded } days { ${DAY} } } }`);
-    const w = d.myWeek;
+    const d = await ok<{ myWeeklyActivity: Json & { days: Json[] } }>(
+      `{ myWeeklyActivity { currentWeek inTeam verifiedDays recordCount passExpected grassAvailable grassFetchedAt banner days { date hasGrass grassCount hasRecord recordCount } } }`,
+    );
+    const w = d.myWeeklyActivity;
     expect(w.days.map((x) => x.grassCount)).toEqual([3, 1, 0, 0, null, null, null]);
-    expect(w.days.map((x) => x.grassLevel)).toEqual([3, 1, 0, 0, null, null, null]);
+    expect(w.days.map((x) => x.hasGrass)).toEqual([true, true, false, false, null, null, null]);
     expect(w.days.map((x) => x.hasRecord)).toEqual([false, true, false, false, false, false, false]);
-    expect(w.days.map((x) => x.verified)).toEqual([true, true, false, false, false, false, false]);
-    expect(w.days.map((x) => x.isToday)).toEqual([false, false, false, true, false, false, false]);
-    expect(w.days.map((x) => x.isFuture)).toEqual([false, false, false, false, true, true, true]);
-    expect(w.verifiedDays).toBe(2);
-    expect(w.recordCount).toBe(1);
-    expect(w.grassUpdatedAt).toBe('2026-10-01T06:00:00+09:00');
-    expect(w.live).toEqual({ status: 'NOT_YET', skipReason: null, verifiedDaysNeeded: 1, recordsNeeded: 0 });
+    expect(w).toMatchObject({
+      currentWeek: true,
+      inTeam: true,
+      verifiedDays: 2,
+      recordCount: 1,
+      passExpected: false,
+      grassAvailable: true,
+      grassFetchedAt: '2026-10-01T06:00:00+09:00',
+      banner: null,
+    });
   });
 
-  it('경고 1/3 · 연속 1/2 · 다음 차감까지 1주 · 카테고리 A팀 + 비공개 팀 (W-07 · W-14)', async () => {
-    const d = await ok<{ myWarnings: { state: Json; history: Json[] } }>(
-      `{ myWarnings { state { activeCount isPenaltyTarget consecutivePasses weeksUntilDeduction byCategory { label { kind name } count } } history { weekStart verifiedDays recordCount categories { kind name } standing } } }`,
+  it('경고 1/3 · 연속 1/2 · 카테고리 A팀 + 비공개 팀 (W-07 · W-14)', async () => {
+    const d = await ok<{ myWarningSummary: Json; myWarningHistory: { items: Json[] } }>(
+      `{ myWarningSummary { onHold warningCount streak penaltyTarget } myWarningHistory { items { weekStart verifiedDays recordCount categories status } } }`,
     );
-    expect(d.myWarnings.state).toEqual({
-      activeCount: 1,
-      isPenaltyTarget: false,
-      consecutivePasses: 1,
-      weeksUntilDeduction: 1,
-      byCategory: [
-        { label: { kind: 'PUBLIC', name: '사이드 프로젝트 A팀' }, count: 1 },
-        { label: { kind: 'PRIVATE', name: null }, count: 1 },
-      ],
-    });
-    expect(d.myWarnings.history).toEqual([
-      { weekStart: '2026-09-14', verifiedDays: 1, recordCount: 0, categories: [{ kind: 'PUBLIC', name: '사이드 프로젝트 A팀' }, { kind: 'PRIVATE', name: null }], standing: 'ACTIVE' },
-      { weekStart: '2026-07-13', verifiedDays: 2, recordCount: 0, categories: [{ kind: 'PUBLIC', name: '웹 프로젝트 B팀' }], standing: 'DEDUCTED' },
+    expect(d.myWarningSummary).toEqual({ onHold: false, warningCount: 1, streak: 1, penaltyTarget: false });
+    expect(d.myWarningHistory.items).toEqual([
+      { weekStart: '2026-09-14', verifiedDays: 1, recordCount: 0, categories: ['사이드 프로젝트 A팀', '비공개 팀'], status: 'ACTIVE' },
+      { weekStart: '2026-07-13', verifiedDays: 2, recordCount: 0, categories: ['웹 프로젝트 B팀'], status: 'DEDUCTED' },
     ]);
   });
 
@@ -164,38 +160,39 @@ describe('한동관 (member) — 목업 숫자', () => {
   });
 
   it('내 팀 요약 · 받은 초대 2건 (W-08)', async () => {
-    const d = await ok<{ me: Json; myTeams: Json[] }>(
-      `{ me { hasTeam pendingInvitationCount } myTeams { name isPublic memberCount viewerRole currentWeekSummary { passCount failCount notYetCount } } }`,
+    const d = await ok<{ receivedTeamInvitations: Json; myTeams: Json[] }>(
+      `{ receivedTeamInvitations { items { id } } myTeams { name isPublic memberCount isLeader weekSummary { passCount failCount notYetCount } } }`,
     );
-    expect(d.me).toEqual({ hasTeam: true, pendingInvitationCount: 2 });
+    expect((d.receivedTeamInvitations as { items: Json[] }).items).toHaveLength(2);
     expect(d.myTeams).toEqual([
-      { name: '사이드 프로젝트 A팀', isPublic: true, memberCount: 4, viewerRole: 'LEADER', currentWeekSummary: { passCount: 1, failCount: 0, notYetCount: 3 } },
-      { name: '알고리즘 스터디', isPublic: false, memberCount: 6, viewerRole: 'MEMBER', currentWeekSummary: { passCount: 3, failCount: 0, notYetCount: 3 } },
+      { name: '사이드 프로젝트 A팀', isPublic: true, memberCount: 4, isLeader: true, weekSummary: { passCount: 1, failCount: 0, notYetCount: 3 } },
+      { name: '알고리즘 스터디', isPublic: false, memberCount: 6, isLeader: false, weekSummary: { passCount: 3, failCount: 0, notYetCount: 3 } },
     ]);
   });
 
   it('A팀 현황판 (W-09 TEAM 배열) · 초대코드 · 보낸 초대 (W-10)', async () => {
-    const d = await ok<{ team: { inviteCode: string; currentWeekBoard: { rows: Json[] }; pendingInvitations: Json[]; recentPosts: Json[] } }>(
-      `{ team(id: "1") { inviteCode pendingInvitations { invitee { githubLogin } } recentPosts { title } currentWeekBoard { rows { member { nickname } isViewer verifiedDays recordCount teamWarningCount status days { grassCount hasRecord } } } } }`,
+    const d = await ok<{ teamInviteCode: string; sentTeamInvitations: { items: Json[] }; teamBoard: { members: Json[]; recentPosts: Json[] } }>(
+      `{ teamInviteCode(teamId: "1") sentTeamInvitations(teamId: "1") { items { invitee { githubLogin } } }
+        teamBoard(teamId: "1") { recentPosts { title } members { nickname isMe verifiedDays recordCount warningCount status days { hasGrass hasRecord } } } }`,
     );
-    expect(d.team.inviteCode).toBe('JD7K-Q2MA');
-    expect(d.team.pendingInvitations).toEqual([{ invitee: { githubLogin: 'seoyeon-lee' } }]);
-    const rows = d.team.currentWeekBoard.rows.map((r) => [
-      (r.member as Json).nickname,
-      r.isViewer,
+    expect(d.teamInviteCode).toBe('JD7K-Q2MA');
+    expect(d.sentTeamInvitations.items).toEqual([{ invitee: { githubLogin: 'seoyeon-lee' } }]);
+    const rows = d.teamBoard.members.map((r) => [
+      r.nickname,
+      r.isMe,
       r.verifiedDays,
       r.recordCount,
-      r.teamWarningCount,
+      r.warningCount,
       r.status,
-      (r.days as Json[]).slice(0, 4).map((x) => `${String(x.grassCount)}${x.hasRecord ? 'r' : ''}`),
+      (r.days as Json[]).slice(0, 4).map((x) => `${x.hasGrass ? 'g' : '-'}${x.hasRecord ? 'r' : ''}`),
     ]);
     expect(rows).toEqual([
-      ['한동관', true, 2, 1, 1, 'NOT_YET', ['3', '1r', '0', '0']],
-      ['김철수', false, 4, 2, 0, 'CONDITION_MET', ['2', '0r', '3', '1r']],
-      ['이영희', false, 0, 0, 2, 'NOT_YET', ['0', '0', '0', '0']],
-      ['박민수', false, 4, 0, 0, 'NOT_YET', ['4', '2', '3', '1']],
+      ['한동관', true, 2, 1, 1, 'NOT_YET', ['g', 'gr', '-', '-']],
+      ['김철수', false, 4, 2, 0, 'PASS', ['g', '-r', 'g', 'gr']],
+      ['이영희', false, 0, 0, 2, 'NOT_YET', ['-', '-', '-', '-']],
+      ['박민수', false, 4, 0, 0, 'NOT_YET', ['g', 'g', 'g', 'g']],
     ]);
-    expect(d.team.recentPosts.map((p) => p.title)).toEqual([
+    expect(d.teamBoard.recentPosts.map((p) => p.title)).toEqual([
       'GraphQL 스키마 초안 정리',
       'Redis TTL이 적용되지 않던 문제',
       'Expo 딥링크가 안드로이드에서만 열리지 않을 때',
@@ -283,11 +280,10 @@ describe('게시판', () => {
 });
 
 describe('접근 규칙', () => {
-  it('비로그인: me는 null, 그 밖은 UNAUTHENTICATED, clock은 허용', async () => {
-    const me = await run(`{ me { id } clock { now } }`, null);
-    expect(me.errors).toBeUndefined();
-    expect(me.data).toEqual({ me: null, clock: { now: '2026-10-01T10:00:00+09:00' } });
-    const week = await run(`{ myWeek { weekStart } }`, null);
+  it('비로그인: me도 UNAUTHENTICATED (백엔드 me는 토큰 필요)', async () => {
+    const me = await run(`{ me { id } }`, null);
+    expect(me.codes).toEqual(['UNAUTHENTICATED']);
+    const week = await run(`{ myWeeklyActivity { weekStart } }`, null);
     expect(week.codes).toEqual(['UNAUTHENTICATED']);
     expect(week.errors?.[0]?.extensions?.classification).toBe('UNAUTHORIZED');
     const bogus = await run(`{ me { id } }`, 'bogus');
@@ -295,8 +291,8 @@ describe('접근 규칙', () => {
   });
 
   it('승인 대기: me만 되고 myTeams는 ACCOUNT_PENDING · 거절: ACCOUNT_REJECTED', async () => {
-    const me = await run(`{ me { status member { nickname } } }`, 'pending');
-    expect(me.data).toEqual({ me: { status: 'PENDING', member: { nickname: '정다은' } } });
+    const me = await run(`{ me { status nickname } }`, 'pending');
+    expect(me.data).toEqual({ me: { status: 'PENDING', nickname: '정다은' } });
     expect((await run(`{ myTeams { id } }`, 'pending')).codes).toEqual(['ACCOUNT_PENDING']);
     expect((await run(`{ myTeams { id } }`, 'rejected')).codes).toEqual(['ACCOUNT_REJECTED']);
     expect((await run(`{ me { status } }`, 'rejected')).data).toEqual({ me: { status: 'REJECTED' } });
@@ -308,28 +304,24 @@ describe('접근 규칙', () => {
     expect(r.errors?.[0]?.extensions?.classification).toBe('FORBIDDEN');
   });
 
-  it('비소속 팀은 FORBIDDEN, 없는 팀은 null', async () => {
+  it('비소속 팀은 FORBIDDEN, 없는 팀은 NOT_FOUND', async () => {
     expect((await run(`{ team(id: "2") { id } }`, 'plain')).codes).toEqual(['FORBIDDEN']);
-    const none = await run(`{ team(id: "999") { id } }`, 'plain');
-    expect(none.errors).toBeUndefined();
-    expect(none.data).toEqual({ team: null });
+    expect((await run(`{ team(id: "999") { id } }`, 'plain')).codes).toEqual(['NOT_FOUND']);
     // 팀원은 현황판은 보지만 팀장 전용 필드는 FORBIDDEN
-    expect((await run(`{ team(id: "1") { pendingInvitations { id } } }`, 'plain')).codes).toEqual(['FORBIDDEN']);
+    expect((await run(`{ sentTeamInvitations(teamId: "1") { items { id } } }`, 'plain')).codes).toEqual(['FORBIDDEN']);
   });
 
-  it('로그인 코드 교환: mock-<persona>만 통과, 대기 회원도 제한 토큰을 받는다', async () => {
-    const q = `mutation($code: String!) { exchangeLoginCode(code: $code) { status accessToken expiresAt me { id } } }`;
+  it('로그인 코드 교환: mock-<persona>만 통과, 대기 회원도 토큰을 받고 거절 회원은 ACCOUNT_REJECTED', async () => {
+    const q = `mutation($code: String!) { exchangeAuthCode(code: $code) { accessToken expiresIn me { id status } } }`;
     const a = await run(q, null, { code: 'mock-member' });
-    expect(a.data?.exchangeLoginCode).toMatchObject({ status: 'ACTIVE', accessToken: 'mock.1', me: { id: '1' } });
+    expect(a.data?.exchangeAuthCode).toEqual({ accessToken: 'mock.1', expiresIn: 43200, me: { id: '1', status: 'ACTIVE' } });
     const p = await run(q, null, { code: 'mock-pending' });
-    expect(p.data?.exchangeLoginCode).toMatchObject({ status: 'PENDING', accessToken: 'mock.9' });
-    const r = await run(q, null, { code: 'mock-rejected' });
-    expect(r.data?.exchangeLoginCode).toMatchObject({ status: 'REJECTED', accessToken: 'mock.10', me: null });
-    expect((await run(q, null, { code: 'nope' })).codes).toEqual(['LOGIN_CODE_INVALID']);
+    expect(p.data?.exchangeAuthCode).toMatchObject({ accessToken: 'mock.9', me: { status: 'PENDING' } });
+    expect((await run(q, null, { code: 'mock-rejected' })).codes).toEqual(['ACCOUNT_REJECTED']);
+    expect((await run(q, null, { code: 'nope' })).codes).toEqual(['AUTH_CODE_INVALID']);
   });
 
   it('구현 전 뮤테이션 자리(notImplemented)는 INTERNAL', async () => {
-    expect((await run(`mutation { logout }`)).data).toEqual({ logout: true });
     // 특정 뮤테이션에 기대지 않는다 — 웨이브 2가 자리를 하나씩 채운다
     const { notImplemented } = await import('./resolvers/stub');
     let code: unknown;
@@ -417,40 +409,40 @@ describe('관리자 (W-15 · W-16)', () => {
 
 describe('페르소나 · 시각', () => {
   it('noteam(서연): 팀 없음 → 이번 주 EXCLUDED/NO_TEAM, 받은 초대 1건', async () => {
-    const d = await ok<{ me: Json; myWeek: Json; myInvitations: Json[] }>(
-      `{ me { hasTeam pendingInvitationCount } myWeek { verifiedDays live { status skipReason } } myInvitations { team { name } } }`,
+    const d = await ok<{ myTeams: Json[]; myWeeklyActivity: Json; receivedTeamInvitations: { items: Json[] } }>(
+      `{ myTeams { id } myWeeklyActivity { inTeam passExpected } receivedTeamInvitations { items { teamName } } }`,
       'noteam',
     );
-    expect(d.me).toEqual({ hasTeam: false, pendingInvitationCount: 1 });
-    expect(d.myWeek).toEqual({ verifiedDays: null, live: { status: 'EXCLUDED', skipReason: 'NO_TEAM' } });
-    expect(d.myInvitations).toEqual([{ team: { name: '사이드 프로젝트 A팀' } }]);
+    expect(d.myTeams).toEqual([]);
+    expect(d.myWeeklyActivity).toEqual({ inTeam: false, passExpected: null });
+    expect(d.receivedTeamInvitations.items).toEqual([{ teamName: '사이드 프로젝트 A팀' }]);
   });
 
   it('penalty(박지훈): 경고 3 · 벌칙 대상 · 차감 없음', async () => {
-    const d = await ok<{ myWarnings: { state: Json } }>(`{ myWarnings { state { activeCount isPenaltyTarget weeksUntilDeduction } } }`, 'penalty');
-    expect(d.myWarnings.state).toEqual({ activeCount: 3, isPenaltyTarget: true, weeksUntilDeduction: null });
+    const d = await ok<{ myWarningSummary: Json }>(`{ myWarningSummary { warningCount penaltyTarget streak } }`, 'penalty');
+    expect(d.myWarningSummary).toEqual({ warningCount: 3, penaltyTarget: true, streak: 0 });
   });
 
   it('월요일 03:00(판정 전)에는 9/21 판정이 아직 없다', async () => {
     setMockControl({ now: '2026-09-28T03:00:00+09:00' });
-    const d = await ok<{ lastWeek: Json; adminDashboardSummary: Json; myWarnings: { state: Json } }>(
-      `{ lastWeek: myWeek(weekStart: "2026-09-21") { judgment { id } verifiedDays } adminDashboardSummary { latestJudgedWeekStart } myWarnings { state { activeCount } } }`,
+    const d = await ok<{ lastWeek: Json; adminDashboardSummary: Json; myWarningSummary: Json }>(
+      `{ lastWeek: myWeeklyActivity(weekStart: "2026-09-21") { judgment { status } verifiedDays } adminDashboardSummary { latestJudgedWeekStart } myWarningSummary { warningCount } }`,
     );
     expect(d.lastWeek.judgment).toBeNull();
     expect(d.adminDashboardSummary.latestJudgedWeekStart).toBe('2026-09-14');
-    expect(d.myWarnings.state.activeCount).toBe(1);
+    expect(d.myWarningSummary.warningCount).toBe(1);
   });
 
   it('잔디 강제 failed: 본인 이번 주 인증일은 null(—)', async () => {
     setMockControl({ grass: 'failed' });
-    const d = await ok<{ myWeek: Json }>(`{ myWeek { grassStatus verifiedDays days { grassCount } } }`);
-    expect(d.myWeek).toMatchObject({ grassStatus: 'FAILED', verifiedDays: null });
+    const d = await ok<{ myWeeklyActivity: Json }>(`{ myWeeklyActivity { grassAvailable verifiedDays banner } }`);
+    expect(d.myWeeklyActivity).toMatchObject({ grassAvailable: false, verifiedDays: null, banner: 'GRASS_NOT_LOADED' });
   });
 
   it('미래 주 · 월요일 아닌 날은 VALIDATION_FAILED', async () => {
-    expect((await run(`{ myWeek(weekStart: "2026-10-05") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
-    expect((await run(`{ myWeek(weekStart: "2026-09-29") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
-    expect((await run(`{ myWeek(weekStart: "2026-13-01") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
+    expect((await run(`{ myWeeklyActivity(weekStart: "2026-10-05") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
+    expect((await run(`{ myWeeklyActivity(weekStart: "2026-09-29") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
+    expect((await run(`{ myWeeklyActivity(weekStart: "2026-13-01") { weekStart } }`)).codes).toEqual(['VALIDATION_FAILED']);
   });
 });
 
@@ -463,22 +455,23 @@ describe('MSW 핸들러', () => {
     });
 
   it('GraphQL 요청을 목 스키마로 실행한다', async () => {
-    const res = await gql(`query HomeQuery { me { member { nickname } } }`, mockTokenFor('member'), 'HomeQuery');
+    const res = await gql(`query HomeQuery { me { nickname } }`, mockTokenFor('member'), 'HomeQuery');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ data: { me: { member: { nickname: '한동관' } } } });
+    expect(await res.json()).toEqual({ data: { me: { nickname: '한동관' } } });
   });
 
   it('failOnce: 그 연산만 한 번 INTERNAL, 다음엔 정상', async () => {
     setMockControl({ failOnce: 'HomeQuery' });
-    const first = (await (await gql(`query HomeQuery { clock { now } }`, null, 'HomeQuery')).json()) as Json;
-    expect((first.errors as Json[])[0]).toMatchObject({ path: ['clock'], extensions: { code: 'INTERNAL', classification: 'INTERNAL_ERROR' } });
-    const second = (await (await gql(`query HomeQuery { clock { now } }`, null, 'HomeQuery')).json()) as Json;
+    const token = mockTokenFor('member');
+    const first = (await (await gql(`query HomeQuery { me { id } }`, token, 'HomeQuery')).json()) as Json;
+    expect((first.errors as Json[])[0]).toMatchObject({ path: ['me'], extensions: { code: 'INTERNAL', classification: 'INTERNAL_ERROR' } });
+    const second = (await (await gql(`query HomeQuery { me { id } }`, token, 'HomeQuery')).json()) as Json;
     expect(second.errors).toBeUndefined();
   });
 
   it('failure network → 요청 실패', async () => {
     setMockControl({ failure: 'network' });
-    await expect(gql(`{ clock { now } }`, null)).rejects.toThrow();
+    await expect(gql(`{ me { id } }`, null)).rejects.toThrow();
   });
 
   it('프로필 이미지 업로드: 형식 · 크기 검사 후 profileImageUrl', async () => {
@@ -503,8 +496,8 @@ describe('MSW 핸들러', () => {
     expect(okRes.status).toBe(200);
     const { profileImageUrl } = (await okRes.json()) as { profileImageUrl: string };
     expect(profileImageUrl).toMatch(/^(data:image\/png;base64,|blob:)/);
-    const me = await ok<{ me: { member: { profileImageUrl: string } } }>(`{ me { member { profileImageUrl } } }`);
-    expect(me.me.member.profileImageUrl).toBe(profileImageUrl);
+    const me = await ok<{ me: { profileImageUrl: string } }>(`{ me { profileImageUrl } }`);
+    expect(me.me.profileImageUrl).toBe(profileImageUrl);
 
     const bad = await upload(new Uint8Array([1]), 'image/gif', 'a.gif');
     expect(bad.status).toBe(400);

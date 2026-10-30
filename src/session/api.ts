@@ -1,44 +1,46 @@
 /**
- * 세션 문서 (계약서 3장). 다른 곳에서 같은 필드를 다시 부르지 않는다.
- * Me는 캐시에서 싱글턴(Me:{})이라, 다른 쿼리가 me { hasTeam pendingInvitationCount }를 다시 받아 오면 viewer도 바뀐다.
+ * 세션 문서 (계약서 3장, 백엔드 auth.graphqls). 다른 곳에서 같은 필드를 다시 부르지 않는다.
+ * 팀 유무(hasTeam)와 받은 초대 수는 백엔드 Me에 없어 SessionTeamsQuery(myTeams · receivedTeamInvitations)로 센다.
+ * 두 필드는 null이 될 수 없어 대기 · 거절 회원이면 응답 data 전체가 null이 된다 — 그래서 활성 회원일 때만 따로 부른다.
  */
 import { graphql } from '@/gql';
 
 export const SessionQuery = graphql(`
   query SessionQuery {
-    clock {
-      now
-      currentWeekStart
-      currentWeekEnd
-    }
     me {
       id
+      githubLogin
+      nickname
+      profileImageUrl
       status
       role
-      hasTeam
-      pendingInvitationCount
-      member {
+    }
+  }
+`);
+
+export const SessionTeamsQuery = graphql(`
+  query SessionTeamsQuery {
+    myTeams {
+      id
+    }
+    receivedTeamInvitations {
+      items {
         id
-        nickname
-        githubLogin
-        profileImageUrl
+      }
+      nextCursor
+    }
+  }
+`);
+
+export const SessionExchangeAuthCode = graphql(`
+  mutation SessionExchangeAuthCode($code: String!) {
+    exchangeAuthCode(code: $code) {
+      accessToken
+      expiresIn
+      me {
+        id
+        status
       }
     }
-  }
-`);
-
-export const SessionExchangeLoginCode = graphql(`
-  mutation SessionExchangeLoginCode($code: String!) {
-    exchangeLoginCode(code: $code) {
-      status
-      accessToken
-      expiresAt
-    }
-  }
-`);
-
-export const SessionLogout = graphql(`
-  mutation SessionLogout {
-    logout
   }
 `);

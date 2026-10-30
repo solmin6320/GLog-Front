@@ -23,7 +23,7 @@ function errorKind(error: unknown): FullStateKind {
 
 /**
  * `/teams/:teamId` 부모 (레이아웃 없음).
- * teamId 형식이 틀리면 조회 없이 404. 서버 응답으로 판정: FORBIDDEN → 403 · null/NOT_FOUND → 404 (관리자도 예외 없음).
+ * teamId 형식이 틀리면 조회 없이 404. 서버 응답으로 판정: FORBIDDEN → 403 · NOT_FOUND → 404.
  * 통과하면 useTeamScope()로 팀 기본 정보 · 내 역할을 하위 화면에 준다.
  */
 export function TeamScope() {
@@ -42,7 +42,7 @@ export function TeamScope() {
             id: raw.id,
             name: raw.name,
             isPublic: raw.isPublic,
-            viewerRole: raw.viewerRole ?? null,
+            isLeader: raw.isLeader,
             memberCount: raw.memberCount,
           }
         : null,

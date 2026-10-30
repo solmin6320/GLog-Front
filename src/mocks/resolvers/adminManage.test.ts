@@ -203,8 +203,8 @@ describe('개인 면제 요청 (AD-01 ②-3 ⑦)', () => {
     const d = await ok<{ rejectPersonalExemption: Json }>(REJECT, { id: '5', r: '대회 일정이 확인되지 않아요.' });
     expect(d.rejectPersonalExemption).toMatchObject({ status: 'REJECTED', rejectReason: '대회 일정이 확인되지 않아요.' });
 
-    const team = await ok<{ team: { exemptionRequests: Json[] } }>(`{ team(id: "1") { exemptionRequests { id status rejectReason } } }`);
-    expect(team.team.exemptionRequests).toContainEqual({ id: '5', status: 'REJECTED', rejectReason: '대회 일정이 확인되지 않아요.' });
+    const mine = await ok<{ myPersonalExemptionRequests: { items: Json[] } }>(`{ myPersonalExemptionRequests { items { id status rejectReason } } }`);
+    expect(mine.myPersonalExemptionRequests.items).toContainEqual({ id: '5', status: 'REJECTED', rejectReason: '대회 일정이 확인되지 않아요.' });
 
     expect(await run(REJECT, { id: '5', r: '다시' })).toMatchObject({ codes: ['VALIDATION_FAILED'], fields: ['requestId'] });
     expect(await run(APPROVE, { id: '5' })).toMatchObject({ codes: ['VALIDATION_FAILED'], fields: ['requestId'] });
@@ -212,8 +212,8 @@ describe('개인 면제 요청 (AD-01 ②-3 ⑦)', () => {
 });
 
 describe('공지 (AD-01 ②-4)', () => {
-  const LIST = `{ notices { nodes { id title isPinned isSystem } } }`;
-  type Notices = { notices: { nodes: { id: string; title: string; isPinned: boolean }[] } };
+  const LIST = `{ notices { items { id title isPinned isSystem } } }`;
+  type Notices = { notices: { items: { id: string; title: string; isPinned: boolean }[] } };
 
   it('작성 · 수정 · 고정 토글 — 고정 공지가 맨 위', async () => {
     const c = await ok<{ createNotice: Json }>(
@@ -229,16 +229,16 @@ describe('공지 (AD-01 ②-4)', () => {
       createdAt: '2026-10-01T10:00:00+09:00',
       updatedAt: null,
     });
-    expect((await ok<Notices>(LIST)).notices.nodes.map((n) => n.id)).toEqual(['2', '7', '6', '5', '4', '3', '1']);
+    expect((await ok<Notices>(LIST)).notices.items.map((n) => n.id)).toEqual(['2', '7', '6', '5', '4', '3', '1']);
 
     const u = await ok<{ updateNotice: Json }>(`mutation($i: NoticeInput!) { updateNotice(id: "7", input: $i) { title isPinned updatedAt } }`, {
       i: { title: '동아리 MT 일정', content: '바뀐 본문', isPinned: true },
     });
     expect(u.updateNotice).toEqual({ title: '동아리 MT 일정', isPinned: true, updatedAt: '2026-10-01T10:00:00+09:00' });
 
-    await ok(`mutation { setNoticePinned(id: "3", pinned: true) { id isPinned } }`);
-    await ok(`mutation { setNoticePinned(id: "2", pinned: false) { id isPinned } }`);
-    expect((await ok<Notices>(LIST)).notices.nodes.map((n) => [n.id, n.isPinned])).toEqual([
+    await ok(`mutation { setNoticePinned(id: "3", isPinned: true) { id isPinned } }`);
+    await ok(`mutation { setNoticePinned(id: "2", isPinned: false) { id isPinned } }`);
+    expect((await ok<Notices>(LIST)).notices.items.map((n) => [n.id, n.isPinned])).toEqual([
       ['7', true],
       ['3', true],
       ['6', false],
@@ -250,8 +250,8 @@ describe('공지 (AD-01 ②-4)', () => {
   });
 
   it('삭제: 일반 공지는 사라지고, 잔디 인정 규칙 공지는 SYSTEM_NOTICE_UNDELETABLE', async () => {
-    expect((await ok<{ deleteNotice: string }>(`mutation { deleteNotice(id: "3") }`)).deleteNotice).toBe('3');
-    expect((await ok<Notices>(LIST)).notices.nodes.map((n) => n.id)).toEqual(['2', '6', '5', '4', '1']);
+    expect((await ok<{ deleteNotice: boolean }>(`mutation { deleteNotice(id: "3") }`)).deleteNotice).toBe(true);
+    expect((await ok<Notices>(LIST)).notices.items.map((n) => n.id)).toEqual(['2', '6', '5', '4', '1']);
     expect((await run(`mutation { deleteNotice(id: "3") }`)).codes).toEqual(['NOT_FOUND']);
     expect((await run(`mutation { deleteNotice(id: "2") }`)).codes).toEqual(['SYSTEM_NOTICE_UNDELETABLE']);
     expect(db.notices.find((n) => n.id === '2')?.deletedAt).toBeNull();

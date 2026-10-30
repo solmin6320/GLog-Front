@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from 'react';
-import { useApolloClient, useMutation } from '@apollo/client/react';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { useMutation } from '@apollo/client/react';
 import { Link } from 'react-router';
-import type { TeamManagedContentsQueryQuery } from '@/gql/graphql';
+import type { TeamCommentsQueryQuery, TeamPostsQueryQuery } from '@/gql/graphql';
 import { MSG } from '@/domain/messages';
-import { appError, useAction, usePagedList } from '@/shared/api';
+import { toPaged, useAction, usePagedList, type PagedList } from '@/shared/api';
 import { paths } from '@/shared/lib/paths';
 import { LIMITS, validateRequiredText } from '@/shared/lib/validators';
 import {
@@ -19,41 +19,34 @@ import {
   SectionHeader,
   TextArea,
 } from '@/shared/ui';
-import { TeamCommentForEditQuery, TeamManagedContentsQuery, TeamUpdateCommentMutation } from '../api';
-import { TEAM_COPY } from '../lib';
+import { TeamCommentsQuery, TeamPostsQuery, TeamUpdateCommentMutation } from '../api';
+import { postTypeLabel, TEAM_COPY } from '../lib';
 import m from './Manage.module.css';
 
-type ContentNode = NonNullable<TeamManagedContentsQueryQuery['team']>['managedContents']['nodes'][number];
+type PostNode = TeamPostsQueryQuery['teamPosts']['items'][number];
+type CommentNode = TeamCommentsQueryQuery['teamComments']['items'][number];
 
 const validateComment = validateRequiredText('댓글', LIMITS.comment);
+/** 댓글 줄에 보여 줄 본문 앞부분 */
+const PREVIEW_LENGTH = 40;
 
-/** 댓글 한 줄 — [수정]을 누르면 그 자리에서 고친다 (ACC-TM06-09). 목록에는 본문 앞부분만 있어 전체 본문을 먼저 받는다 */
-function CommentRow({ node }: { node: ContentNode }) {
-  const client = useApolloClient();
+function preview(content: string): string {
+  const flat = content.replace(/\s+/g, ' ').trim();
+  return flat.length > PREVIEW_LENGTH ? `${flat.slice(0, PREVIEW_LENGTH)}…` : flat;
+}
+
+/** 댓글 한 줄 — [수정]을 누르면 그 자리에서 고친다 (ACC-TM06-09). 목록에 본문 전체가 있다 */
+function CommentRow({ node }: { node: CommentNode }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updateComment] = useMutation(TeamUpdateCommentMutation);
+  const title = preview(node.content);
 
-  const open = useAction(async () => {
-    const res = await client.query({ query: TeamCommentForEditQuery, variables: { postId: node.postId }, fetchPolicy: 'network-only' });
-    const post = res.data?.post;
-    const comment = post && 'comments' in post ? post.comments.nodes.find((c) => c.id === node.targetId) : undefined;
-    if (!comment || !comment.viewerCanEdit) throw appError('NOT_FOUND');
-    return comment.content;
-  });
   const save = useAction(
     (content: string) =>
-      updateComment({ variables: { id: node.targetId, content }, refetchQueries: ['TeamManagedContentsQuery'], awaitRefetchQueries: true }),
+      updateComment({ variables: { id: node.id, content }, refetchQueries: ['TeamCommentsQuery'], awaitRefetchQueries: true }),
     { success: MSG.saved },
   );
-
-  const startEdit = async () => {
-    const content = await open.run();
-    if (content !== undefined) {
-      setError(null);
-      setDraft(content);
-    }
-  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -75,9 +68,11 @@ function CommentRow({ node }: { node: ContentNode }) {
           <Button
             variant="outline"
             size="xs"
-            loading={open.pending}
-            aria-label={`수정: 댓글 ${node.title}`}
-            onClick={() => void startEdit()}
+            aria-label={`수정: 댓글 ${title}`}
+            onClick={() => {
+              setError(null);
+              setDraft(node.content);
+            }}
           >
             수정
           </Button>
@@ -87,7 +82,7 @@ function CommentRow({ node }: { node: ContentNode }) {
       <CategoryChip>댓글</CategoryChip>
       <div className={m.contentBody}>
         <Link to={paths.post(node.postId)} className={m.contentTitle}>
-          {node.title}
+          {title}
         </Link>
         <div className={m.mutedXs}>{node.author.nickname}</div>
         {draft !== null ? (
@@ -121,19 +116,19 @@ function CommentRow({ node }: { node: ContentNode }) {
 }
 
 /** 글 한 줄 — [수정] → BD-04 (팀장이 남의 글을 고치는 경우 BD-04가 배너를 띄운다) */
-function PostRow({ node }: { node: ContentNode }) {
+function PostRow({ node }: { node: PostNode }) {
   return (
     <RowItem
       alignTop
       right={
-        <LinkButton to={paths.postEdit(node.postId)} variant="outline" size="xs" aria-label={`수정: ${node.title}`}>
+        <LinkButton to={paths.postEdit(node.id)} variant="outline" size="xs" aria-label={`수정: ${node.title}`}>
           수정
         </LinkButton>
       }
     >
-      <CategoryChip>글</CategoryChip>
+      <CategoryChip>{postTypeLabel(node.type)}</CategoryChip>
       <div className={m.contentBody}>
-        <Link to={paths.post(node.postId)} className={m.contentTitle}>
+        <Link to={paths.post(node.id)} className={m.contentTitle}>
           {node.title}
         </Link>
         <div className={m.mutedXs}>{node.author.nickname}</div>
@@ -142,14 +137,21 @@ function PostRow({ node }: { node: ContentNode }) {
   );
 }
 
-/** TM-06 ⑧ 팀 글 관리 — 행마다 [수정]만. 삭제 버튼은 두지 않는다 (삭제는 관리자만) */
-export function TeamContentsSection({ teamId }: { teamId: string }) {
-  const list = usePagedList(TeamManagedContentsQuery, { variables: { id: teamId }, select: (d) => d.team?.managedContents });
-
-  let body;
-  if (list.nodes.length === 0 && list.loading) body = <ListSkeleton rows={3} />;
-  else if (list.nodes.length === 0 && list.error)
-    body = (
+/** 목록 하나(글 또는 댓글)의 로딩 · 오류 · 빈 상태 · 더 보기 */
+function PagedRows<TNode>({
+  list,
+  label,
+  empty,
+  render,
+}: {
+  list: PagedList<unknown, TNode>;
+  label: string;
+  empty: string;
+  render: (n: TNode) => ReactNode;
+}) {
+  if (list.nodes.length === 0 && list.loading) return <ListSkeleton rows={3} />;
+  if (list.nodes.length === 0 && list.error)
+    return (
       <InfoBox
         tone="red"
         icon="alert"
@@ -163,23 +165,36 @@ export function TeamContentsSection({ teamId }: { teamId: string }) {
         불러오지 못했어요.
       </InfoBox>
     );
-  else if (list.nodes.length === 0) body = <p className={m.emptyNote}>이 팀에 연결된 글이 없어요.</p>;
-  else
-    body = (
-      <RowList ariaLabel="팀 글과 댓글">
-        {list.nodes.map((n) =>
-          n.kind === 'COMMENT' ? <CommentRow key={`c-${n.targetId}`} node={n} /> : <PostRow key={`p-${n.targetId}`} node={n} />,
-        )}
-      </RowList>
-    );
+  if (list.nodes.length === 0) return <p className={m.emptyNote}>{empty}</p>;
+  return (
+    <>
+      <RowList ariaLabel={label}>{list.nodes.map(render)}</RowList>
+      <LoadMore hasMore={list.hasMore} loading={list.loadingMore} error={list.loadMoreError} onLoadMore={list.loadMore} endText={null} />
+    </>
+  );
+}
+
+/** TM-06 ⑧ 팀 글 관리 — 글과 댓글을 따로, 행마다 [수정]만. 삭제 버튼은 두지 않는다 (삭제는 작성자 · 관리자만) */
+export function TeamContentsSection({ teamId }: { teamId: string }) {
+  const posts = usePagedList(TeamPostsQuery, { variables: { id: teamId }, select: (d) => toPaged(d.teamPosts) });
+  const comments = usePagedList(TeamCommentsQuery, { variables: { id: teamId }, select: (d) => toPaged(d.teamComments) });
 
   return (
     <section className={m.section} aria-labelledby="manage-contents-heading">
       <SectionHeader id="manage-contents-heading" title="팀 글 관리" />
-      {body}
-      {list.nodes.length > 0 ? (
-        <LoadMore hasMore={list.hasMore} loading={list.loadingMore} error={list.loadMoreError} onLoadMore={list.loadMore} endText={null} />
-      ) : null}
+      <PagedRows
+        list={posts}
+        label="팀 글"
+        empty="이 팀에 연결된 글이 없어요."
+        render={(n) => <PostRow key={`p-${n.id}`} node={n} />}
+      />
+      <SectionHeader title="댓글" as="h3" />
+      <PagedRows
+        list={comments}
+        label="팀 글 댓글"
+        empty="이 팀 글에 달린 댓글이 없어요."
+        render={(n) => <CommentRow key={`c-${n.id}`} node={n} />}
+      />
       <Hint>{TEAM_COPY.deleteAskAdmin}</Hint>
     </section>
   );

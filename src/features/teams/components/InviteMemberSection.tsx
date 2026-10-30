@@ -9,10 +9,10 @@ import { TeamCancelInvitationMutation, TeamInviteMemberMutation } from '../api';
 import { TEAM_COPY } from '../lib';
 import m from './Manage.module.css';
 
-type PendingInvitation = NonNullable<TeamManageQueryQuery['team']>['pendingInvitations'][number];
+type PendingInvitation = TeamManageQueryQuery['sentTeamInvitations']['items'][number];
 
-/** 아이디 초대에서 인라인으로 보여 줄 서버 오류 (E-15 · E-16) */
-const INLINE_CODES = new Set(['INVITEE_NOT_FOUND', 'ALREADY_TEAM_MEMBER', 'VALIDATION_FAILED']);
+/** 아이디 초대에서 인라인으로 보여 줄 서버 오류 (E-15 · E-16 · 중복 초대) */
+const INLINE_CODES = new Set(['INVITEE_NOT_FOUND', 'INVITEE_ALREADY_MEMBER', 'INVITATION_DUPLICATE', 'VALIDATION_FAILED']);
 
 /** TM-06 ② 아이디로 초대 + ③ 보낸 초대 목록 */
 export function InviteMemberSection({ teamId, pending }: { teamId: string; pending: PendingInvitation[] }) {
@@ -31,7 +31,7 @@ export function InviteMemberSection({ teamId, pending }: { teamId: string; pendi
       onError: (e) => {
         if (!INLINE_CODES.has(e.code)) return false;
         setError(
-          e.code === 'VALIDATION_FAILED' ? VALIDATION_MSG.githubLogin : messageFor(e, { ALREADY_TEAM_MEMBER: TEAM_COPY.alreadyInTeam }),
+          e.code === 'VALIDATION_FAILED' ? VALIDATION_MSG.githubLogin : messageFor(e, { INVITEE_ALREADY_MEMBER: TEAM_COPY.alreadyInTeam }),
         );
         inputRef.current?.focus();
         return true;

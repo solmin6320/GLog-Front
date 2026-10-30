@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useBlocker, useNavigate } from 'react-router';
 import { MSG } from '@/domain/messages';
-import { DEFAULT_PAGE_SIZE, useAction } from '@/shared/api';
+import { useAction } from '@/shared/api';
 import { paths } from '@/shared/lib/paths';
 import { validateRequiredText } from '@/shared/lib/validators';
 import { Button, Card, CardSkeleton, InfoBox, Modal, QueryBoundary, Switch, TextArea, TextField } from '@/shared/ui';
@@ -67,7 +67,7 @@ function NoticeForm({ id, isSystem = false, initial }: { id?: string; isSystem?:
   const [createNotice] = useMutation(AdminNoticesCreate);
   const [updateNotice] = useMutation(AdminNoticesUpdate);
   // 목록이 에디터 뒤에서 내려가 있으므로 문서 + 변수로 직접 다시 받아 둔다 → 돌아가면 바로 새 목록
-  const refetchList = { refetchQueries: [{ query: AdminNoticesQuery, variables: { first: DEFAULT_PAGE_SIZE } }], awaitRefetchQueries: true };
+  const refetchList = { refetchQueries: [{ query: AdminNoticesQuery, variables: {} }], awaitRefetchQueries: true };
   const save = useAction(
     async (input: Values) => {
       if (id) await updateNotice({ variables: { id, input }, ...refetchList });

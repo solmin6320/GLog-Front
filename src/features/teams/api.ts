@@ -1,15 +1,16 @@
 /**
  * 팀 영역 GraphQL 문서 (설계서 9장 TM-01 ~ TM-08). 연산 이름은 `Team…`으로 시작한다.
- * 팀 기본 정보(이름 · 공개 · 내 역할)는 TeamScope가 이미 받았으므로 TM-05 · 06 · 08은 useTeamScope()로 읽는다.
+ * 백엔드(GLog-Backend) team · team-board · team-post · exemption 스키마를 그대로 쓴다.
+ * 팀 기본 정보(이름 · 공개 · 팀장 여부)는 TeamScope가 이미 받았으므로 TM-05 · 06 · 08은 useTeamScope()로 읽는다.
  */
 import { graphql } from '@/gql';
-import { SessionQuery } from '@/session/api';
+import { SessionTeamsQuery } from '@/session/api';
 
 /**
  * 소속 · 받은 초대 수가 바뀌는 뮤테이션 뒤에 세션(hasTeam · pendingInvitationCount)을 다시 받는다.
- * 세션은 캐시만 지켜보는(cache-only) 쿼리라 이름('SessionQuery')으로는 다시 불리지 않는다 → 문서로 넘긴다.
+ * 세션은 캐시만 지켜보는(cache-only) 쿼리라 이름('SessionTeamsQuery')으로는 다시 불리지 않는다 → 문서로 넘긴다.
  */
-export const REFRESH_SESSION = { query: SessionQuery } as const;
+export const REFRESH_SESSION = { query: SessionTeamsQuery } as const;
 
 /* ------------------------------------------------------------------ */
 /* TM-01 내 팀 목록                                                     */
@@ -17,17 +18,19 @@ export const REFRESH_SESSION = { query: SessionQuery } as const;
 
 export const TeamListQuery = graphql(`
   query TeamListQuery {
-    me {
-      id
-      pendingInvitationCount
+    receivedTeamInvitations {
+      items {
+        id
+      }
+      nextCursor
     }
     myTeams {
       id
       name
       isPublic
-      viewerRole
+      isLeader
       memberCount
-      currentWeekSummary {
+      weekSummary {
         passCount
         notYetCount
       }
@@ -47,7 +50,7 @@ export const TeamCreateMutation = graphql(`
         id
         name
         isPublic
-        viewerRole
+        isLeader
         memberCount
       }
     }
@@ -55,12 +58,12 @@ export const TeamCreateMutation = graphql(`
 `);
 
 export const TeamJoinMutation = graphql(`
-  mutation TeamJoinByInviteCode($code: String!) {
-    joinTeamByInviteCode(code: $code) {
+  mutation TeamJoinByCode($code: String!) {
+    joinTeamByCode(code: $code) {
       id
       name
       isPublic
-      viewerRole
+      isLeader
       memberCount
     }
   }
@@ -71,38 +74,38 @@ export const TeamJoinMutation = graphql(`
 /* ------------------------------------------------------------------ */
 
 export const TeamInvitationsQuery = graphql(`
-  query TeamInvitationsQuery {
-    me {
-      id
-      pendingInvitationCount
-    }
-    myInvitations {
-      id
-      createdAt
-      team {
+  query TeamInvitationsQuery($after: String) {
+    receivedTeamInvitations(after: $after) {
+      items {
         id
-        name
+        teamId
+        teamName
+        createdAt
+        inviter {
+          id
+          nickname
+        }
       }
-      invitedBy {
-        id
-        nickname
-      }
+      nextCursor
     }
   }
 `);
 
-export const TeamRespondInvitationMutation = graphql(`
-  mutation TeamRespondInvitation($invitationId: ID!, $accept: Boolean!) {
-    respondInvitation(invitationId: $invitationId, accept: $accept) {
-      invitationId
-      team {
-        id
-        name
-        isPublic
-        viewerRole
-        memberCount
-      }
+export const TeamAcceptInvitationMutation = graphql(`
+  mutation TeamAcceptInvitation($invitationId: ID!) {
+    acceptTeamInvitation(invitationId: $invitationId) {
+      id
+      name
+      isPublic
+      isLeader
+      memberCount
     }
+  }
+`);
+
+export const TeamDeclineInvitationMutation = graphql(`
+  mutation TeamDeclineInvitation($invitationId: ID!) {
+    declineTeamInvitation(invitationId: $invitationId)
   }
 `);
 
@@ -112,42 +115,33 @@ export const TeamRespondInvitationMutation = graphql(`
 
 export const TeamBoardQuery = graphql(`
   query TeamBoardQuery($id: ID!) {
-    team(id: $id) {
-      id
-      currentWeekBoard {
-        weekStart
-        weekEnd
-        grassUpdatedAt
-        rows {
-          member {
-            id
-            nickname
-            profileImageUrl
-          }
-          isViewer
-          days {
-            date
-            grassCount
-            grassLevel
-            hasGrass
-            recordCount
-            hasRecord
-            verified
-            isFuture
-            isToday
-          }
-          verifiedDays
-          recordCount
-          teamWarningCount
-          status
-          grassStatus
+    teamBoard(teamId: $id) {
+      weekStart
+      weekEnd
+      grassFetchedAt
+      grassNotLoaded
+      members {
+        memberId
+        nickname
+        githubLogin
+        isMe
+        days {
+          date
+          hasGrass
+          hasRecord
+          verified
         }
+        verifiedDays
+        recordCount
+        warningCount
+        status
       }
-      recentPosts(first: 5) {
+      recentPosts {
         id
         type
         title
         createdAt
+        isRecord
         author {
           id
           nickname
@@ -169,21 +163,9 @@ export const TeamLeaveMutation = graphql(`
 
 export const TeamManageQuery = graphql(`
   query TeamManageQuery($id: ID!) {
-    team(id: $id) {
-      id
-      inviteCode
-      memberCount
-      members {
-        role
-        joinedAt
-        member {
-          id
-          nickname
-          githubLogin
-          profileImageUrl
-        }
-      }
-      pendingInvitations {
+    teamInviteCode(teamId: $id)
+    sentTeamInvitations(teamId: $id) {
+      items {
         id
         createdAt
         invitee {
@@ -192,40 +174,69 @@ export const TeamManageQuery = graphql(`
           githubLogin
         }
       }
+      nextCursor
     }
   }
 `);
 
-export const TeamManagedContentsQuery = graphql(`
-  query TeamManagedContentsQuery($id: ID!, $first: Int, $after: String) {
-    team(id: $id) {
-      id
-      managedContents(first: $first, after: $after) {
-        nodes {
-          kind
-          targetId
-          postId
-          postType
-          title
-          createdAt
-          author {
-            id
-            nickname
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        totalCount
+/** TM-06 ④ 팀원 목록 — 팀장이 맨 앞, 커서 20개 */
+export const TeamMembersQuery = graphql(`
+  query TeamMembersQuery($id: ID!, $after: String) {
+    teamMembers(teamId: $id, after: $after) {
+      items {
+        id
+        nickname
+        githubLogin
+        profileImageUrl
+        isLeader
+        joinedAt
       }
+      nextCursor
+    }
+  }
+`);
+
+/** TM-06 ⑧ 팀 글 — 팀장만 */
+export const TeamPostsQuery = graphql(`
+  query TeamPostsQuery($id: ID!, $after: String) {
+    teamPosts(teamId: $id, after: $after) {
+      items {
+        id
+        type
+        title
+        createdAt
+        author {
+          id
+          nickname
+        }
+      }
+      nextCursor
+    }
+  }
+`);
+
+/** TM-06 ⑧ 팀 글에 달린 댓글 — 팀장만. 본문 전체가 와서 그 자리에서 고친다 */
+export const TeamCommentsQuery = graphql(`
+  query TeamCommentsQuery($id: ID!, $after: String) {
+    teamComments(teamId: $id, after: $after) {
+      items {
+        id
+        postId
+        content
+        createdAt
+        author {
+          id
+          nickname
+        }
+      }
+      nextCursor
     }
   }
 `);
 
 export const TeamInviteMemberMutation = graphql(`
   mutation TeamInviteMember($teamId: ID!, $githubLogin: String!) {
-    inviteMember(teamId: $teamId, githubLogin: $githubLogin) {
+    inviteToTeam(teamId: $teamId, githubLogin: $githubLogin) {
       id
       createdAt
       invitee {
@@ -239,35 +250,21 @@ export const TeamInviteMemberMutation = graphql(`
 
 export const TeamCancelInvitationMutation = graphql(`
   mutation TeamCancelInvitation($invitationId: ID!) {
-    cancelInvitation(invitationId: $invitationId)
+    cancelTeamInvitation(invitationId: $invitationId)
   }
 `);
 
 export const TeamKickMemberMutation = graphql(`
   mutation TeamKickMember($teamId: ID!, $memberId: ID!) {
-    kickMember(teamId: $teamId, memberId: $memberId) {
-      id
-      memberCount
-      members {
-        role
-        joinedAt
-        member {
-          id
-          nickname
-          githubLogin
-          profileImageUrl
-        }
-      }
-    }
+    kickTeamMember(teamId: $teamId, memberId: $memberId)
   }
 `);
 
 export const TeamTransferLeadershipMutation = graphql(`
-  mutation TeamTransferLeadership($teamId: ID!, $memberId: ID!) {
-    transferLeadership(teamId: $teamId, memberId: $memberId) {
+  mutation TeamTransferLeadership($teamId: ID!, $newLeaderId: ID!) {
+    transferTeamLeadership(teamId: $teamId, newLeaderId: $newLeaderId) {
       id
-      viewerRole
-      inviteCode
+      isLeader
       memberCount
     }
   }
@@ -275,7 +272,7 @@ export const TeamTransferLeadershipMutation = graphql(`
 
 export const TeamSetVisibilityMutation = graphql(`
   mutation TeamSetVisibility($teamId: ID!, $isPublic: Boolean!) {
-    setTeamVisibility(teamId: $teamId, isPublic: $isPublic) {
+    updateTeam(teamId: $teamId, input: { isPublic: $isPublic }) {
       id
       isPublic
     }
@@ -285,24 +282,6 @@ export const TeamSetVisibilityMutation = graphql(`
 export const TeamDeleteMutation = graphql(`
   mutation TeamDelete($teamId: ID!) {
     deleteTeam(teamId: $teamId)
-  }
-`);
-
-/** TM-06 ⑧ 댓글 인라인 수정 — 목록 줄에는 본문 앞부분만 있어 고치기 전에 전체 본문을 받는다 */
-export const TeamCommentForEditQuery = graphql(`
-  query TeamCommentForEditQuery($postId: ID!) {
-    post(id: $postId) {
-      ... on Post {
-        id
-        comments(first: 100) {
-          nodes {
-            id
-            content
-            viewerCanEdit
-          }
-        }
-      }
-    }
   }
 `);
 
@@ -320,18 +299,18 @@ export const TeamUpdateCommentMutation = graphql(`
 /* TM-08 개인 면제 요청                                                 */
 /* ------------------------------------------------------------------ */
 
+/** 대상 셀렉트용 팀원 + 내가 보낸 요청. 요청에는 팀이 없어 화면이 이 팀 팀원 것만 고른다 */
 export const TeamExemptionQuery = graphql(`
   query TeamExemptionQuery($id: ID!) {
-    team(id: $id) {
-      id
-      members {
-        role
-        member {
-          id
-          nickname
-        }
+    teamMembers(teamId: $id) {
+      items {
+        id
+        nickname
       }
-      exemptionRequests {
+      nextCursor
+    }
+    myPersonalExemptionRequests {
+      items {
         id
         weekStart
         weekEnd
@@ -344,13 +323,14 @@ export const TeamExemptionQuery = graphql(`
           nickname
         }
       }
+      nextCursor
     }
   }
 `);
 
 export const TeamRequestExemptionMutation = graphql(`
-  mutation TeamRequestExemption($input: RequestPersonalExemptionInput!) {
-    requestPersonalExemption(input: $input) {
+  mutation TeamRequestExemption($teamId: ID!, $memberId: ID!, $weekStart: String!, $reason: String!) {
+    requestPersonalExemption(teamId: $teamId, memberId: $memberId, weekStart: $weekStart, reason: $reason) {
       id
       weekStart
       weekEnd
