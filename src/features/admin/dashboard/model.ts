@@ -2,21 +2,21 @@
  * 대시보드 표시 규칙 (순수 함수). 판정 · 경고 계산은 서버 값만 쓴다 — 여기서는 라벨 · 문구 · 주차 목록만 만든다.
  */
 import type {
+  AdminCorrectionStatus,
   AdminDashboardCorrectionPreviewQueryQuery,
   AdminDashboardSummaryQueryQuery,
   AdminDashboardWeekQueryQuery,
   AdminJudgmentFilter,
-  CorrectableJudgmentStatus,
-  PenaltyChange,
 } from '@/gql/graphql';
 import { formatMD, formatWeekRange } from '@/shared/lib/format';
 import { addDays } from '@/shared/lib/kst';
 import type { AdminResultParam } from '@/shared/lib/paths';
+import type { PenaltyChange } from '../impact';
 
-export type JudgmentRow = AdminDashboardWeekQueryQuery['adminJudgmentWeek']['rows']['nodes'][number];
-export type HeldRow = AdminDashboardSummaryQueryQuery['heldJudgments'][number];
+export type JudgmentRow = AdminDashboardWeekQueryQuery['adminJudgments']['items'][number];
+export type HeldRow = AdminDashboardSummaryQueryQuery['adminJudgmentHolds']['items'][number];
 export type DashboardSummary = AdminDashboardSummaryQueryQuery['adminDashboardSummary'];
-export type CorrectionPreview = AdminDashboardCorrectionPreviewQueryQuery['judgmentCorrectionPreview'];
+export type CorrectionPreview = AdminDashboardCorrectionPreviewQueryQuery['previewJudgmentCorrection'];
 
 /** 판정 목록 한 번에 20행 (E-57) */
 export const JUDGMENT_PAGE_SIZE = 20;
@@ -27,7 +27,7 @@ export const CORRECTION_REASON_MAX = 500;
 /** ⑨ 보류 안내에 이름을 보여 주는 최대 수 */
 export const HELD_NAMES_MAX = 5;
 
-export const RESULT_FILTER: Record<AdminResultParam, AdminJudgmentFilter> = { all: 'ALL', fail: 'FAIL', hold: 'HOLD' };
+export const RESULT_FILTER: Record<AdminResultParam, AdminJudgmentFilter> = { all: 'ALL', fail: 'FAIL_ONLY', hold: 'HOLD_ONLY' };
 
 export const RESULT_OPTIONS: { value: AdminResultParam; label: string }[] = [
   { value: 'all', label: '전체' },
@@ -36,15 +36,13 @@ export const RESULT_OPTIONS: { value: AdminResultParam; label: string }[] = [
 ];
 
 /** 정정으로 만들 수 있는 결과 3종 (기능명세서 7장 — '제외' 없음, Q-05) */
-export const CORRECTABLE: readonly CorrectableJudgmentStatus[] = ['PASS', 'FAIL', 'EXEMPT'];
+export const CORRECTABLE: readonly AdminCorrectionStatus[] = ['PASS', 'FAIL', 'EXEMPT'];
 
-export const CORRECT_TO_LABEL: Record<CorrectableJudgmentStatus, string> = {
+export const CORRECT_TO_LABEL: Record<AdminCorrectionStatus, string> = {
   PASS: '통과로 정정',
   FAIL: '미달로 정정',
   EXEMPT: '면제로 정정',
 };
-
-export const PENALTY_CHANGE_LABEL: Record<PenaltyChange, string> = { RELEASE: '해제', ENTER: '진입', NONE: '변화 없음' };
 
 export const COPY = {
   /** AD-01 ⑩ 안내 (W-15) */
@@ -67,10 +65,24 @@ export const COPY = {
   emptyFiltered: '조건에 맞는 판정이 없어요.',
 } as const;
 
-/** E-49 (M-14 해요체): '경고가 3개에서 2개로 바뀌어요.' / 같으면 '경고 수는 2개 그대로예요.' */
-export function warningChangeText(before: number, after: number): string {
+/** E-49 (M-14 해요체): '경고가 3개에서 2개로 바뀌어요.' / 같으면 '경고 수는 2개 그대로예요.' / 보류 주가 있으면 비교하지 않는다 */
+export function warningChangeSentence(before: number | null | undefined, after: number | null | undefined): string {
+  if (before == null || after == null) return '확인 중인 주가 있어 경고 수는 나중에 정해져요.';
   return before === after ? `경고 수는 ${after}개 그대로예요.` : `경고가 ${before}개에서 ${after}개로 바뀌어요.`;
 }
+
+/** 정정할 수 있는 판정인가: 보류는 불가, 제외(첫 참가 · 팀 없음)는 면제로만 (Q-05) */
+export function correctableTargets(status: string): readonly AdminCorrectionStatus[] {
+  if (status === 'HOLD') return [];
+  if (status === 'EXCLUDED') return ['EXEMPT'];
+  return CORRECTABLE.filter((st) => st !== status);
+}
+
+/** 행에서 바로 다시 판정할 수 있는 보류 (GitHub 응답 실패). 아이디가 바뀐 건은 본인이 다시 로그인해야 풀린다(E-08) */
+export const canRetryRow = (r: Pick<JudgmentRow, 'status' | 'holdReason'>) => r.status === 'HOLD' && r.holdReason === 'API_ERROR';
+
+/** 경고 3개 이상 = 벌칙 대상 (판정 목록에 벌칙 여부 필드가 없어 경고 수로 본다) */
+export const PENALTY_WARNINGS = 3;
 
 export function penaltyChangeText(change: PenaltyChange): string | null {
   if (change === 'RELEASE') return COPY.released;
@@ -94,10 +106,10 @@ export function weekOptions(currentWeekStart: string, include: (string | null | 
   return [...weeks].sort((a, b) => b.localeCompare(a)).map((w) => ({ value: w, label: weekOptionLabel(w, currentWeekStart) }));
 }
 
-/** ⑤ 두 번째 카드 라벨 (M-07): 가장 최근 판정 주가 지난 주면 '지난 주 미달', 아니면 '9/14 주 미달' */
-export function failKpiLabel(latestJudgedWeekStart: string | null | undefined, currentWeekStart: string): string {
-  if (!latestJudgedWeekStart || latestJudgedWeekStart === addDays(currentWeekStart, -7)) return '지난 주 미달';
-  return `${formatMD(latestJudgedWeekStart)} 주 미달`;
+/** ⑤ 두 번째 카드 라벨 (M-07): 판정 주가 지난 주면 '지난 주 미달', 아니면 '9/14 주 미달' */
+export function failKpiLabel(judgedWeekStart: string | null | undefined, currentWeekStart: string): string {
+  if (!judgedWeekStart || judgedWeekStart === addDays(currentWeekStart, -7)) return '지난 주 미달';
+  return `${formatMD(judgedWeekStart)} 주 미달`;
 }
 
 /** 판정이 아직 없는 주의 안내 (5-4-9). 지난 주 · 이번 주는 '월요일 오전에 실행', 그보다 오래된 주는 결과 없음 */
@@ -107,9 +119,10 @@ export function notExecutedText(weekStart: string, currentWeekStart: string): st
   return COPY.emptyWeek;
 }
 
-/** E-35 토스트: '{n}명 처리했어요.' */
-export function rerunToast(processedCount: number): string {
-  return processedCount > 0 ? `${processedCount}명 처리했어요.` : '다시 판정할 수 있는 보류가 없어요.';
+/** E-35 토스트: '{n}명 처리했어요.' (보류가 풀린 수) */
+export function rerunToast(resolved: number, attempted: number): string {
+  if (attempted === 0) return '다시 판정할 수 있는 보류가 없어요.';
+  return resolved > 0 ? `${resolved}명 처리했어요.` : '아직 보류가 풀리지 않았어요.';
 }
 
 /** 인증일 · 기록글 칸 ('—' = 면제 · 제외 · 보류) */

@@ -30,9 +30,9 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
   const summary = data?.adminDashboardSummary;
   const counts: Record<DrawerBadgeKey, number> = {
     invitations: viewer.pendingInvitationCount,
-    penaltyTargets: summary?.penaltyTargetCount ?? 0,
-    pendingMembers: summary?.pendingMemberCount ?? 0,
-    pendingExemptions: summary?.pendingExemptionRequestCount ?? 0,
+    penaltyTargets: summary?.penaltyTargets ?? 0,
+    pendingMembers: summary?.pendingMembers ?? 0,
+    pendingExemptions: summary?.pendingExemptions ?? 0,
   };
 
   const active = drawerActive(pathname, search);

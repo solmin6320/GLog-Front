@@ -21,10 +21,10 @@ describe('normalizeError', () => {
       code: 'TEAM_JOIN_BLOCKED',
       category: 'forbidden',
     });
-    expect(normalizeError(gqlErrors({ code: 'PREVIEW_STALE' })).category).toBe('conflict');
+    expect(normalizeError(gqlErrors({ code: 'JUDGMENT_CHANGED' })).category).toBe('conflict');
     expect(normalizeError(gqlErrors({ code: 'ACCOUNT_PENDING' })).category).toBe('status');
     expect(normalizeError(gqlErrors({ code: 'POST_DELETED' })).category).toBe('notFound');
-    expect(normalizeError(gqlErrors({ code: 'RECALC_BUSY' })).category).toBe('server');
+    expect(normalizeError(gqlErrors({ code: 'INTERNAL' })).category).toBe('server');
   });
 
   it.each([

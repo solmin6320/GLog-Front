@@ -8,7 +8,7 @@ export type { SessionEvent } from './sessionEvents';
 export { normalizeError, isAppError, appError, categoryOf, isErrorCode } from './errors';
 export type { AppError, ErrorCode, ErrorCategory } from './errors';
 export { apolloClient, createApolloClient, createCache, createTypePolicies } from './client';
-export { itemsPage, nodesConnection, toPaged } from './pagination';
+export { itemsPage, toPaged } from './pagination';
 export { usePagedList, DEFAULT_PAGE_SIZE } from './usePagedList';
 export type { PagedConnection, PagedList } from './usePagedList';
 export { useAction } from './useAction';

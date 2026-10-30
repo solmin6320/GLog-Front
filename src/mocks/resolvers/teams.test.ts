@@ -183,7 +183,7 @@ describe('teams 목 리졸버 — 나가기 · 추방 · 위임 · 공개 · 삭
     expect(await ok('mutation { updateTeam(teamId: "1", input: { isPublic: false }) { id isPublic } }')).toEqual({
       updateTeam: { id: '1', isPublic: false },
     });
-    expect(await ok('{ member(id: "2") { publicTeams { id } } }', 'plain')).toEqual({ member: { publicTeams: [] } });
+    expect(await ok('{ profile(memberId: "2") { teams { id } } }', 'plain')).toEqual({ profile: { teams: [] } });
     expect(await codesOf('mutation { updateTeam(teamId: "1", input: { isPublic: true }) { id } }', 'plain')).toEqual(['FORBIDDEN']);
   });
 

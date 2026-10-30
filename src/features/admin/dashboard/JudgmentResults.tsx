@@ -22,16 +22,20 @@ import { HeldNotice } from './HeldNotice';
 import {
   COPY,
   JUDGMENT_PAGE_SIZE,
+  PENALTY_WARNINGS,
   RESULT_OPTIONS,
+  canRetryRow,
+  correctableTargets,
   daysText,
   notExecutedText,
   recordsText,
   type HeldRow,
   type JudgmentRow,
 } from './model';
+import { holdKey } from './useRerunHeld';
 import s from './Dashboard.module.css';
 
-type WeekData = AdminDashboardWeekQueryQuery['adminJudgmentWeek'];
+type WeekData = AdminDashboardWeekQueryQuery['adminJudgments'];
 
 export type JudgmentFilters = { weekValue: string; q: string | undefined; result: AdminResultParam };
 
@@ -46,6 +50,8 @@ export function JudgmentResults({
   onChange,
   list,
   held,
+  heldTotal,
+  heldIdentityMismatch,
   fix,
   onFix,
   running,
@@ -58,13 +64,16 @@ export function JudgmentResults({
   onChange: (next: Partial<{ week: string; q: string | undefined; result: AdminResultParam }>) => void;
   list: PagedList<AdminDashboardWeekQueryQuery, JudgmentRow>;
   held: HeldRow[];
+  heldTotal: number;
+  heldIdentityMismatch: number;
   fix: string | undefined;
   onFix: (judgmentId: string) => void;
   running: string | null;
-  onRetryOne: (judgmentId: string) => void;
+  onRetryOne: (memberId: string, weekStart: string) => void;
   onRetryAll: (retryableCount: number) => void;
 }) {
   const filtered = !!filters.q || filters.result !== 'all';
+  const weekStart = list.data?.adminJudgments.weekStart ?? filters.weekValue;
 
   const columns: Column<JudgmentRow>[] = [
     {
@@ -72,20 +81,20 @@ export function JudgmentResults({
       header: '회원',
       render: (r) => (
         <Link to={paths.profile(r.member.id)} className={s.member}>
-          <Avatar name={r.member.nickname} imageUrl={r.member.profileImageUrl} size={32} />
+          <Avatar name={r.member.nickname} size={32} />
           <span className={s.memberName}>{r.member.nickname}</span>
         </Link>
       ),
     },
-    { key: 'days', header: '인증일', render: (r) => daysText(r.judgment.verifiedDays) },
-    { key: 'records', header: '기록글', render: (r) => recordsText(r.judgment.recordCount) },
+    { key: 'days', header: '인증일', render: (r) => daysText(r.verifiedDays) },
+    { key: 'records', header: '기록글', render: (r) => recordsText(r.recordCount) },
     {
       key: 'result',
       header: '결과',
       render: (r) => (
         <span className={s.result}>
-          <StatusBadge kind="judgment" status={r.judgment.status} skipReason={r.judgment.skipReason} context="admin" />
-          {r.judgment.corrected ? <StatusBadge kind="corrected" /> : null}
+          <StatusBadge kind="judgment" status={r.status} skipReason={r.skipReason} context="admin" />
+          {r.corrected ? <StatusBadge kind="corrected" /> : null}
         </span>
       ),
     },
@@ -94,8 +103,8 @@ export function JudgmentResults({
       header: '누적 경고',
       render: (r) => (
         <span className={s.warn}>
-          {r.activeWarningCount}
-          {r.isPenaltyTarget ? <StatusBadge kind="penalty" /> : null}
+          {r.warningCount ?? '—'}
+          {(r.warningCount ?? 0) >= PENALTY_WARNINGS ? <StatusBadge kind="penalty" /> : null}
         </span>
       ),
     },
@@ -104,25 +113,25 @@ export function JudgmentResults({
       header: '처리',
       align: 'right',
       render: (r) => {
-        const id = r.judgment.id;
+        const id = r.judgmentId;
         if (fix === id) return <span className={s.fixing}>정정 중</span>;
-        if (r.canCorrect) {
+        if (correctableTargets(r.status).length > 0) {
           return (
             <Button variant="text" size="sm" data-correct-id={id} aria-label={`${r.member.nickname} 판정 정정`} onClick={() => onFix(id)}>
               정정
             </Button>
           );
         }
-        if (r.canRetry) {
+        if (canRetryRow(r)) {
           return (
             <Button
               variant="outline"
               size="xs"
               icon="refresh"
-              loading={running === id}
+              loading={running === holdKey(r.member.id, weekStart)}
               disabled={running !== null}
               aria-label={`${r.member.nickname} 재시도`}
-              onClick={() => onRetryOne(id)}
+              onClick={() => onRetryOne(r.member.id, weekStart)}
             >
               재시도
             </Button>
@@ -152,12 +161,12 @@ export function JudgmentResults({
         </div>
       </div>
 
-      <HeldNotice held={held} running={running === 'all'} onRetryAll={onRetryAll} />
+      <HeldNotice held={held} total={heldTotal} identityMismatch={heldIdentityMismatch} running={running === 'all'} onRetryAll={onRetryAll} />
 
       <QueryBoundary
         loading={list.loading}
         error={list.error}
-        data={list.data?.adminJudgmentWeek}
+        data={list.data?.adminJudgments}
         skeleton={
           <div className={s.notExecuted}>
             <TableSkeleton rows={6} cols={6} />
@@ -175,8 +184,8 @@ export function JudgmentResults({
                     caption="판정 결과"
                     columns={columns}
                     rows={list.nodes}
-                    rowKey={(r) => r.judgment.id}
-                    rowTone={(r) => (r.judgment.id === fix ? 'focus' : undefined)}
+                    rowKey={(r) => r.judgmentId}
+                    rowTone={(r) => (r.judgmentId === fix ? 'focus' : undefined)}
                     empty={filtered ? COPY.emptyFiltered : COPY.emptyWeek}
                   />
                 </div>
@@ -185,7 +194,7 @@ export function JudgmentResults({
                   loading={list.loadingMore}
                   error={list.loadMoreError}
                   onLoadMore={list.loadMore}
-                  endText={(list.totalCount ?? 0) > JUDGMENT_PAGE_SIZE ? undefined : null}
+                  endText={list.nodes.length > JUDGMENT_PAGE_SIZE ? undefined : null}
                 />
               </>
             ) : (
@@ -201,22 +210,21 @@ export function JudgmentResults({
 /** ⑦ 집계 + ⑧ 보류 배지 + 실행 시각 ('9/28 07:00 실행'). 판정 전 주는 그리지 않는다 */
 function WeekCounts({ week }: { week: WeekData }) {
   if (!week.executedAt) return null;
-  const c = week.counts;
   return (
     <p className={s.counts}>
       <span>
-        통과 <b>{c.pass}</b>
+        통과 <b>{week.passCount}</b>
       </span>
       <span>
-        미달 <b>{c.fail}</b>
+        미달 <b>{week.failCount}</b>
       </span>
       <span>
-        면제 <b>{c.exempt}</b>
+        면제 <b>{week.exemptCount}</b>
       </span>
       <span>
-        첫 참가 <b>{c.firstWeek}</b>
+        첫 참가 <b>{week.firstWeekCount}</b>
       </span>
-      {c.hold > 0 ? <StatusBadge kind="judgment" status="HOLD" context="admin" label={`보류 ${c.hold}`} /> : null}
+      {week.holdCount > 0 ? <StatusBadge kind="judgment" status="HOLD" context="admin" label={`보류 ${week.holdCount}`} /> : null}
       <span className={s.executed}>{formatDateTime(week.executedAt)} 실행</span>
     </p>
   );

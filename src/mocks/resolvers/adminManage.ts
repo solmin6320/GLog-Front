@@ -3,7 +3,8 @@
  * admin.ts(판정 · 경고 · 벌칙)와 담당을 나눠 둔 파일이다. 조회(Query)는 admin.ts에 있다.
  * 이 파일의 루트 필드는 전부 관리자 전용으로 감싼다 (schema.ts policyOf).
  *
- * 소급 면제(판정이 끝난 주의 면제 기간 등록 · 수정 · 삭제, 개인 면제 승인)는 판정 행과 경고 행만 고친다.
+ * 소급 면제(판정이 끝난 주의 면제 기간 등록 · 다른 주로 옮기기, 개인 면제 승인)는 판정 행과 경고 행만 고친다.
+ * 백엔드처럼 기간을 지우거나 옮겨도 이미 면제로 바뀐 판정은 되돌리지 않는다.
  * 경고 수 · 연속 · 벌칙은 derive.replayWarnings()가 다시 계산한다 — 결과는 미리보기(weekExemptionScenario)와 같다.
  */
 import type {
@@ -14,6 +15,7 @@ import type {
   MutationCreateNoticeArgs,
   MutationDeleteExemptionPeriodArgs,
   MutationDeleteNoticeArgs,
+  MutationPromoteMemberToAdminArgs,
   MutationRejectMemberArgs,
   MutationRejectPersonalExemptionArgs,
   MutationRevertMemberToPendingArgs,
@@ -21,12 +23,9 @@ import type {
   MutationUpdateExemptionPeriodArgs,
   MutationUpdateNoticeArgs,
   NoticeInput,
-  SkipReason,
 } from '../__generated__/schema-types';
 import type { MockClock } from '../clock';
 import {
-  approvedPersonalExemption,
-  assertBasis,
   exemptionPeriodOn,
   isMondayDate,
   isRetroactiveWeek,
@@ -40,14 +39,14 @@ import {
   findNotice,
   findPersonalExemption,
   nextId,
-  teamsOfMember,
   touch,
   type JudgmentRow,
   type NoticeRow,
+  type SkipReason,
 } from '../db/store';
-import { gqlError, invalid } from '../errors';
+import { gqlError, type ErrorCode } from '../errors';
 import type { MockContext, Resolvers } from '../types';
-import { adminMemberRowView, exemptionPeriodView, noticeView, personalExemptionView } from '../views';
+import { adminMemberView, exemptionPeriodView, noticeView, personalExemptionView } from '../views';
 
 /* ------------------------------------------------------------------ */
 /* 입력 제한 (DB 명세 1-12 · 1-13 · 1-15)                                */
@@ -62,10 +61,11 @@ export const NOTICE_TITLE_MAX = 200;
 /** notice.content TEXT — 목은 이 길이에서 자른다 (제안) */
 export const NOTICE_CONTENT_MAX = 20_000;
 
-/** 앞뒤 공백을 지우고 1 ~ max자인지 본다. 아니면 VALIDATION_FAILED(field) */
-function requiredText(value: string, field: string, max: number): string {
+/** 앞뒤 공백을 지우고 1 ~ max자인지 본다 (백엔드 InputRules). 빈 값은 requiredCode, 너무 길면 INVALID_INPUT */
+function requiredText(value: string, max: number, requiredCode: ErrorCode = 'INVALID_INPUT'): string {
   const text = value.trim();
-  if (text.length < 1 || text.length > max) throw invalid(field);
+  if (text.length < 1) throw gqlError(requiredCode);
+  if (text.length > max) throw gqlError('INVALID_INPUT');
   return text;
 }
 
@@ -74,18 +74,16 @@ function requiredText(value: string, field: string, max: number): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * 회원 상태 전환. 이미 to면 그대로 돌려준다(두 번 눌러도 안전). from에 없는 상태에서는 VALIDATION_FAILED(memberId).
+ * 회원 상태 전환. from에 없는 상태(이미 처리됨 포함)면 CONFLICT (백엔드 MemberApprovalService).
  * 승인 대기 → 승인 · 거절, 거절 → 승인 대기 (AD-01 ②-2 ⑦⑧)
  */
-function transition(ctx: MockContext, memberId: string, from: MemberStatus[], to: MemberStatus) {
+function transition(memberId: string, from: MemberStatus[], to: MemberStatus) {
   const m = findMember(memberId);
   if (!m) throw gqlError('NOT_FOUND');
-  if (m.status !== to) {
-    if (!from.includes(m.status)) throw invalid('memberId', `mock: ${m.status} → ${to} is not allowed`);
-    m.status = to;
-    touch();
-  }
-  return adminMemberRowView(ctx, m);
+  if (!from.includes(m.status)) throw gqlError('CONFLICT', { message: `mock: ${m.status} → ${to} is not allowed` });
+  m.status = to;
+  touch();
+  return adminMemberView(m);
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,55 +107,15 @@ function exemptJudgment(j: JudgmentRow, reason: SkipReason, clock: MockClock): v
   j.recordCount = null;
 }
 
-/**
- * 면제 기간 때문에 면제였던 판정을 풀어 스냅숏(judgment_day)으로 다시 판정한다 (C-05 미결 → 목 가정).
- * 미달이 되면 회수했던 경고를 되살리거나, 없으면 지금 소속 팀 카테고리로 새로 만든다.
- * 같은 주에 승인된 개인 면제가 있으면 면제를 유지한다 (E-44 두 면제 독립 보존).
- */
-function unexemptJudgment(j: JudgmentRow): void {
-  if (j.status !== 'EXEMPT' || j.skipReason !== 'EXEMPTION_PERIOD') return;
-  if (approvedPersonalExemption(j.memberId, j.weekStart)) {
-    j.skipReason = 'PERSONAL_EXEMPTION';
-    return;
-  }
-  const verified = j.days.filter((d) => d.hasGrass || d.hasRecord).length;
-  const records = j.days.filter((d) => d.hasRecord).length;
-  j.status = verified >= 3 && records >= 1 ? 'PASS' : 'FAIL';
-  j.skipReason = null;
-  j.verifiedDays = verified;
-  j.recordCount = records;
-  if (j.status !== 'FAIL') return;
-  const w = warningOf(j);
-  if (w) {
-    w.retractedAt = null;
-    return;
-  }
-  const teamIds = teamsOfMember(j.memberId).map((t) => t.id);
-  db.warnings.push({
-    id: nextId('warnings'),
-    memberId: j.memberId,
-    weekStart: j.weekStart,
-    judgmentId: j.id,
-    verifiedDays: verified,
-    recordCount: records,
-    teamIds,
-    originalTeamIds: [...teamIds],
-    deleted: null,
-    retractedAt: null,
-  });
-}
-
-/** 판정이 끝난 주면 그 주 판정 전체에 면제 기간을 적용(또는 해제)한다. 판정 전 주는 할 일이 없다 */
-function applyPeriodToWeek(weekStart: string, exempt: boolean, clock: MockClock): void {
+/** 판정이 끝난 주면 그 주 판정 전체에 면제 기간을 적용한다. 판정 전 주는 할 일이 없다 */
+function applyPeriodToWeek(weekStart: string, clock: MockClock): void {
   if (!isRetroactiveWeek(weekStart, clock)) return;
-  for (const j of judgmentsOfWeek(weekStart, clock)) {
-    if (exempt) exemptJudgment(j, 'EXEMPTION_PERIOD', clock);
-    else unexemptJudgment(j);
-  }
+  for (const j of judgmentsOfWeek(weekStart, clock)) exemptJudgment(j, 'EXEMPTION_PERIOD', clock);
 }
 
+/** 월요일이 아니면 INVALID_INPUT */
 function checkWeek(weekStart: string): void {
-  if (!isMondayDate(weekStart)) throw invalid('weekStart', 'mock: weekStart must be a Monday');
+  if (!isMondayDate(weekStart)) throw gqlError('INVALID_INPUT', { message: 'mock: weekStart must be a Monday' });
 }
 
 function periodOrThrow(id: string) {
@@ -184,8 +142,8 @@ function noticeOrThrow(id: string): NoticeRow {
 
 function noticeFields(input: NoticeInput) {
   return {
-    title: requiredText(input.title, 'title', NOTICE_TITLE_MAX),
-    content: requiredText(input.content, 'content', NOTICE_CONTENT_MAX),
+    title: requiredText(input.title, NOTICE_TITLE_MAX),
+    content: requiredText(input.content, NOTICE_CONTENT_MAX),
     isPinned: !!input.isPinned,
   };
 }
@@ -197,61 +155,60 @@ function noticeFields(input: NoticeInput) {
 export const adminManageResolvers: Resolvers = {
   Mutation: {
     // --- 가입 승인 (AD-01 ②-2) ---
-    approveMember: (_: unknown, { memberId }: MutationApproveMemberArgs, ctx: MockContext) =>
-      transition(ctx, memberId, ['PENDING', 'REJECTED'], 'ACTIVE'),
-    rejectMember: (_: unknown, { memberId }: MutationRejectMemberArgs, ctx: MockContext) =>
-      transition(ctx, memberId, ['PENDING'], 'REJECTED'),
-    revertMemberToPending: (_: unknown, { memberId }: MutationRevertMemberToPendingArgs, ctx: MockContext) =>
-      transition(ctx, memberId, ['REJECTED'], 'PENDING'),
+    approveMember: (_: unknown, { memberId }: MutationApproveMemberArgs) => transition(memberId, ['PENDING'], 'ACTIVE'),
+    rejectMember: (_: unknown, { memberId }: MutationRejectMemberArgs) => transition(memberId, ['PENDING'], 'REJECTED'),
+    revertMemberToPending: (_: unknown, { memberId }: MutationRevertMemberToPendingArgs) => transition(memberId, ['REJECTED'], 'PENDING'),
+    // 활성 일반 회원만 관리자로. 대기 · 거절 · 이미 관리자면 CONFLICT
+    promoteMemberToAdmin: (_: unknown, { memberId }: MutationPromoteMemberToAdminArgs) => {
+      const m = findMember(memberId);
+      if (!m) throw gqlError('NOT_FOUND');
+      if (m.status !== 'ACTIVE' || m.role === 'ADMIN') throw gqlError('CONFLICT');
+      m.role = 'ADMIN';
+      touch();
+      return adminMemberView(m);
+    },
 
     // --- 면제 기간 (AD-01 ②-3 ⑤⑥) ---
     createExemptionPeriod: (_: unknown, { input }: MutationCreateExemptionPeriodArgs, ctx: MockContext) => {
-      assertBasis(input.expectedBasis);
       checkWeek(input.weekStart);
-      const reason = requiredText(input.reason, 'reason', PERIOD_REASON_MAX);
-      if (exemptionPeriodOn(input.weekStart)) throw gqlError('EXEMPTION_DUPLICATE', { field: 'weekStart' });
-      applyPeriodToWeek(input.weekStart, true, ctx.clock);
+      const reason = requiredText(input.reason, PERIOD_REASON_MAX, 'REASON_REQUIRED');
+      if (exemptionPeriodOn(input.weekStart)) throw gqlError('EXEMPTION_PERIOD_DUPLICATE');
+      applyPeriodToWeek(input.weekStart, ctx.clock);
       const row = { id: nextId('exemptionPeriods'), weekStart: input.weekStart, reason, createdAt: ctx.clock.now, updatedAt: null };
       db.exemptionPeriods.push(row);
       touch();
-      return exemptionPeriodView(ctx, row);
+      return exemptionPeriodView(row);
     },
 
     updateExemptionPeriod: (_: unknown, { id, input }: MutationUpdateExemptionPeriodArgs, ctx: MockContext) => {
-      assertBasis(input.expectedBasis);
       const p = periodOrThrow(id);
       checkWeek(input.weekStart);
-      const reason = requiredText(input.reason, 'reason', PERIOD_REASON_MAX);
+      const reason = requiredText(input.reason, PERIOD_REASON_MAX, 'REASON_REQUIRED');
       const other = exemptionPeriodOn(input.weekStart);
-      if (other && other.id !== p.id) throw gqlError('EXEMPTION_DUPLICATE', { field: 'weekStart' });
+      if (other && other.id !== p.id) throw gqlError('EXEMPTION_PERIOD_DUPLICATE');
       if (p.weekStart !== input.weekStart) {
-        applyPeriodToWeek(p.weekStart, false, ctx.clock);
-        applyPeriodToWeek(input.weekStart, true, ctx.clock);
+        applyPeriodToWeek(input.weekStart, ctx.clock);
         p.weekStart = input.weekStart;
       }
       p.reason = reason;
       p.updatedAt = ctx.clock.now;
       touch();
-      return exemptionPeriodView(ctx, p);
+      return exemptionPeriodView(p);
     },
 
-    // C-05 미결: 판정이 끝난 주의 면제를 지우면 스냅숏으로 다시 판정한다 (exemptionPeriodPreview removing과 같다)
-    deleteExemptionPeriod: (_: unknown, { id, expectedBasis }: MutationDeleteExemptionPeriodArgs, ctx: MockContext) => {
-      assertBasis(expectedBasis);
+    // 지워도 이미 면제로 바뀐 판정은 되돌리지 않는다 (확정 판정은 정정으로만 바뀐다)
+    deleteExemptionPeriod: (_: unknown, { id }: MutationDeleteExemptionPeriodArgs) => {
       const p = periodOrThrow(id);
-      applyPeriodToWeek(p.weekStart, false, ctx.clock);
       db.exemptionPeriods.splice(db.exemptionPeriods.indexOf(p), 1);
       touch();
-      return p.id;
+      return true;
     },
 
     // --- 개인 면제 (AD-01 ②-3 ⑦) ---
-    // 그 주 판정이 끝났으면 소급 면제: 판정 EXEMPT/PERSONAL_EXEMPTION + 경고 회수 (personalExemptionApprovalPreview와 같다)
-    approvePersonalExemption: (_: unknown, { requestId, expectedBasis }: MutationApprovePersonalExemptionArgs, ctx: MockContext) => {
-      assertBasis(expectedBasis);
-      const e = personalOrThrow(requestId);
-      if (e.status === 'APPROVED') return personalExemptionView(ctx, e);
-      if (e.status !== 'PENDING') throw invalid('requestId', 'mock: request is not pending');
+    // 그 주 판정이 끝났으면 소급 면제: 판정 EXEMPT/PERSONAL_EXEMPTION + 경고 회수 (previewPersonalExemptionApproval과 같다)
+    approvePersonalExemption: (_: unknown, { id }: MutationApprovePersonalExemptionArgs, ctx: MockContext) => {
+      const e = personalOrThrow(id);
+      if (e.status !== 'PENDING') throw gqlError('ALREADY_HANDLED');
       e.status = 'APPROVED';
       e.rejectReason = null;
       e.respondedAt = ctx.clock.now;
@@ -260,19 +217,19 @@ export const adminManageResolvers: Resolvers = {
         if (j) exemptJudgment(j, 'PERSONAL_EXEMPTION', ctx.clock);
       }
       touch();
-      return personalExemptionView(ctx, e);
+      return personalExemptionView(e);
     },
 
     // 사유 필수 (E-48) — 요청한 팀장의 TM-08 ⑤ "거절됨 · 사유: …"
-    rejectPersonalExemption: (_: unknown, { requestId, reason }: MutationRejectPersonalExemptionArgs, ctx: MockContext) => {
-      const e = personalOrThrow(requestId);
-      const text = requiredText(reason, 'reason', REJECT_REASON_MAX);
-      if (e.status !== 'PENDING') throw invalid('requestId', 'mock: request is not pending');
+    rejectPersonalExemption: (_: unknown, { id, reason }: MutationRejectPersonalExemptionArgs, ctx: MockContext) => {
+      const e = personalOrThrow(id);
+      const text = requiredText(reason, REJECT_REASON_MAX, 'REJECT_REASON_REQUIRED');
+      if (e.status !== 'PENDING') throw gqlError('ALREADY_HANDLED');
       e.status = 'REJECTED';
       e.rejectReason = text;
       e.respondedAt = ctx.clock.now;
       touch();
-      return personalExemptionView(ctx, e);
+      return personalExemptionView(e);
     },
 
     // --- 공지 (AD-01 ②-4) ---

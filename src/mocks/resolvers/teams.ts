@@ -23,7 +23,6 @@ import type {
   QueryTeamInviteCodeArgs,
   QueryTeamMembersArgs,
   QueryTeamPostsArgs,
-  WarningDeleteReason,
 } from '../__generated__/schema-types';
 import { kstIsoFromMs } from '../clock';
 import { hash01 } from '../db/seed';
@@ -44,6 +43,7 @@ import {
   type MemberRow,
   type PersonalExemptionRow,
   type TeamRow,
+  type WarningDeleteReason,
 } from '../db/store';
 import { gqlError, invalid } from '../errors';
 import type { MockContext, Resolvers } from '../types';
@@ -62,7 +62,7 @@ import {
   teamBoardView,
   teamMembersOrdered,
   teamMemberView,
-  teamPersonalExemptionView,
+  personalExemptionView,
   teamView,
 } from '../views';
 
@@ -216,7 +216,7 @@ export const teamsResolvers: Resolvers = {
       const rows = db.personalExemptions
         .filter((e) => e.requestedById === viewer.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return itemsPage(rows, after, (e) => teamPersonalExemptionView(ctx, e));
+      return itemsPage(rows, after, (e) => personalExemptionView(e));
     },
   },
   Mutation: {
@@ -399,7 +399,7 @@ export const teamsResolvers: Resolvers = {
       };
       db.personalExemptions.push(row);
       touch();
-      return teamPersonalExemptionView(ctx, row);
+      return personalExemptionView(row);
     },
   },
 };

@@ -61,15 +61,16 @@ describe('AD-01 ②-1 진입', () => {
     expect(screen.queryByText('벌칙 대상')).not.toBeInTheDocument();
   });
 
-  it('ACC-PEN-01: 벌칙 대상 2명 — 경고 3 + 배지 · 도달 M/D · 비공개 팀도 실명 + (비공개) · 각주', async () => {
+  it('ACC-PEN-01: 벌칙 대상 2명 — 경고 3 + 배지 · 도달 주 M/D · 비공개 팀도 실명 · 각주', async () => {
     renderRoute('/admin/warnings');
     await ready();
     expect(screen.getByRole('heading', { level: 2, name: '경고 복구 · 벌칙' })).toBeInTheDocument();
     expect(headersOf('벌칙 대상')).toEqual(['회원', '경고', '도달', '경고가 붙은 팀', '처리']);
     expect(screen.getByText('2명')).toBeInTheDocument();
     const jihoon = rowIn('벌칙 대상', '박지훈');
-    expect(jihoon).toHaveTextContent(/3\s*벌칙 대상\s*9\/28\s*사이드 프로젝트 A팀, 알고리즘 스터디 \(비공개\)/);
-    expect(rowIn('벌칙 대상', '정하늘')).toHaveTextContent(/3\s*벌칙 대상\s*9\/21\s*웹 프로젝트 B팀/);
+    // 도달은 경고 3개에 도달한 주 월요일 (백엔드 reachedWeek). 공개 여부는 백엔드가 싣지 않는다
+    expect(jihoon).toHaveTextContent(/3\s*벌칙 대상\s*9\/21\s*사이드 프로젝트 A팀, 알고리즘 스터디/);
+    expect(rowIn('벌칙 대상', '정하늘')).toHaveTextContent(/3\s*벌칙 대상\s*9\/14\s*웹 프로젝트 B팀/);
     expect(rowIn('벌칙 대상', '정하늘')).not.toHaveTextContent('비공개');
     expect(screen.getByText('벌칙을 누구에게 통보할지 판단할 수 있도록, 이 화면에서만 비공개 팀 이름도 그대로 보여요.')).toBeInTheDocument();
   });
@@ -188,7 +189,7 @@ describe('AD-01 ②-1 ⑧ 경고 복구', () => {
     expect(within(dialog).queryByText('복구하면 이 회원은 다시 벌칙 대상이 돼요. 복구할까요?')).not.toBeInTheDocument();
   });
 
-  it('미리보기 뒤 다른 변경이 먼저 반영되면 복구하지 않고 미리보기를 다시 받아 알린다 (PREVIEW_STALE)', async () => {
+  it('미리보기 뒤 그새 복구됐으면(ALREADY_HANDLED) 알리고 닫은 뒤 목록을 다시 받는다', async () => {
     const mutations = trackMutations();
     const { user } = renderRoute('/admin/warnings');
     await ready();
@@ -196,15 +197,12 @@ describe('AD-01 ②-1 ⑧ 경고 복구', () => {
     const dialog = await screen.findByRole('dialog', { name: '경고를 복구할까요?' });
     await within(dialog).findByText('2회 → 3회');
 
+    const w = db.warnings.find((x) => x.memberId === '3' && x.weekStart === '2026-09-14');
+    if (w) w.deleted = null;
     touch();
     await user.click(within(dialog).getByRole('button', { name: '복구하기' }));
-    expect(await within(dialog).findByText(MSG.previewStale)).toBeInTheDocument();
-    expect(db.warnings.find((w) => w.memberId === '3' && w.weekStart === '2026-09-14')?.deleted).not.toBeNull();
-
-    const confirm = within(dialog).getByRole('button', { name: '복구하기' });
-    await waitFor(() => expect(confirm).toBeEnabled());
-    await user.click(confirm);
-    expect(await screen.findByText('복구했어요.')).toBeInTheDocument();
-    expect(mutations).toEqual(['AdminWarningsRestoreWarning', 'AdminWarningsRestoreWarning']);
+    expect(await screen.findByText('이미 복구됐거나 없는 경고예요.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mutations).toEqual(['AdminWarningsRestoreWarning']);
   });
 });

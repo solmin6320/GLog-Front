@@ -10,16 +10,7 @@
  * - 미리보기: replay를 가정(scenario)으로 한 번 더 돌려 차이를 낸다. basis = 'v' + db.version
  */
 import { addDays, isDateString, isMonday, kstDateOf, mondayOf, weekDates } from '@/shared/lib/kst';
-import type {
-  GrassFetchStatus,
-  JudgmentStatus,
-  LiveWeekStatus,
-  PenaltyChange,
-  PostType,
-  SkipReason,
-  TeamLabelKind,
-  WarningStanding,
-} from '../__generated__/schema-types';
+import type { JudgmentStatus, PostType } from '../__generated__/schema-types';
 import { grassUpdatedAt, judgmentExecutionTime, type MockClock } from '../clock';
 import { getMockControl } from '../control';
 import { gqlError } from '../errors';
@@ -33,13 +24,19 @@ import {
   teamsOfMember,
   type CommentRow,
   type DateStr,
+  type GrassFetchStatus,
   type Id,
   type JudgmentRow,
+  type LiveWeekStatus,
   type NoticeRow,
+  type PenaltyChange,
   type PostRow,
   type PostSectionKey,
+  type SkipReason,
+  type TeamLabelKind,
   type TeamRow,
   type WarningRow,
+  type WarningStanding,
 } from './store';
 
 /* ================================================================== */

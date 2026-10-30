@@ -117,38 +117,34 @@ describe('캐시 정책', () => {
     expect(store['Me:1']).toBeUndefined();
   });
 
-  it('TeamLabel은 정규화하지 않는다 (id 없는 값 객체)', () => {
+  it('TeamMember는 정규화하지 않는다 (팀마다 isLeader · joinedAt이 다른 값 객체)', () => {
     const { client } = setup(() => jsonResponse({}));
     client.writeQuery({
-      query: parse('query B { member(id: "1") { id warningState { activeCount byCategory { count label { kind name } } } } }'),
+      query: parse('query B { teamMembers(teamId: "1") { items { id nickname isLeader } nextCursor } }'),
       data: {
-        member: {
-          __typename: 'Member',
-          id: '1',
-          warningState: {
-            __typename: 'WarningState',
-            activeCount: 1,
-            byCategory: [{ __typename: 'CategoryWarningCount', count: 1, label: { __typename: 'TeamLabel', kind: 'PRIVATE', name: null } }],
-          },
+        teamMembers: {
+          __typename: 'TeamMemberPage',
+          items: [{ __typename: 'TeamMember', id: '1', nickname: '한동관', isLeader: true }],
+          nextCursor: null,
         },
       },
     });
     const keys = Object.keys(client.cache.extract() as Record<string, unknown>);
-    expect(keys.some((k) => k.startsWith('TeamLabel') || k.startsWith('WarningState'))).toBe(false);
+    expect(keys.some((k) => k.startsWith('TeamMember'))).toBe(false);
   });
 
   it('AdminDashboardSummary는 서로 다른 필드를 골라 온 쿼리끼리 합친다', () => {
     const { client } = setup(() => jsonResponse({}));
     client.writeQuery({
-      query: parse('query C1 { adminDashboardSummary { pendingMemberCount } }'),
-      data: { adminDashboardSummary: { __typename: 'AdminDashboardSummary', pendingMemberCount: 3 } },
+      query: parse('query C1 { adminDashboardSummary { pendingMembers } }'),
+      data: { adminDashboardSummary: { __typename: 'AdminDashboardSummary', pendingMembers: 3 } },
     });
     client.writeQuery({
-      query: parse('query C2 { adminDashboardSummary { penaltyTargetCount } }'),
-      data: { adminDashboardSummary: { __typename: 'AdminDashboardSummary', penaltyTargetCount: 2 } },
+      query: parse('query C2 { adminDashboardSummary { penaltyTargets } }'),
+      data: { adminDashboardSummary: { __typename: 'AdminDashboardSummary', penaltyTargets: 2 } },
     });
-    const both = client.readQuery({ query: parse('query C3 { adminDashboardSummary { pendingMemberCount penaltyTargetCount } }') });
-    expect(both).toEqual({ adminDashboardSummary: { __typename: 'AdminDashboardSummary', pendingMemberCount: 3, penaltyTargetCount: 2 } });
+    const both = client.readQuery({ query: parse('query C3 { adminDashboardSummary { pendingMembers penaltyTargets } }') });
+    expect(both).toEqual({ adminDashboardSummary: { __typename: 'AdminDashboardSummary', pendingMembers: 3, penaltyTargets: 2 } });
   });
 
   it("기본 watchQuery 정책은 cache-and-network → cache-first", () => {

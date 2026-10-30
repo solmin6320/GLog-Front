@@ -1,12 +1,12 @@
 /** 프로필 (PR-01 · PR-02, 백엔드 profile.graphqls). 이미지 업로드는 REST(handlers.ts) */
 import { addDays } from '@/shared/lib/kst';
-import type { QueryMemberArgs, QueryProfileArgs } from '../__generated__/schema-types';
+import type { QueryProfileArgs } from '../__generated__/schema-types';
 import { grassUpdatedAt } from '../clock';
-import { grassCalendarData, grassStatusOf, liveWeek, teamLabel, visibleJudgments, warningState } from '../db/derive';
-import { findMember, teamsOfMember, touch, type MemberRow } from '../db/store';
+import { allVisibleComments, grassCalendarData, grassStatusOf, liveWeek, teamLabel, visibleJudgments, visiblePosts, warningState } from '../db/derive';
+import { findMember, teamsOfMember, type MemberRow } from '../db/store';
 import { gqlError } from '../errors';
 import type { MockContext, Resolvers } from '../types';
-import { itemsPage, memberView, requireViewer, viewerId } from '../views';
+import { itemsPage, viewerId } from '../views';
 
 const PRIVATE_TEAM = '비공개 팀';
 const DELETED_TEAM = '삭제된 팀';
@@ -59,7 +59,6 @@ function historyRows(m: MemberRow, ctx: MockContext) {
 
 function profileView(ctx: MockContext, m: MemberRow) {
   const { clock } = ctx;
-  const base = memberView(ctx, m);
   const onHold = () => visibleJudgments(clock, m.id).some((j) => j.status === 'HOLD');
   return {
     id: m.id,
@@ -67,8 +66,8 @@ function profileView(ctx: MockContext, m: MemberRow) {
     githubLogin: m.githubLogin,
     profileImageUrl: m.profileImageUrl,
     isMine: viewerId(ctx) === m.id,
-    postCount: base.postCount,
-    commentCount: base.commentCount,
+    postCount: () => visiblePosts(clock).filter((p) => p.authorId === m.id).length,
+    commentCount: () => allVisibleComments(clock).filter((c) => c.authorId === m.id).length,
     grass: () => profileGrass(ctx, m),
     warning: () => {
       if (onHold()) return { onHold: true, warningCount: null, penaltyTarget: null };
@@ -97,25 +96,11 @@ function profileView(ctx: MockContext, m: MemberRow) {
 
 export const profileResolvers: Resolvers = {
   Query: {
-    // 없는 회원 · 승인 안 된 회원 → null(E-53). 다른 영역(활동)이 아직 쓴다
-    member: (_: unknown, { id }: QueryMemberArgs, ctx: MockContext) => {
-      const m = findMember(id);
-      return m && m.status === 'ACTIVE' ? memberView(ctx, m) : null;
-    },
     // 백엔드: 없는 회원 · 승인 안 된 회원 → NOT_FOUND
     profile: (_: unknown, { memberId }: QueryProfileArgs, ctx: MockContext) => {
       const m = findMember(memberId);
       if (!m || m.status !== 'ACTIVE') throw gqlError('NOT_FOUND');
       return profileView(ctx, m);
-    },
-  },
-  Mutation: {
-    // PR-02 ③ 기본 이미지로 되돌리기 — 본인 사진만 지운다. 이미 기본 이미지여도 성공(멱등)
-    resetProfileImage: (_: unknown, __: unknown, ctx: MockContext) => {
-      const viewer = requireViewer(ctx);
-      viewer.profileImageUrl = null;
-      touch();
-      return memberView(ctx, viewer);
     },
   },
 };

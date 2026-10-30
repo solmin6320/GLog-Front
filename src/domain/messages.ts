@@ -76,6 +76,14 @@ const BY_CODE: Record<string, string> = {
   POST_DELETED: MSG.deletedPost, // E-31
   AUTH_CODE_INVALID: '로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.', // E-05 · E-06
   VALIDATION_FAILED: '입력한 내용을 다시 확인해 주세요.',
+  // 관리자 (백엔드 ErrorCode 문구)
+  CONFLICT: '이미 처리된 회원이에요. 목록을 새로고침해 주세요.',
+  JUDGMENT_CHANGED: '그 사이 판정이 바뀌었어요. 목록을 새로고침해 주세요.',
+  ALREADY_HANDLED: '이미 처리된 항목이에요. 목록을 새로고침해 주세요.',
+  NOT_PENALTY_TARGET: '벌칙 대상이 아니에요. 목록을 새로고침해 주세요.',
+  EXEMPTION_PERIOD_DUPLICATE: '이미 면제 기간으로 등록된 주예요.',
+  REASON_REQUIRED: '사유를 입력해 주세요.',
+  REJECT_REASON_REQUIRED: '거절 사유를 입력해 주세요.',
   // 게시판 입력 오류 (백엔드 ErrorCode 문구)
   INVALID_INPUT: '요청 내용을 확인해 주세요.',
   TITLE_REQUIRED: '제목을 입력해 주세요.',
@@ -102,12 +110,9 @@ const BY_CODE: Record<string, string> = {
   TEAM_MEMBER_NOT_FOUND: '그 팀원을 찾을 수 없어요.',
   LEADER_MUST_TRANSFER: '팀장은 다른 팀원에게 팀장을 넘긴 뒤에 나갈 수 있어요.', // E-19
   LEADER_LAST_MEMBER: '혼자 있는 팀이에요. 나가면 팀이 삭제돼요. 삭제할까요?', // E-20
-  EXEMPTION_DUPLICATE: '이미 요청한 주간이에요.', // 관리자 면제 기간 (팀 요청은 EXEMPTION_REQUEST_DUPLICATE)
   EXEMPTION_REQUEST_DUPLICATE: '이미 요청한 주간이에요.', // E-47
   JUDGMENT_NOT_CORRECTABLE: MSG.server, // 서버 오류 표준형 (A3 7-2)
   SYSTEM_NOTICE_UNDELETABLE: '이 공지는 판정 기준 안내라 삭제할 수 없어요.', // EX-AD01-02
-  PREVIEW_STALE: MSG.previewStale,
-  RECALC_BUSY: MSG.server, // E-52
   INTERNAL: MSG.server, // E-52
   NETWORK: MSG.network, // E-51
 };

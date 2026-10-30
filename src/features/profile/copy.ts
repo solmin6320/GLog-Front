@@ -31,7 +31,7 @@ export const PROFILE_EDIT_COPY = {
   sub: '닉네임과 GitHub 아이디는 GitHub 계정에서 가져와요.',
   pick: '사진 바꾸기',
   pickHint: '5MB 이하의 jpg, png, webp 사진을 올릴 수 있어요.',
-  reset: '기본 이미지로 되돌리기',
+  reset: '고른 사진 취소',
   save: '저장',
   saving: '저장 중...',
   cancel: '취소',

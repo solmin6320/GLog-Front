@@ -1,19 +1,18 @@
 import { useId, useState, type FormEvent } from 'react';
-import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
-import { MSG } from '@/domain/messages';
+import { useApolloClient, useMutation } from '@apollo/client/react';
 import { useClock } from '@/session';
 import { useAction } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import { validateRequiredText } from '@/shared/lib/validators';
-import { Button, InfoBox, Modal, Select, Skeleton, TextArea } from '@/shared/ui';
+import { Button, Modal, Select, TextArea } from '@/shared/ui';
 import {
   AdminExemptionsCreatePeriod,
   AdminExemptionsDeletePeriod,
   AdminExemptionsPeriodPreviewQuery,
   AdminExemptionsUpdatePeriod,
 } from './api';
-import { PeriodImpact } from './ImpactSummary';
-import { COPY, PERIOD_REASON_MAX, exemptionsRefetch, weekOptions, type PeriodPreview, type PeriodRow } from './model';
+import { RetroImpact } from './ImpactSummary';
+import { COPY, PERIOD_REASON_MAX, exemptionsRefetch, weekOptions, type PeriodRow, type RetroPreview } from './model';
 import s from './Exemptions.module.css';
 
 const validateReason = validateRequiredText('사유', PERIOD_REASON_MAX);
@@ -22,8 +21,8 @@ type Errors = { week?: string | null; reason?: string | null };
 
 /**
  * ⑥ 면제 기간 등록 · 수정 (ACC-ADM-04 · 05).
- * [등록]을 누르면 먼저 미리보기 쿼리로 중복 주 · 소급 여부를 확인한다. 판정이 끝난 주면 영향 미리보기 단계를 거치고,
- * 거기서 [취소]하면 뮤테이션은 한 건도 나가지 않는다. 반영 때는 미리보기의 basis를 expectedBasis로 싣는다.
+ * 새 주를 고르면 먼저 미리보기 쿼리로 소급 여부를 확인한다. 판정이 끝난 주면 영향 미리보기 단계를 거치고,
+ * 거기서 [이전]·닫기를 하면 뮤테이션은 한 건도 나가지 않는다. 같은 주 중복은 반영할 때 EXEMPTION_PERIOD_DUPLICATE로 온다.
  */
 export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose: () => void }) {
   const client = useApolloClient();
@@ -35,33 +34,18 @@ export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose:
   const [reason, setReason] = useState(period?.reason ?? '');
   const [errors, setErrors] = useState<Errors>({});
   /** null이면 입력 단계, 값이 있으면 미리보기 단계 */
-  const [preview, setPreview] = useState<PeriodPreview | null>(null);
-  const [stale, setStale] = useState(false);
+  const [preview, setPreview] = useState<RetroPreview | null>(null);
 
-  const check = useAction(
-    async () => {
-      const r = await client.query({
-        query: AdminExemptionsPeriodPreviewQuery,
-        variables: { weekStart, periodId: period?.id ?? null },
-        fetchPolicy: 'network-only',
-      });
-      return r.data?.exemptionPeriodPreview;
-    },
-    {
-      onError: (e) => {
-        if (e.code !== 'EXEMPTION_DUPLICATE') return false;
-        setPreview(null);
-        setErrors({ week: COPY.duplicate });
-        return true;
-      },
-    },
-  );
+  const check = useAction(async () => {
+    const r = await client.query({ query: AdminExemptionsPeriodPreviewQuery, variables: { weekStart }, fetchPolicy: 'network-only' });
+    return r.data?.previewExemptionPeriod;
+  });
 
   const [create] = useMutation(AdminExemptionsCreatePeriod);
   const [update] = useMutation(AdminExemptionsUpdatePeriod);
   const commit = useAction(
-    async (expectedBasis: string | null) => {
-      const input = { weekStart, reason: reason.trim(), expectedBasis };
+    async () => {
+      const input = { weekStart, reason: reason.trim() };
       const opts = { refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true };
       if (period) await update({ variables: { id: period.id, input }, ...opts });
       else await create({ variables: { input }, ...opts });
@@ -71,13 +55,7 @@ export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose:
       success: editing ? COPY.updated : COPY.created,
       errorOverrides: { NOT_FOUND: COPY.gone },
       onError: (e) => {
-        if (e.code === 'PREVIEW_STALE') {
-          // 그새 다른 변경이 반영됐다 → 미리보기를 다시 받아 보여 준다 (설계서 3-6)
-          setStale(true);
-          void check.run().then((p) => p && setPreview(p));
-          return true;
-        }
-        if (e.code === 'EXEMPTION_DUPLICATE') {
+        if (e.code === 'EXEMPTION_PERIOD_DUPLICATE') {
           setPreview(null);
           setErrors({ week: COPY.duplicate });
           return true;
@@ -99,20 +77,21 @@ export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose:
       setErrors({ reason: reasonError });
       return;
     }
-    const p = await check.run();
-    if (!p) return;
-    if (p.isRetroactive) {
-      setStale(false);
-      setPreview(p);
-      return;
+    // 주를 그대로 두고 사유만 고치면 재계산이 없다
+    if (weekStart !== period?.weekStart) {
+      const p = await check.run();
+      if (!p) return;
+      if (p.retroactive) {
+        setPreview(p);
+        return;
+      }
     }
-    if (await commit.run(p.basis)) onClose();
+    if (await commit.run()) onClose();
   };
 
   const confirmPreview = async () => {
     if (!preview || commit.pending) return;
-    setStale(false);
-    if (await commit.run(preview.basis)) onClose();
+    if (await commit.run()) onClose();
   };
 
   const verb = editing ? '저장' : '등록';
@@ -150,14 +129,8 @@ export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose:
           <p className={s.lead}>
             {formatWeekRange(weekStart)} · {reason.trim()}
           </p>
-          <PeriodImpact p={check.pending ? undefined : preview} />
-          {stale ? (
-            <div className={s.notes}>
-              <InfoBox tone="warn" icon="alert" role="alert">
-                {MSG.previewStale}
-              </InfoBox>
-            </div>
-          ) : null}
+          <RetroImpact p={preview} />
+          {editing ? <p className={s.muted}>{COPY.keepsJudged}</p> : null}
         </>
       ) : (
         <form id={formId} className={s.form} onSubmit={(e) => void submitForm(e)} noValidate>
@@ -194,31 +167,18 @@ export function PeriodDialog({ period, onClose }: { period?: PeriodRow; onClose:
 }
 
 /**
- * ⑤ [삭제] (ACC-ADM-06). 판정이 끝난 주면 영향 미리보기형, 아니면 단순 확인형으로 같은 다이얼로그를 쓴다.
- * 어느 쪽인지는 미리보기의 isRetroactive가 정한다.
+ * ⑤ [삭제] (ACC-ADM-06). 단순 확인형 — 백엔드는 지워도 이미 면제로 바뀐 판정을 되돌리지 않아 재계산 미리보기가 없다.
  */
 export function DeletePeriodDialog({ period, onClose }: { period: PeriodRow; onClose: () => void }) {
   const client = useApolloClient();
-  const preview = useQuery(AdminExemptionsPeriodPreviewQuery, {
-    variables: { weekStart: period.weekStart, periodId: period.id, removing: true },
-    fetchPolicy: 'network-only',
-  });
-  const p = preview.loading ? undefined : preview.data?.exemptionPeriodPreview;
-  const [stale, setStale] = useState(false);
-
+  const clock = useClock();
   const [remove] = useMutation(AdminExemptionsDeletePeriod);
   const action = useAction(
-    (expectedBasis: string | null) =>
-      remove({ variables: { id: period.id, expectedBasis }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
+    () => remove({ variables: { id: period.id }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.deleted,
       errorOverrides: { NOT_FOUND: COPY.gone },
       onError: (e) => {
-        if (e.code === 'PREVIEW_STALE') {
-          setStale(true);
-          preview.refetch().catch(() => undefined);
-          return true;
-        }
         if (e.code === 'NOT_FOUND') {
           client.refetchQueries({ include: exemptionsRefetch() }).catch(() => undefined);
           onClose();
@@ -229,9 +189,8 @@ export function DeletePeriodDialog({ period, onClose }: { period: PeriodRow; onC
   );
 
   const submit = async () => {
-    if (!p || action.pending) return;
-    setStale(false);
-    if (await action.run(p.basis)) onClose();
+    if (action.pending) return;
+    if (await action.run()) onClose();
   };
 
   return (
@@ -245,7 +204,7 @@ export function DeletePeriodDialog({ period, onClose }: { period: PeriodRow; onC
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          <Button variant="danger" onClick={() => void submit()} disabled={!p} loading={action.pending}>
+          <Button variant="danger" onClick={() => void submit()} loading={action.pending}>
             삭제
           </Button>
         </>
@@ -254,32 +213,9 @@ export function DeletePeriodDialog({ period, onClose }: { period: PeriodRow; onC
       <p className={s.lead}>
         {formatWeekRange(period.weekStart)} · {period.reason}
       </p>
-      {preview.error && !preview.loading ? (
-        <InfoBox
-          tone="red"
-          icon="alert"
-          action={
-            <Button variant="outline" size="sm" onClick={() => preview.refetch().catch(() => undefined)}>
-              다시 시도
-            </Button>
-          }
-        >
-          {COPY.previewFailed}
-        </InfoBox>
-      ) : !p ? (
-        <Skeleton height={16} />
-      ) : p.isRetroactive ? (
-        <PeriodImpact p={p} />
-      ) : (
-        <p className={s.muted}>삭제하면 이 주도 평소처럼 판정해요.</p>
-      )}
-      {stale ? (
-        <div className={s.notes}>
-          <InfoBox tone="warn" icon="alert" role="alert">
-            {MSG.previewStale}
-          </InfoBox>
-        </div>
-      ) : null}
+      <p className={s.muted}>
+        {period.weekStart < clock.currentWeekStart ? COPY.keepsJudged : '삭제하면 이 주도 평소처럼 판정해요.'}
+      </p>
     </Modal>
   );
 }

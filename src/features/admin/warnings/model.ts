@@ -2,22 +2,19 @@
  * 경고 복구 · 벌칙 표시 규칙 (순수 함수 · 문구). 경고 수 · 벌칙 대상은 서버 값만 그린다.
  */
 import type {
+  AdminWarningDeleteReason,
   AdminWarningsDeletedQueryQuery,
   AdminWarningsPenaltyTargetsQueryQuery,
   AdminWarningsRestorePreviewQueryQuery,
-  PenaltyChange,
-  WarningDeleteReason,
 } from '@/gql/graphql';
-import { formatDateTimeMD, formatMD } from '@/shared/lib/format';
+import { formatMD } from '@/shared/lib/format';
 
-export type PenaltyTargetRow = AdminWarningsPenaltyTargetsQueryQuery['penaltyTargets'][number];
-export type DeletedWarningRow = AdminWarningsDeletedQueryQuery['deletedWarnings']['nodes'][number];
-export type RestorePreview = AdminWarningsRestorePreviewQueryQuery['restoreWarningPreview'];
+export type PenaltyTargetRow = AdminWarningsPenaltyTargetsQueryQuery['adminPenaltyTargets']['items'][number];
+export type DeletedWarningRow = AdminWarningsDeletedQueryQuery['adminDeletedWarnings']['items'][number];
+export type RestorePreview = AdminWarningsRestorePreviewQueryQuery['previewWarningRestore'];
 export type AdminTeam = PenaltyTargetRow['teams'][number];
 
-export const DELETE_REASON_LABEL: Record<WarningDeleteReason, string> = { KICKED: '추방', TEAM_DELETED: '팀 삭제' };
-
-export const PENALTY_CHANGE_LABEL: Record<PenaltyChange, string> = { RELEASE: '해제', ENTER: '진입', NONE: '변화 없음' };
+export const DELETE_REASON_LABEL: Record<AdminWarningDeleteReason, string> = { KICKED: '추방', TEAM_DELETED: '팀 삭제' };
 
 export const COPY = {
   /** W-16 각주 */
@@ -41,12 +38,7 @@ export const COPY = {
   deletedTeam: '삭제된 팀',
 } as const;
 
-/** 도달: 판정일(reachedAt) M/D, 없으면 그 주 월요일 (계약서 C-14 · W-16 '도달 9/28') */
-export function reachedText(t: Pick<PenaltyTargetRow, 'reachedAt' | 'reachedWeekStart'>): string {
-  return t.reachedAt ? formatDateTimeMD(t.reachedAt) : formatMD(t.reachedWeekStart);
-}
-
-/** 이름표로 그릴 살아 있는 팀 (삭제된 팀은 빼고 '삭제된 팀' 한 번으로) */
-export function liveTeams(teams: AdminTeam[]): AdminTeam[] {
-  return teams.filter((t) => !t.isDeleted);
+/** 도달: 경고 3개에 도달한 주 월요일 M/D (W-16 '도달 9/28'). 백엔드에 판정 시각은 없다 */
+export function reachedText(t: Pick<PenaltyTargetRow, 'reachedWeek'>): string {
+  return formatMD(t.reachedWeek);
 }

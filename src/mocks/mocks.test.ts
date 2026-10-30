@@ -20,13 +20,13 @@ async function ok<T = Json>(query: string, as: PersonaKey = 'member', variables?
   return r.data as T;
 }
 
-const MEMBER_FIELDS = `
-  id nickname githubLogin profileImageUrl postCount commentCount
-  grassCalendar { status updatedAt privateContributionSuspected days { date count level } }
-  warningState { activeCount isPenaltyTarget consecutivePasses weeksUntilDeduction byCategory { label { kind name } count } }
-  currentWeek { weekStart isCurrentWeek verifiedDays recordCount live { status } }
-  judgmentHistory(first: 8) { nodes { id weekStart status skipReason verifiedDays recordCount corrected judgedAt hasActiveWarning } pageInfo { hasNextPage endCursor } }
-  publicTeams { id name }
+const PROFILE_FIELDS = `
+  id nickname githubLogin profileImageUrl isMine postCount commentCount
+  grass { from to fetchedAt days { date count } }
+  warning { onHold warningCount penaltyTarget }
+  teamWarnings { onHold teams { name count } }
+  teams { id name }
+  judgmentHistory { items { weekStart weekEnd result verifiedDays recordCount } nextCursor }
 `;
 
 const POST_FIELDS = `
@@ -35,10 +35,11 @@ const POST_FIELDS = `
   comments { items { id postId authorId content author { nickname } createdAt updatedAt } nextCursor }
 `;
 
-const PREVIEW = 'member { id nickname } warningCountBefore warningCountAfter penaltyChange affectedWeekCount frozenByFulfillment restoresWithoutCategory basis';
+const IMPACT = 'impact { onHold warningCountBefore warningCountAfter entersPenalty leavesPenalty recordOnly affectedWeeks }';
+const BRIEF = 'id nickname githubLogin';
 
 const EVERY_QUERY_FIELD = /* GraphQL */ `
-  query Everything($postId: ID!, $warningId: ID!) {
+  query Everything($postId: ID!, $warningId: ID!, $judgmentId: ID!) {
     me { id githubLogin nickname profileImageUrl status role }
     myWeeklyActivity {
       weekStart weekEnd currentWeek inTeam verifiedDays recordCount requiredVerifiedDays requiredRecordCount passExpected
@@ -69,28 +70,32 @@ const EVERY_QUERY_FIELD = /* GraphQL */ `
       items { id member { nickname } requester { nickname } weekStart weekEnd status reason rejectReason respondedAt createdAt overlapsExemptionPeriod }
       nextCursor
     }
-    member(id: "1") { ${MEMBER_FIELDS} }
+    profile(memberId: "1") { ${PROFILE_FIELDS} }
     posts(type: TROUBLESHOOTING) { items { ${POST_FIELDS} } nextCursor totalCount }
     popularTags(type: TROUBLESHOOTING) { tag count }
     post(id: $postId) { ${POST_FIELDS} }
     notices { items { id title content isPinned isSystem createdAt updatedAt } nextCursor }
     notice(id: "6") { id title }
-    adminDashboardSummary { pendingMemberCount latestWeekFailCount latestJudgedWeekStart penaltyTargetCount pendingExemptionRequestCount heldJudgmentCount }
-    adminJudgmentWeek {
-      weekStart weekEnd executedAt counts { pass fail exempt firstWeek noTeam hold }
-      rows(first: 20) { nodes { judgment { id status } member { nickname } activeWarningCount isPenaltyTarget canRetry canCorrect } pageInfo { hasNextPage endCursor } totalCount }
+    adminDashboardSummary { judgedWeekStart pendingMembers failedMembers penaltyTargets pendingExemptions }
+    adminJudgments {
+      weekStart weekEnd executedAt passCount failCount exemptCount firstWeekCount holdCount
+      items { judgmentId member { ${BRIEF} } status skipReason holdReason verifiedDays recordCount warningCount corrected manualHold }
+      nextCursor
     }
-    heldJudgments { judgment { id status holdReason } member { nickname } canRetry canCorrect }
-    judgmentCorrectionPreview(judgmentId: "1", newStatus: PASS) { ${PREVIEW} }
-    penaltyTargets { member { nickname } activeWarningCount reachedWeekStart reachedAt teams { teamId name isPublic isDeleted } }
-    deletedWarnings { nodes { id member { nickname } weekStart weekEnd deleteReason deletedAt restoreCategories { teamId name isPublic isDeleted } } pageInfo { hasNextPage } totalCount }
-    restoreWarningPreview(warningId: $warningId) { ${PREVIEW} }
-    adminMembers(filter: ALL) { nodes { member { nickname githubLogin } status appliedAt } pageInfo { hasNextPage } totalCount }
-    exemptionPeriods { nodes { id weekStart weekEnd reason createdAt updatedAt isPast } pageInfo { hasNextPage } }
-    exemptionPeriodPreview(weekStart: "2026-09-21") { weekStart isRetroactive affectedMemberCount changes { ${PREVIEW} } basis }
-    personalExemptionRequests { nodes { id member { nickname } requestedBy { nickname } weekStart weekEnd reason status createdAt respondedAt overlapsExemptionPeriod isRetroactive } pageInfo { hasNextPage } totalCount }
-    personalExemptionApprovalPreview(requestId: "5") { ${PREVIEW} }
-    adminContents(filter: ALL, first: 5) { nodes { kind targetId postId postType title author { nickname } createdAt } pageInfo { hasNextPage } totalCount }
+    adminJudgmentHolds { items { member { ${BRIEF} } weekStart reason retryCount retriesExhausted } nextCursor totalCount identityMismatchCount }
+    previewJudgmentCorrection(judgmentId: $judgmentId, status: FAIL) { judgmentId member { ${BRIEF} } weekStart currentStatus targetStatus ${IMPACT} }
+    adminPenaltyTargets { items { member { ${BRIEF} } warningCount reachedWeek teams { id name } } nextCursor totalCount }
+    adminDeletedWarnings { items { warningId member { ${BRIEF} } weekStart deleteReason deletedAt restoreTeams { id name } teamDeleted } nextCursor }
+    previewWarningRestore(warningId: $warningId) { warningId member { ${BRIEF} } weekStart restoreTeams { id name } teamDeleted ${IMPACT} }
+    adminMembers(status: ALL) { items { id githubLogin nickname status role createdAt } nextCursor totalCount }
+    exemptionPeriods { items { id weekStart weekEnd reason createdAt updatedAt } nextCursor }
+    previewExemptionPeriod(weekStart: "2026-09-21") { weekStart retroactive items { member { ${BRIEF} } currentStatus ${IMPACT} } }
+    personalExemptionRequests {
+      items { id member { ${BRIEF} } requester { nickname } weekStart weekEnd status reason rejectReason respondedAt createdAt overlapsExemptionPeriod }
+      nextCursor
+    }
+    previewPersonalExemptionApproval(id: "5") { weekStart retroactive items { member { id } currentStatus ${IMPACT} } }
+    adminPosts(filter: ALL) { items { kind id postId title content author { ${BRIEF} } createdAt } nextCursor }
   }
 `;
 
@@ -105,7 +110,8 @@ describe('목 스키마', () => {
 
   it('member 페르소나로 모든 Query 필드를 오류 없이 실행한다', async () => {
     const warningId = db.warnings.find((w) => w.deleted)?.id;
-    const data = await ok<Json>(EVERY_QUERY_FIELD, 'member', { postId: seedPostId('redisTtl'), warningId });
+    const judgmentId = db.judgments.find((j) => j.status === 'PASS')?.id;
+    const data = await ok<Json>(EVERY_QUERY_FIELD, 'member', { postId: seedPostId('redisTtl'), warningId, judgmentId });
     expect(data.me).toMatchObject({ id: '1', nickname: '한동관', status: 'ACTIVE', role: 'ADMIN' });
   });
 });
@@ -143,17 +149,19 @@ describe('한동관 (member) — 목업 숫자', () => {
   });
 
   it('지난 판정 5주 (W-06) · 프로필 글 12 · 댓글 34 (W-14)', async () => {
-    const d = await ok<{ member: { postCount: number; commentCount: number; judgmentHistory: { nodes: Json[] } } }>(
-      `{ member(id: "1") { postCount commentCount judgmentHistory { nodes { weekStart status skipReason verifiedDays recordCount hasActiveWarning } } } }`,
+    const d = await ok<{ profile: { postCount: number; commentCount: number; judgmentHistory: { items: Json[] } } }>(
+      `{ profile(memberId: "1") { postCount commentCount judgmentHistory { items { weekStart result verifiedDays recordCount } } } }`,
     );
-    expect(d.member.postCount).toBe(12);
-    expect(d.member.commentCount).toBe(34);
-    expect(d.member.judgmentHistory.nodes).toEqual([
-      { weekStart: '2026-09-21', status: 'PASS', skipReason: null, verifiedDays: 4, recordCount: 1, hasActiveWarning: false },
-      { weekStart: '2026-09-14', status: 'FAIL', skipReason: null, verifiedDays: 1, recordCount: 0, hasActiveWarning: true },
-      { weekStart: '2026-09-07', status: 'EXEMPT', skipReason: 'EXEMPTION_PERIOD', verifiedDays: null, recordCount: null, hasActiveWarning: false },
-      { weekStart: '2026-08-31', status: 'PASS', skipReason: null, verifiedDays: 3, recordCount: 2, hasActiveWarning: false },
-      { weekStart: '2026-08-24', status: 'EXCLUDED', skipReason: 'FIRST_WEEK', verifiedDays: null, recordCount: null, hasActiveWarning: false },
+    expect(d.profile.postCount).toBe(12);
+    expect(d.profile.commentCount).toBe(34);
+    // 맨 위는 이번 주 진행 중 행
+    expect(d.profile.judgmentHistory.items).toEqual([
+      { weekStart: '2026-09-28', result: 'IN_PROGRESS', verifiedDays: 2, recordCount: 1 },
+      { weekStart: '2026-09-21', result: 'PASS', verifiedDays: 4, recordCount: 1 },
+      { weekStart: '2026-09-14', result: 'FAIL', verifiedDays: 1, recordCount: 0 },
+      { weekStart: '2026-09-07', result: 'EXEMPT', verifiedDays: null, recordCount: null },
+      { weekStart: '2026-08-31', result: 'PASS', verifiedDays: 3, recordCount: 2 },
+      { weekStart: '2026-08-24', result: 'EXCLUDED', verifiedDays: null, recordCount: null },
     ]);
   });
 
@@ -288,7 +296,7 @@ describe('접근 규칙', () => {
   });
 
   it('관리자 아님: adminDashboardSummary는 FORBIDDEN', async () => {
-    const r = await run(`{ adminDashboardSummary { pendingMemberCount } }`, 'plain');
+    const r = await run(`{ adminDashboardSummary { pendingMembers } }`, 'plain');
     expect(r.codes).toEqual(['FORBIDDEN']);
     expect(r.errors?.[0]?.extensions?.classification).toBe('FORBIDDEN');
   });
@@ -325,74 +333,82 @@ describe('접근 규칙', () => {
 
 describe('관리자 (W-15 · W-16)', () => {
   it('대시보드 요약 · 9/21 주 판정 집계', async () => {
-    const d = await ok<{ adminDashboardSummary: Json; adminJudgmentWeek: Json & { rows: Json } }>(
-      `{ adminDashboardSummary { pendingMemberCount latestWeekFailCount latestJudgedWeekStart penaltyTargetCount pendingExemptionRequestCount heldJudgmentCount }
-         adminJudgmentWeek { weekStart executedAt counts { pass fail exempt firstWeek noTeam hold } rows { totalCount pageInfo { hasNextPage } } } }`,
+    const d = await ok<{ adminDashboardSummary: Json; adminJudgments: Json & { items: Json[] }; adminJudgmentHolds: Json }>(
+      `{ adminDashboardSummary { judgedWeekStart pendingMembers failedMembers penaltyTargets pendingExemptions }
+         adminJudgments { weekStart executedAt passCount failCount exemptCount firstWeekCount holdCount items { judgmentId } nextCursor }
+         adminJudgmentHolds { totalCount identityMismatchCount } }`,
     );
     expect(d.adminDashboardSummary).toEqual({
-      pendingMemberCount: 3,
-      latestWeekFailCount: 4,
-      latestJudgedWeekStart: '2026-09-21',
-      penaltyTargetCount: 2,
-      pendingExemptionRequestCount: 2,
-      heldJudgmentCount: 1,
+      judgedWeekStart: '2026-09-21',
+      pendingMembers: 3,
+      failedMembers: 4,
+      penaltyTargets: 2,
+      pendingExemptions: 2,
     });
-    expect(d.adminJudgmentWeek).toMatchObject({
+    expect(d.adminJudgments).toMatchObject({
       weekStart: '2026-09-21',
       executedAt: '2026-09-28T07:00:00+09:00',
-      counts: { pass: 18, fail: 4, exempt: 2, firstWeek: 1, noTeam: 0, hold: 1 },
-      rows: { totalCount: 26, pageInfo: { hasNextPage: true } },
+      passCount: 18,
+      failCount: 4,
+      exemptCount: 2,
+      firstWeekCount: 1,
+      holdCount: 1,
     });
+    // 20개 고정 페이지 · 다음 페이지가 있다
+    expect(d.adminJudgments.items).toHaveLength(20);
+    expect(d.adminJudgments.nextCursor).not.toBeNull();
+    expect(d.adminJudgmentHolds).toEqual({ totalCount: 1, identityMismatchCount: 0 });
   });
 
   it('벌칙 대상 2명 · 삭제된 경고 2건', async () => {
-    const d = await ok<{ penaltyTargets: Json[]; deletedWarnings: { nodes: Json[] } }>(
-      `{ penaltyTargets { member { nickname } activeWarningCount reachedWeekStart reachedAt teams { name isPublic } }
-         deletedWarnings { nodes { member { nickname } weekStart deleteReason restoreCategories { name isDeleted } } } }`,
+    const d = await ok<{ adminPenaltyTargets: { items: Json[]; totalCount: number }; adminDeletedWarnings: { items: Json[] } }>(
+      `{ adminPenaltyTargets { items { member { nickname } warningCount reachedWeek teams { name } } totalCount }
+         adminDeletedWarnings { items { member { nickname } weekStart deleteReason restoreTeams { name } teamDeleted } } }`,
     );
-    expect(d.penaltyTargets).toEqual([
+    expect(d.adminPenaltyTargets.totalCount).toBe(2);
+    expect(d.adminPenaltyTargets.items).toEqual([
       {
         member: { nickname: '박지훈' },
-        activeWarningCount: 3,
-        reachedWeekStart: '2026-09-21',
-        reachedAt: '2026-09-28T07:00:00+09:00',
-        teams: [
-          { name: '사이드 프로젝트 A팀', isPublic: true },
-          { name: '알고리즘 스터디', isPublic: false },
-        ],
+        warningCount: 3,
+        reachedWeek: '2026-09-21',
+        teams: [{ name: '사이드 프로젝트 A팀' }, { name: '알고리즘 스터디' }],
       },
-      { member: { nickname: '정하늘' }, activeWarningCount: 3, reachedWeekStart: '2026-09-14', reachedAt: '2026-09-21T07:00:00+09:00', teams: [{ name: '웹 프로젝트 B팀', isPublic: true }] },
+      { member: { nickname: '정하늘' }, warningCount: 3, reachedWeek: '2026-09-14', teams: [{ name: '웹 프로젝트 B팀' }] },
     ]);
-    expect(d.deletedWarnings.nodes).toEqual([
-      { member: { nickname: '이영희' }, weekStart: '2026-09-14', deleteReason: 'KICKED', restoreCategories: [{ name: '웹 프로젝트 B팀', isDeleted: false }] },
-      { member: { nickname: '최유진' }, weekStart: '2026-08-31', deleteReason: 'TEAM_DELETED', restoreCategories: [{ name: '모바일 스터디', isDeleted: true }] },
+    expect(d.adminDeletedWarnings.items).toEqual([
+      { member: { nickname: '이영희' }, weekStart: '2026-09-14', deleteReason: 'KICKED', restoreTeams: [{ name: '웹 프로젝트 B팀' }], teamDeleted: false },
+      { member: { nickname: '최유진' }, weekStart: '2026-08-31', deleteReason: 'TEAM_DELETED', restoreTeams: [], teamDeleted: true },
     ]);
   });
 
   it('재계산 미리보기: 박지훈 9/21 미달 → 통과 = 경고 3 → 2 · 벌칙 해제 · 1주', async () => {
-    const week = await ok<{ adminJudgmentWeek: { rows: { nodes: { judgment: { id: string }; member: { nickname: string } }[] } } }>(
-      `{ adminJudgmentWeek { rows(filter: FAIL) { nodes { judgment { id } member { nickname } } } } }`,
+    const week = await ok<{ adminJudgments: { items: { judgmentId: string; member: { nickname: string } }[] } }>(
+      `{ adminJudgments(filter: FAIL_ONLY) { items { judgmentId member { nickname } } } }`,
     );
-    const jid = week.adminJudgmentWeek.rows.nodes.find((r) => r.member.nickname === '박지훈')?.judgment.id;
-    const d = await ok<{ judgmentCorrectionPreview: Json }>(
-      `query($id: ID!) { judgmentCorrectionPreview(judgmentId: $id, newStatus: PASS) { warningCountBefore warningCountAfter penaltyChange affectedWeekCount basis } }`,
+    const jid = week.adminJudgments.items.find((r) => r.member.nickname === '박지훈')?.judgmentId;
+    const d = await ok<{ previewJudgmentCorrection: Json }>(
+      `query($id: ID!) { previewJudgmentCorrection(judgmentId: $id, status: PASS) { currentStatus targetStatus ${IMPACT} } }`,
       'member',
       { id: jid },
     );
-    expect(d.judgmentCorrectionPreview).toEqual({ warningCountBefore: 3, warningCountAfter: 2, penaltyChange: 'RELEASE', affectedWeekCount: 1, basis: 'v1' });
+    expect(d.previewJudgmentCorrection).toEqual({
+      currentStatus: 'FAIL',
+      targetStatus: 'PASS',
+      impact: { onHold: false, warningCountBefore: 3, warningCountAfter: 2, entersPenalty: false, leavesPenalty: true, recordOnly: false, affectedWeeks: 1 },
+    });
   });
 
   it('경고 복구 미리보기: 이영희 2 → 3 벌칙 진입 · 최유진은 삭제된 팀', async () => {
-    const list = await ok<{ deletedWarnings: { nodes: { id: string; member: { nickname: string } }[] } }>(`{ deletedWarnings { nodes { id member { nickname } } } }`);
-    const id = (name: string) => list.deletedWarnings.nodes.find((n) => n.member.nickname === name)?.id;
-    const q = `query($id: ID!) { restoreWarningPreview(warningId: $id) { warningCountBefore warningCountAfter penaltyChange restoresWithoutCategory } }`;
-    expect((await ok<{ restoreWarningPreview: Json }>(q, 'member', { id: id('이영희') })).restoreWarningPreview).toEqual({
-      warningCountBefore: 2,
-      warningCountAfter: 3,
-      penaltyChange: 'ENTER',
-      restoresWithoutCategory: false,
+    const list = await ok<{ adminDeletedWarnings: { items: { warningId: string; member: { nickname: string } }[] } }>(
+      `{ adminDeletedWarnings { items { warningId member { nickname } } } }`,
+    );
+    const id = (name: string) => list.adminDeletedWarnings.items.find((n) => n.member.nickname === name)?.warningId;
+    const q = `query($id: ID!) { previewWarningRestore(warningId: $id) { teamDeleted impact { warningCountBefore warningCountAfter entersPenalty leavesPenalty } } }`;
+    expect((await ok<{ previewWarningRestore: Json }>(q, 'member', { id: id('이영희') })).previewWarningRestore).toEqual({
+      teamDeleted: false,
+      impact: { warningCountBefore: 2, warningCountAfter: 3, entersPenalty: true, leavesPenalty: false },
     });
-    expect((await ok<{ restoreWarningPreview: Json }>(q, 'member', { id: id('최유진') })).restoreWarningPreview).toMatchObject({ restoresWithoutCategory: true });
+    expect((await ok<{ previewWarningRestore: Json }>(q, 'member', { id: id('최유진') })).previewWarningRestore).toMatchObject({ teamDeleted: true });
   });
 });
 
@@ -415,10 +431,10 @@ describe('페르소나 · 시각', () => {
   it('월요일 03:00(판정 전)에는 9/21 판정이 아직 없다', async () => {
     setMockControl({ now: '2026-09-28T03:00:00+09:00' });
     const d = await ok<{ lastWeek: Json; adminDashboardSummary: Json; myWarningSummary: Json }>(
-      `{ lastWeek: myWeeklyActivity(weekStart: "2026-09-21") { judgment { status } verifiedDays } adminDashboardSummary { latestJudgedWeekStart } myWarningSummary { warningCount } }`,
+      `{ lastWeek: myWeeklyActivity(weekStart: "2026-09-21") { judgment { status } verifiedDays } adminDashboardSummary { judgedWeekStart } myWarningSummary { warningCount } }`,
     );
     expect(d.lastWeek.judgment).toBeNull();
-    expect(d.adminDashboardSummary.latestJudgedWeekStart).toBe('2026-09-14');
+    expect(d.adminDashboardSummary.judgedWeekStart).toBe('2026-09-14');
     expect(d.myWarningSummary.warningCount).toBe(1);
   });
 

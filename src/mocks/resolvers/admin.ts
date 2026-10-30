@@ -1,28 +1,27 @@
-/** 관리자 (AD-01 탭 6). 이 파일의 Query · Mutation은 스키마 가드가 ADMIN만 통과시킨다 */
+/** 관리자 — 판정 · 경고 · 벌칙 뮤테이션과 관리자 조회 전부 (백엔드 admin · member-approval · exemption 스키마) */
 import { addDays, weekDates } from '@/shared/lib/kst';
 import type {
   JudgmentStatus,
   MutationCorrectJudgmentArgs,
   MutationFulfillPenaltyArgs,
-  MutationRerunHeldJudgmentsArgs,
   MutationRestoreWarningArgs,
-  QueryAdminContentsArgs,
-  QueryAdminJudgmentWeekArgs,
+  MutationRetryJudgmentHoldArgs,
+  QueryAdminDeletedWarningsArgs,
+  QueryAdminJudgmentHoldsArgs,
+  QueryAdminJudgmentsArgs,
   QueryAdminMembersArgs,
-  QueryDeletedWarningsArgs,
-  QueryExemptionPeriodPreviewArgs,
+  QueryAdminPenaltyTargetsArgs,
+  QueryAdminPostsArgs,
   QueryExemptionPeriodsArgs,
-  QueryJudgmentCorrectionPreviewArgs,
-  QueryPersonalExemptionApprovalPreviewArgs,
   QueryPersonalExemptionRequestsArgs,
-  QueryRestoreWarningPreviewArgs,
-  AdminJudgmentWeekRowsArgs,
+  QueryPreviewExemptionPeriodArgs,
+  QueryPreviewJudgmentCorrectionArgs,
+  QueryPreviewPersonalExemptionApprovalArgs,
+  QueryPreviewWarningRestoreArgs,
 } from '../__generated__/schema-types';
 import {
   approvedPersonalExemption,
-  assertBasis,
   correctionScenario,
-  currentBasis,
   exemptionPeriodOn,
   grassCount,
   isJudgmentVisible,
@@ -38,15 +37,12 @@ import {
   visibleJudgments,
   weekExecutedAt,
   weekExemptionScenario,
-  type Scenario,
 } from '../db/derive';
 import {
   db,
-  findExemptionPeriod,
   findJudgment,
   findMember,
   findPersonalExemption,
-  findTeam,
   findWarning,
   liveTeam,
   nextId,
@@ -56,20 +52,20 @@ import {
   type JudgmentRow,
   type WarningRow,
 } from '../db/store';
-import { gqlError, invalid } from '../errors';
+import { gqlError } from '../errors';
 import type { MockContext, Resolvers } from '../types';
 import {
   adminJudgmentRowView,
-  adminMemberRowView,
+  adminMemberView,
+  adminPostItemView,
   contentItems,
-  contentRowView,
   deletedWarningView,
   exemptionPeriodView,
-  paginate,
+  impactView,
+  itemsPage,
+  memberBriefView,
   penaltyTargetView,
   personalExemptionView,
-  recalcPayloadView,
-  recalcPreviewView,
   requireViewer,
 } from '../views';
 
@@ -80,8 +76,8 @@ function sortJudgmentRows(rows: JudgmentRow[]): JudgmentRow[] {
   return [...rows].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || nick(a.memberId).localeCompare(nick(b.memberId), 'ko'));
 }
 
-const matchesMember = (memberId: Id, search: string | null | undefined) => {
-  const q = search?.trim().toLowerCase().replace(/^@/, '');
+const matchesMember = (memberId: Id, keyword: string | null | undefined) => {
+  const q = keyword?.trim().toLowerCase().replace(/^@/, '');
   if (!q) return true;
   const m = db.members.find((x) => x.id === memberId);
   return !!m && (m.nickname.toLowerCase().includes(q) || m.githubLogin.toLowerCase().includes(q));
@@ -152,59 +148,109 @@ function rejudgeHeld(j: JudgmentRow, ctx: MockContext): void {
   }
 }
 
+
+/** 판정 정정으로 갈 수 있는 결과: 보류는 불가, 제외(첫 참가 · 팀 없음)는 면제로만, 같은 결과는 불가 */
+function assertCorrectable(j: JudgmentRow, to: JudgmentStatus): void {
+  if (j.status === 'HOLD' || j.status === to || (j.status === 'EXCLUDED' && to !== 'EXEMPT')) throw gqlError('JUDGMENT_NOT_CORRECTABLE');
+}
+
+function weekOrThrow(weekStart: string): void {
+  if (!isMondayDate(weekStart)) throw gqlError('INVALID_INPUT', { message: 'mock: weekStart must be a Monday' });
+}
+
+/** 소급 면제 미리보기 (RetroExemptionPreview). 판정 전 주면 retroactive=false · items 빈 배열 */
+function retroPreview(ctx: MockContext, weekStart: string, memberIds: Id[], reason: 'EXEMPTION_PERIOD' | 'PERSONAL_EXEMPTION') {
+  if (!isRetroactiveWeek(weekStart, ctx.clock)) return { weekStart, retroactive: false, items: [] };
+  const items = memberIds.flatMap((memberId) => {
+    const j = judgmentsOfWeek(weekStart, ctx.clock).find((x) => x.memberId === memberId);
+    // 통과 · 미달만 면제로 바뀐다
+    if (!j || (j.status !== 'PASS' && j.status !== 'FAIL')) return [];
+    const sc = weekExemptionScenario(memberId, weekStart, true, reason, ctx.clock) ?? {};
+    return [{ member: memberBriefView(memberId), currentStatus: j.status, impact: impactView(ctx, recalcPreview(memberId, sc, weekStart, ctx.clock)) }];
+  });
+  return { weekStart, retroactive: true, items };
+}
+
+const holdsOf = (ctx: MockContext) =>
+  visibleJudgments(ctx.clock)
+    .filter((j) => j.status === 'HOLD')
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart) || Number(a.id) - Number(b.id));
+
 export const adminResolvers: Resolvers = {
   Query: {
     adminDashboardSummary: (_: unknown, __: unknown, ctx: MockContext) => {
-      const latest = latestExecutedWeek(ctx.clock);
+      const judged = latestExecutedWeek(ctx.clock) ?? addDays(ctx.clock.currentWeekStart, -7);
       return {
-        pendingMemberCount: db.members.filter((m) => m.status === 'PENDING').length,
-        latestWeekFailCount: latest ? judgmentsOfWeek(latest, ctx.clock).filter((j) => j.status === 'FAIL').length : 0,
-        latestJudgedWeekStart: latest,
-        penaltyTargetCount: penaltyTargetIds(ctx.clock).length,
-        pendingExemptionRequestCount: db.personalExemptions.filter((e) => e.status === 'PENDING').length,
-        heldJudgmentCount: visibleJudgments(ctx.clock).filter((j) => j.status === 'HOLD').length,
+        judgedWeekStart: judged,
+        pendingMembers: db.members.filter((m) => m.status === 'PENDING').length,
+        failedMembers: judgmentsOfWeek(judged, ctx.clock).filter((j) => j.status === 'FAIL').length,
+        penaltyTargets: penaltyTargetIds(ctx.clock).length,
+        pendingExemptions: db.personalExemptions.filter((e) => e.status === 'PENDING').length,
       };
     },
 
-    // weekStart 생략 = 가장 최근 판정 주. 이번 주(판정 전)면 executedAt null · 행 없음
-    adminJudgmentWeek: (_: unknown, { weekStart }: QueryAdminJudgmentWeekArgs, ctx: MockContext) => {
+    // weekStart 생략 = 가장 최근 판정 주. 판정 전 주면 executedAt null · 행 없음. 집계는 검색 · 필터와 무관
+    adminJudgments: (_: unknown, { weekStart, keyword, filter, after }: QueryAdminJudgmentsArgs, ctx: MockContext) => {
       const week = weekStart ?? latestExecutedWeek(ctx.clock) ?? addDays(ctx.clock.currentWeekStart, -7);
-      if (!isMondayDate(week)) throw invalid('weekStart', 'mock: weekStart must be a Monday');
-      if (week > ctx.clock.currentWeekStart) throw invalid('weekStart', 'mock: future week');
+      weekOrThrow(week);
+      if (week > ctx.clock.currentWeekStart) throw gqlError('INVALID_INPUT', { message: 'mock: future week' });
       const all = judgmentsOfWeek(week, ctx.clock);
+      const c = judgmentCounts(all);
+      const rows = all.filter((j) => {
+        if (filter === 'FAIL_ONLY' && j.status !== 'FAIL') return false;
+        if (filter === 'HOLD_ONLY' && j.status !== 'HOLD') return false;
+        // 팀 없음 제외는 전체 목록에서도 뺀다 (추측)
+        if ((filter ?? 'ALL') === 'ALL' && j.status === 'EXCLUDED' && j.skipReason === 'NO_TEAM') return false;
+        return matchesMember(j.memberId, keyword);
+      });
       return {
         weekStart: week,
         weekEnd: addDays(week, 6),
         executedAt: weekExecutedAt(week, ctx.clock),
-        counts: judgmentCounts(all),
-        rows: ({ filter, search, first, after }: AdminJudgmentWeekRowsArgs) => {
-          const rows = all.filter((j) => {
-            if (filter === 'FAIL' && j.status !== 'FAIL') return false;
-            if (filter === 'HOLD' && j.status !== 'HOLD') return false;
-            // 팀 없음 제외는 목록 기본 필터에서도 뺀다 (추측)
-            if ((filter ?? 'ALL') === 'ALL' && j.status === 'EXCLUDED' && j.skipReason === 'NO_TEAM') return false;
-            return matchesMember(j.memberId, search);
-          });
-          return paginate(sortJudgmentRows(rows), { first, after }, (j) => adminJudgmentRowView(ctx, j));
-        },
+        passCount: c.pass,
+        failCount: c.fail,
+        exemptCount: c.exempt,
+        firstWeekCount: c.firstWeek,
+        holdCount: c.hold,
+        ...itemsPage(sortJudgmentRows(rows), after, (j) => adminJudgmentRowView(ctx, j)),
       };
     },
 
-    heldJudgments: (_: unknown, __: unknown, ctx: MockContext) =>
-      visibleJudgments(ctx.clock)
-        .filter((j) => j.status === 'HOLD')
-        .map((j) => adminJudgmentRowView(ctx, j)),
-
-    judgmentCorrectionPreview: (_: unknown, { judgmentId, newStatus }: QueryJudgmentCorrectionPreviewArgs, ctx: MockContext) => {
-      const j = findJudgment(judgmentId);
-      if (!j || !isJudgmentVisible(j, ctx.clock)) throw gqlError('NOT_FOUND');
-      if (j.status === 'HOLD') throw gqlError('JUDGMENT_NOT_CORRECTABLE');
-      return recalcPreviewView(ctx, recalcPreview(j.memberId, correctionScenario(j.id, newStatus), j.weekStart, ctx.clock));
+    adminJudgmentHolds: (_: unknown, { after }: QueryAdminJudgmentHoldsArgs, ctx: MockContext) => {
+      const holds = holdsOf(ctx);
+      return {
+        ...itemsPage(holds, after, (j) => ({
+          member: memberBriefView(j.memberId),
+          weekStart: j.weekStart,
+          reason: j.holdReason ?? 'API_ERROR',
+          retryCount: 0,
+          retriesExhausted: false,
+        })),
+        totalCount: holds.length,
+        identityMismatchCount: holds.filter((j) => j.holdReason === 'IDENTITY_MISMATCH').length,
+      };
     },
 
-    penaltyTargets: (_: unknown, __: unknown, ctx: MockContext) => penaltyTargetIds(ctx.clock).map((id) => penaltyTargetView(ctx, id)),
+    previewJudgmentCorrection: (_: unknown, { judgmentId, status }: QueryPreviewJudgmentCorrectionArgs, ctx: MockContext) => {
+      const j = findJudgment(judgmentId);
+      if (!j || !isJudgmentVisible(j, ctx.clock)) throw gqlError('NOT_FOUND');
+      assertCorrectable(j, status);
+      return {
+        judgmentId: j.id,
+        member: memberBriefView(j.memberId),
+        weekStart: j.weekStart,
+        currentStatus: j.status,
+        targetStatus: status,
+        impact: impactView(ctx, recalcPreview(j.memberId, correctionScenario(j.id, status), j.weekStart, ctx.clock)),
+      };
+    },
 
-    deletedWarnings: (_: unknown, args: QueryDeletedWarningsArgs, ctx: MockContext) => {
+    adminPenaltyTargets: (_: unknown, { after }: QueryAdminPenaltyTargetsArgs, ctx: MockContext) => {
+      const ids = penaltyTargetIds(ctx.clock);
+      return { ...itemsPage(ids, after, (id) => penaltyTargetView(ctx, id)), totalCount: ids.length };
+    },
+
+    adminDeletedWarnings: (_: unknown, { after }: QueryAdminDeletedWarningsArgs, ctx: MockContext) => {
       const rows = db.warnings
         .filter((w) => {
           if (!w.deleted || w.retractedAt) return false;
@@ -212,129 +258,107 @@ export const adminResolvers: Resolvers = {
           return !j || isJudgmentVisible(j, ctx.clock);
         })
         .sort((a, b) => b.weekStart.localeCompare(a.weekStart) || Number(b.id) - Number(a.id));
-      return paginate(rows, args, (w) => deletedWarningView(ctx, w));
+      return itemsPage(rows, after, (w) => deletedWarningView(ctx, w));
     },
 
-    restoreWarningPreview: (_: unknown, { warningId }: QueryRestoreWarningPreviewArgs, ctx: MockContext) => {
-      const w = findWarning(warningId);
-      if (!w || !w.deleted || w.retractedAt) throw gqlError('NOT_FOUND');
-      const withoutCategory = w.originalTeamIds.every((t) => !findTeam(t) || !!findTeam(t)?.deletedAt);
-      return recalcPreviewView(
-        ctx,
-        recalcPreview(w.memberId, { restoreWarningIds: [w.id] }, w.weekStart, ctx.clock, { restoresWithoutCategory: withoutCategory }),
-      );
-    },
-
-    adminMembers: (_: unknown, { filter, search, first, after }: QueryAdminMembersArgs, ctx: MockContext) => {
-      const f = filter ?? 'PENDING';
-      const rows = db.members
-        .filter((m) => (f === 'ALL' ? m.status === 'PENDING' || m.status === 'REJECTED' : m.status === f))
-        .filter((m) => matchesMember(m.id, search))
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      return paginate(rows, { first, after }, (m) => adminMemberRowView(ctx, m));
-    },
-
-    exemptionPeriods: (_: unknown, args: QueryExemptionPeriodsArgs, ctx: MockContext) => {
-      const rows = [...db.exemptionPeriods].sort((a, b) => b.weekStart.localeCompare(a.weekStart));
-      return paginate(rows, args, (e) => exemptionPeriodView(ctx, e));
-    },
-
-    exemptionPeriodPreview: (_: unknown, { weekStart, periodId, removing }: QueryExemptionPeriodPreviewArgs, ctx: MockContext) => {
-      if (!isMondayDate(weekStart)) throw invalid('weekStart', 'mock: weekStart must be a Monday');
-      const period = periodId ? findExemptionPeriod(periodId) : undefined;
-      if (periodId && !period) throw gqlError('NOT_FOUND');
-      const existing = exemptionPeriodOn(weekStart);
-      if (!removing && existing && existing.id !== periodId) throw gqlError('EXEMPTION_DUPLICATE', { field: 'weekStart' });
-
-      const specs: { week: string; exempt: boolean }[] = [];
-      if (removing) specs.push({ week: period?.weekStart ?? weekStart, exempt: false });
-      else {
-        if (period && period.weekStart !== weekStart) specs.push({ week: period.weekStart, exempt: false });
-        if (!period || period.weekStart !== weekStart) specs.push({ week: weekStart, exempt: true });
-      }
-      const retro = specs.filter((s) => isRetroactiveWeek(s.week, ctx.clock));
-      const memberIds = [...new Set(retro.flatMap((s) => judgmentsOfWeek(s.week, ctx.clock).map((j) => j.memberId)))];
-      // affectedMemberCount = 판정이 바뀌는 회원 수 · changes = 그중 경고 수나 벌칙 상태가 바뀌는 회원만
-      const from = retro.map((s) => s.week).sort()[0] ?? weekStart;
-      const previews = memberIds.flatMap((memberId) => {
-        const merged: Scenario = { judgmentOverrides: {} };
-        for (const s of retro) {
-          const sc = weekExemptionScenario(memberId, s.week, s.exempt, 'EXEMPTION_PERIOD', ctx.clock);
-          Object.assign(merged.judgmentOverrides ?? {}, sc?.judgmentOverrides ?? {});
-        }
-        if (Object.keys(merged.judgmentOverrides ?? {}).length === 0) return [];
-        return [recalcPreview(memberId, merged, from, ctx.clock)];
-      });
-      const changes = previews
-        .filter((p) => p.warningCountBefore !== p.warningCountAfter || p.penaltyChange !== 'NONE')
-        .map((p) => recalcPreviewView(ctx, p));
-      return { weekStart, isRetroactive: retro.length > 0, affectedMemberCount: previews.length, changes, basis: currentBasis() };
-    },
-
-    personalExemptionRequests: (_: unknown, { status, first, after }: QueryPersonalExemptionRequestsArgs, ctx: MockContext) => {
-      const s = status ?? 'PENDING';
-      const rows = db.personalExemptions.filter((e) => e.status === s).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return paginate(rows, { first, after }, (e) => personalExemptionView(ctx, e));
-    },
-
-    // 소급이 아니면 null
-    personalExemptionApprovalPreview: (_: unknown, { requestId }: QueryPersonalExemptionApprovalPreviewArgs, ctx: MockContext) => {
-      const e = findPersonalExemption(requestId);
-      if (!e) throw gqlError('NOT_FOUND');
-      if (!isRetroactiveWeek(e.weekStart, ctx.clock)) return null;
-      const sc = weekExemptionScenario(e.memberId, e.weekStart, true, 'PERSONAL_EXEMPTION', ctx.clock) ?? {};
-      return recalcPreviewView(ctx, recalcPreview(e.memberId, sc, e.weekStart, ctx.clock));
-    },
-
-    adminContents: (_: unknown, { filter, search, first, after }: QueryAdminContentsArgs, ctx: MockContext) =>
-      paginate(contentItems(ctx, { kind: filter ?? 'ALL', search }), { first, after }, (it) => contentRowView(ctx, it)),
-  },
-
-  Mutation: {
-    // --- 판정 (반영 전 assertBasis(expectedBasis) → 고친 뒤 touch() → recalcPayloadView) ---
-
-    /**
-     * AD-01 ⑦ [재시도] · ⑨ [전체 재시도] (E-35). judgmentIds 생략 = 보류 전부.
-     * 확정 건은 건너뛰고, API_ERROR 보류만 다시 판정한다. IDENTITY_MISMATCH는 재시도로 풀리지 않는다(E-08) → stillHeldCount.
-     */
-    rerunHeldJudgments: (_: unknown, { judgmentIds }: MutationRerunHeldJudgmentsArgs, ctx: MockContext) => {
-      let targets: JudgmentRow[];
-      if (judgmentIds && judgmentIds.length > 0) {
-        targets = [...new Set(judgmentIds)].map((id) => {
-          const j = findJudgment(id);
-          if (!j || !isJudgmentVisible(j, ctx.clock)) throw gqlError('NOT_FOUND');
-          return j;
-        });
-      } else {
-        targets = visibleJudgments(ctx.clock);
-      }
-      const held = targets.filter((j) => j.status === 'HOLD');
-      const retryable = held.filter((j) => j.holdReason === 'API_ERROR');
-      for (const j of retryable) rejudgeHeld(j, ctx);
-      if (retryable.length > 0) touch();
+    // 삭제된 경고가 아니면 ALREADY_HANDLED, 복구 대상이 아니면(회수 · 없음) NOT_FOUND
+    previewWarningRestore: (_: unknown, { warningId }: QueryPreviewWarningRestoreArgs, ctx: MockContext) => {
+      const w = restorableWarning(warningId);
+      const view = deletedWarningView(ctx, w);
       return {
-        processedCount: retryable.length,
-        stillHeldCount: held.length - retryable.length,
-        rows: retryable.map((j) => adminJudgmentRowView(ctx, j)),
+        warningId: w.id,
+        member: view.member,
+        weekStart: w.weekStart,
+        restoreTeams: view.restoreTeams,
+        teamDeleted: view.teamDeleted,
+        impact: impactView(ctx, recalcPreview(w.memberId, { restoreWarningIds: [w.id] }, w.weekStart, ctx.clock)),
       };
     },
 
+    adminMembers: (_: unknown, { status, keyword, after }: QueryAdminMembersArgs) => {
+      const f = status ?? 'PENDING';
+      const rows = db.members
+        .filter((m) => (f === 'ALL' ? m.status === 'PENDING' || m.status === 'REJECTED' : m.status === f))
+        .filter((m) => matchesMember(m.id, keyword))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return { ...itemsPage(rows, after, adminMemberView), totalCount: rows.length };
+    },
+
+    exemptionPeriods: (_: unknown, { after }: QueryExemptionPeriodsArgs) => {
+      const rows = [...db.exemptionPeriods].sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+      return itemsPage(rows, after, exemptionPeriodView);
+    },
+
+    previewExemptionPeriod: (_: unknown, { weekStart }: QueryPreviewExemptionPeriodArgs, ctx: MockContext) => {
+      weekOrThrow(weekStart);
+      const memberIds = judgmentsOfWeek(weekStart, ctx.clock).map((j) => j.memberId);
+      return retroPreview(ctx, weekStart, memberIds, 'EXEMPTION_PERIOD');
+    },
+
+    personalExemptionRequests: (_: unknown, { status, after }: QueryPersonalExemptionRequestsArgs) => {
+      const s = status ?? 'PENDING';
+      const rows = db.personalExemptions.filter((e) => e.status === s).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return itemsPage(rows, after, personalExemptionView);
+    },
+
+    previewPersonalExemptionApproval: (_: unknown, { id }: QueryPreviewPersonalExemptionApprovalArgs, ctx: MockContext) => {
+      const e = findPersonalExemption(id);
+      if (!e) throw gqlError('NOT_FOUND');
+      if (e.status !== 'PENDING') throw gqlError('ALREADY_HANDLED');
+      return retroPreview(ctx, e.weekStart, [e.memberId], 'PERSONAL_EXEMPTION');
+    },
+
+    adminPosts: (_: unknown, { filter, keyword, after }: QueryAdminPostsArgs, ctx: MockContext) => {
+      const kind = filter === 'POSTS' ? 'POST' : filter === 'COMMENTS' ? 'COMMENT' : 'ALL';
+      return itemsPage(contentItems(ctx, { kind, search: keyword }), after, adminPostItemView);
+    },
+  },
+
+  Mutation: {
+    /** AD-01 ⑦ [재시도] — 보류 한 건. 확정된 건은 건너뛰고 현재 결과를 돌려준다. IDENTITY_MISMATCH는 풀리지 않는다(E-08) */
+    retryJudgmentHold: (_: unknown, { memberId, weekStart }: MutationRetryJudgmentHoldArgs, ctx: MockContext) => {
+      const j = visibleJudgments(ctx.clock, memberId).find((x) => x.weekStart === weekStart);
+      if (!j) throw gqlError('NOT_FOUND');
+      const wasHold = j.status === 'HOLD';
+      if (wasHold && j.holdReason === 'API_ERROR') {
+        rejudgeHeld(j, ctx);
+        touch();
+      }
+      return {
+        member: memberBriefView(memberId),
+        weekStart,
+        status: j.status,
+        holdReason: j.holdReason,
+        resolved: wasHold && j.status !== 'HOLD',
+      };
+    },
+
+    /** AD-01 ⑨ [전체 재시도] (E-35). API_ERROR 보류만 다시 판정한다 */
+    retryAllJudgmentHolds: (_: unknown, __: unknown, ctx: MockContext) => {
+      const held = holdsOf(ctx);
+      const retryable = held.filter((j) => j.holdReason === 'API_ERROR');
+      for (const j of retryable) rejudgeHeld(j, ctx);
+      if (retryable.length > 0) touch();
+      const resolved = retryable.filter((j) => j.status !== 'HOLD').length;
+      return { attempted: held.length, resolved, stillHold: held.length - resolved, failed: 0 };
+    },
+
     /**
-     * AD-01 ⑩ [정정하고 재계산] (E-49 · E-50 · E-58 · E-60). 결과는 judgmentCorrectionPreview와 같아야 한다:
+     * AD-01 ⑩ [정정하고 재계산] (E-49 · E-50 · E-58 · E-60). 결과는 previewJudgmentCorrection과 같아야 한다:
      * 미달 → 통과/면제면 그 주 경고를 회수(retractedAt), 그 외 → 미달이면 경고를 새로 붙이거나 회수했던 것을 되살린다.
      * 경고 수 · 벌칙은 replay가 다시 계산한다 (이행 체크 고정점도 replay가 지킨다).
      */
     correctJudgment: (_: unknown, { input }: MutationCorrectJudgmentArgs, ctx: MockContext) => {
       const viewer = requireViewer(ctx);
-      assertBasis(input.expectedBasis);
       const j = findJudgment(input.judgmentId);
       if (!j || !isJudgmentVisible(j, ctx.clock)) throw gqlError('NOT_FOUND');
-      if (j.status === 'HOLD') throw gqlError('JUDGMENT_NOT_CORRECTABLE');
+      if (input.expectedStatus && input.expectedStatus !== j.status) throw gqlError('JUDGMENT_CHANGED');
       const reason = input.reason.trim();
-      if (reason.length < 1 || reason.length > CORRECTION_REASON_MAX) throw invalid('reason');
+      if (reason.length < 1) throw gqlError('REASON_REQUIRED');
+      if (reason.length > CORRECTION_REASON_MAX) throw gqlError('INVALID_INPUT');
       const before = j.status;
-      const after = input.newStatus;
-      if (after === before) throw invalid('newStatus', 'mock: same status');
+      const after = input.status;
+      assertCorrectable(j, after);
 
       const now = ctx.clock.now;
       const w = warningOfJudgment(j);
@@ -369,17 +393,27 @@ export const adminResolvers: Resolvers = {
         correctedAt: now,
       });
       touch();
-      return recalcPayloadView(ctx, j.memberId, j);
+      const r = replayWarnings(j.memberId, ctx.clock);
+      const onHold = visibleJudgments(ctx.clock, j.memberId).some((x) => x.status === 'HOLD');
+      return {
+        judgmentId: j.id,
+        member: memberBriefView(j.memberId),
+        weekStart: j.weekStart,
+        status: j.status,
+        onHold,
+        warningCount: onHold ? null : r.activeCount,
+        penaltyTarget: r.isPenaltyTarget,
+      };
     },
-
-    // --- 경고 · 벌칙 ---
 
     /** AD-01 ②-1 ⑥ 이행 완료 — 되돌릴 수 없는 고정점(E-58). 이번 주부터 경고 0 · 연속 0 [Q-10 ⓓ 추측] */
     fulfillPenalty: (_: unknown, { memberId }: MutationFulfillPenaltyArgs, ctx: MockContext) => {
       const viewer = requireViewer(ctx);
       const m = findMember(memberId);
-      // 벌칙 대상이 아니면(이미 이행 처리됨 · 정정으로 해제됨) 처리할 것이 없다
-      if (!m || m.status !== 'ACTIVE' || !replayWarnings(m.id, ctx.clock).isPenaltyTarget) throw gqlError('NOT_FOUND');
+      if (!m) throw gqlError('NOT_FOUND');
+      const r = replayWarnings(m.id, ctx.clock);
+      // 벌칙 대상이 아니면(이미 이행 처리됨 · 정정으로 해제됨) NOT_PENALTY_TARGET
+      if (m.status !== 'ACTIVE' || !r.isPenaltyTarget) throw gqlError('NOT_PENALTY_TARGET');
       db.penaltyFulfillments.push({
         id: nextId('penaltyFulfillments'),
         memberId: m.id,
@@ -388,21 +422,40 @@ export const adminResolvers: Resolvers = {
         fulfilledById: viewer.id,
       });
       touch();
-      return recalcPayloadView(ctx, m.id);
+      return {
+        member: memberBriefView(m.id),
+        fulfilledAt: ctx.clock.now,
+        reachedWeek: r.reachedWeekStart ?? ctx.clock.currentWeekStart,
+      };
     },
 
     /** AD-01 ②-1 ⑧ 복구 (E-42 · E-43 · E-59). 삭제 표시를 풀고 살아 있는 원래 팀을 다시 붙인다(없으면 '삭제된 팀') */
-    restoreWarning: (_: unknown, { warningId, expectedBasis }: MutationRestoreWarningArgs, ctx: MockContext) => {
+    restoreWarning: (_: unknown, { warningId }: MutationRestoreWarningArgs, ctx: MockContext) => {
       requireViewer(ctx);
-      assertBasis(expectedBasis);
-      const w = findWarning(warningId);
-      if (!w || !w.deleted || w.retractedAt) throw gqlError('NOT_FOUND');
+      const w = restorableWarning(warningId);
       const j = w.judgmentId ? findJudgment(w.judgmentId) : undefined;
       if (j && !isJudgmentVisible(j, ctx.clock)) throw gqlError('NOT_FOUND');
       w.deleted = null;
       w.teamIds = w.originalTeamIds.filter((t) => !!liveTeam(t));
       touch();
-      return recalcPayloadView(ctx, w.memberId, j ?? null);
+      const r = replayWarnings(w.memberId, ctx.clock);
+      const onHold = visibleJudgments(ctx.clock, w.memberId).some((x) => x.status === 'HOLD');
+      return {
+        warningId: w.id,
+        member: memberBriefView(w.memberId),
+        weekStart: w.weekStart,
+        onHold,
+        warningCount: onHold ? null : r.activeCount,
+        penaltyTarget: r.isPenaltyTarget,
+      };
     },
   },
 };
+
+/** 복구할 경고: 없거나 회수됐으면 NOT_FOUND, 이미 복구됐으면(삭제 표시 없음) ALREADY_HANDLED */
+function restorableWarning(warningId: Id): WarningRow {
+  const w = findWarning(warningId);
+  if (!w || w.retractedAt) throw gqlError('NOT_FOUND');
+  if (!w.deleted) throw gqlError('ALREADY_HANDLED');
+  return w;
+}

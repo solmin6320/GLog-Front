@@ -2,7 +2,7 @@ import { InMemoryCache } from '@apollo/client';
 import { parse } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import { createTypePolicies } from './client';
-import { itemsPage, nodesConnection, toPaged } from './pagination';
+import { itemsPage, toPaged } from './pagination';
 
 const Notices = parse(`
   query Notices($after: String) {
@@ -40,16 +40,5 @@ describe('itemsPage (백엔드 { items, nextCursor })', () => {
     expect(merge({ items: [1] }, { items: [2] }, { args: null }).items).toEqual([2]);
     expect(toPaged({ items: [1], nextCursor: 'c' })).toEqual({ nodes: [1], pageInfo: { hasNextPage: true, endCursor: 'c' } });
     expect(toPaged({ items: [], nextCursor: null })?.pageInfo.hasNextPage).toBe(false);
-  });
-});
-
-describe('nodesConnection', () => {
-  it('merge 함수 단독', () => {
-    const policy = nodesConnection(['filter']);
-    expect(policy.keyArgs).toEqual(['filter']);
-    const merge = policy.merge as (e: unknown, i: unknown, o: { args: Record<string, unknown> | null }) => { nodes: unknown[] };
-    expect(merge(undefined, { nodes: [1] }, { args: { after: 'x' } }).nodes).toEqual([1]);
-    expect(merge({ nodes: [1] }, { nodes: [2] }, { args: { after: 'x' } }).nodes).toEqual([1, 2]);
-    expect(merge({ nodes: [1] }, { nodes: [2] }, { args: null }).nodes).toEqual([2]);
   });
 });

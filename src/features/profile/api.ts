@@ -65,13 +65,3 @@ export const ProfileHistoryQuery = graphql(`
     }
   }
 `);
-
-/** PR-02 ③ 기본 이미지로 되돌리기 ([저장] 때 보낸다). 업로드는 REST(uploadProfileImage) */
-export const ProfileResetImage = graphql(`
-  mutation ProfileResetImage {
-    resetProfileImage {
-      id
-      profileImageUrl
-    }
-  }
-`);

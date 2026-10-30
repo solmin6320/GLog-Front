@@ -136,13 +136,15 @@ describe('AD-01 ②-3 ⑥ 면제 기간 등록', () => {
     expect(mutations).toEqual([]);
   });
 
-  it('이미 면제 기간인 주는 그 자리에서 막힌다', async () => {
+  it('이미 면제 기간인 주는 등록이 EXEMPTION_PERIOD_DUPLICATE로 막히고 입력 단계에 알린다', async () => {
     const mutations = trackMutations();
     const { user } = renderRoute('/admin/exemptions');
     await ready();
     const dialog = await openRegister(user, '2026-10-19', '중복');
     expect(await within(dialog).findByText('이미 면제 기간으로 등록된 주간이에요.')).toBeInTheDocument();
-    expect(mutations).toEqual([]);
+    // 백엔드 미리보기는 중복을 보지 않아 등록 뮤테이션이 한 번 나가고 거절된다
+    expect(mutations).toEqual(['AdminExemptionsCreatePeriod']);
+    expect(db.exemptionPeriods.filter((e) => e.weekStart === '2026-10-19')).toHaveLength(1);
   });
 
   it('ACC-ADM-05: 판정이 끝난 주 → 영향 미리보기형이 먼저 뜬다. [이전] · [취소]면 뮤테이션 0건', async () => {
@@ -220,13 +222,14 @@ describe('AD-01 ②-3 ⑤ 면제 기간 삭제', () => {
     expect(mutations).toEqual(['AdminExemptionsDeletePeriod']);
   });
 
-  it('ACC-ADM-06: 판정이 끝난 주 → 영향 미리보기형. [취소]면 그대로', async () => {
+  it('ACC-ADM-06: 판정이 끝난 주 → 이미 면제로 바뀐 판정은 그대로라고 알린다(백엔드는 되돌리지 않는다). [취소]면 그대로', async () => {
     const mutations = trackMutations();
     const { user } = renderRoute('/admin/exemptions');
     await ready();
     await user.click(within(rowIn('전체 면제 기간', '2학기 개강 주간')).getByRole('button', { name: '삭제: 9/7 ~ 9/13 면제' }));
     const dialog = await screen.findByRole('dialog', { name: '면제 기간을 삭제할까요?' });
-    expect(await within(dialog).findByRole('region', { name: '재계산 미리보기' })).toBeInTheDocument();
+    expect(within(dialog).getByText('이미 면제로 바뀐 판정은 그대로 남아요.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('region', { name: '재계산 미리보기' })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: '취소' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(rowIn('전체 면제 기간', '2학기 개강 주간')).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { PromoteAdminButton } from '@/features/admin/members/PromoteAdminButton';
 import type { ProfileHistoryQueryQuery, ProfileQueryQuery } from '@/gql/graphql';
 import { useClock } from '@/session';
 import type { PagedList } from '@/shared/api';
@@ -57,7 +58,7 @@ function SectionError({ message, onRetry }: { message: string; onRetry: () => vo
   );
 }
 
-/** ①~⑤ 사진 · 닉네임 · GitHub · [프로필 수정](본인) · [관리자 메뉴](본인 + 관리자) */
+/** ①~⑤ 사진 · 닉네임 · GitHub · [프로필 수정](본인) · [관리자 메뉴](본인 + 관리자) · [관리자로 지정](남 + 관리자) */
 export function ProfileHeader({ member, isOwn, isAdmin }: { member: Member; isOwn: boolean; isAdmin: boolean }) {
   return (
     <div className={s.head}>
@@ -84,6 +85,10 @@ export function ProfileHeader({ member, isOwn, isAdmin }: { member: Member; isOw
                 {PROFILE_COPY.adminMenu}
               </LinkButton>
             ) : null}
+          </div>
+        ) : isAdmin ? (
+          <div className={s.actions}>
+            <PromoteAdminButton memberId={member.id} nickname={member.nickname} />
           </div>
         ) : null}
       </div>

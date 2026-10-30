@@ -8,7 +8,7 @@
  * 이 파일은 순수 데이터다 — 다른 목 모듈(derive · clock)을 import하지 않는다.
  */
 import { addDays, kstIso, weekDates } from '@/shared/lib/kst';
-import type { PostType, SkipReason } from '../__generated__/schema-types';
+import type { PostType } from '../__generated__/schema-types';
 import { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';
 import type {
   CommentRow,
@@ -24,6 +24,7 @@ import type {
   PersonalExemptionRow,
   PostRow,
   PostSectionKey,
+  SkipReason,
   TeamRow,
   WarningRow,
 } from './store';

@@ -15,6 +15,13 @@ export type ErrorCode =
   | 'POST_DELETED'
   | 'AUTH_CODE_INVALID'
   | 'VALIDATION_FAILED'
+  | 'CONFLICT'
+  | 'JUDGMENT_CHANGED'
+  | 'ALREADY_HANDLED'
+  | 'NOT_PENALTY_TARGET'
+  | 'EXEMPTION_PERIOD_DUPLICATE'
+  | 'REASON_REQUIRED'
+  | 'REJECT_REASON_REQUIRED'
   | 'INVALID_INPUT'
   | 'TITLE_REQUIRED'
   | 'INVALID_COMMIT_URL'
@@ -40,12 +47,9 @@ export type ErrorCode =
   | 'TEAM_MEMBER_NOT_FOUND'
   | 'LEADER_MUST_TRANSFER'
   | 'LEADER_LAST_MEMBER'
-  | 'EXEMPTION_DUPLICATE'
   | 'EXEMPTION_REQUEST_DUPLICATE'
   | 'JUDGMENT_NOT_CORRECTABLE'
   | 'SYSTEM_NOTICE_UNDELETABLE'
-  | 'PREVIEW_STALE'
-  | 'RECALC_BUSY'
   | 'INTERNAL'
   | 'NETWORK';
 
@@ -66,6 +70,13 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   TEAM_GONE: 'notFound',
   TEAM_MEMBER_NOT_FOUND: 'notFound',
   VALIDATION_FAILED: 'validation',
+  CONFLICT: 'validation',
+  JUDGMENT_CHANGED: 'conflict',
+  ALREADY_HANDLED: 'conflict',
+  NOT_PENALTY_TARGET: 'conflict',
+  EXEMPTION_PERIOD_DUPLICATE: 'validation',
+  REASON_REQUIRED: 'validation',
+  REJECT_REASON_REQUIRED: 'validation',
   INVALID_INPUT: 'validation',
   TITLE_REQUIRED: 'validation',
   INVALID_COMMIT_URL: 'validation',
@@ -88,12 +99,9 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   INVITATION_ALREADY_JOINED: 'validation',
   LEADER_MUST_TRANSFER: 'validation',
   LEADER_LAST_MEMBER: 'validation',
-  EXEMPTION_DUPLICATE: 'validation',
   EXEMPTION_REQUEST_DUPLICATE: 'validation',
   JUDGMENT_NOT_CORRECTABLE: 'validation',
   SYSTEM_NOTICE_UNDELETABLE: 'validation',
-  PREVIEW_STALE: 'conflict',
-  RECALC_BUSY: 'server',
   INTERNAL: 'server',
   NETWORK: 'network',
 };

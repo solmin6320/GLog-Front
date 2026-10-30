@@ -7,22 +7,17 @@
  */
 import { addDays, kstDateOf } from '@/shared/lib/kst';
 import type {
-  ContentKind,
-  MemberJudgmentHistoryArgs,
   PostCommentsArgs,
   PostType,
 } from './__generated__/schema-types';
 import { grassUpdatedAt } from './clock';
 import {
-  adminTeamLabel,
   allVisibleComments,
   byNewest,
   currentWeekDays,
   exemptionPeriodOn,
-  grassCalendarData,
   grassStatusOf,
   isRecord,
-  isRetroactiveWeek,
   judgmentHasActiveWarning,
   liveWeek,
   publicTeamOf,
@@ -33,7 +28,6 @@ import {
   visibleComments,
   visibleJudgments,
   visiblePosts,
-  warningState,
   weekActivity,
   writtenDateOf,
   type RecalcPreviewData,
@@ -48,7 +42,6 @@ import {
   isTeamLeader,
   membershipOf,
   membershipsOfTeam,
-  teamsOfMember,
   type CommentRow,
   type ExemptionPeriodRow,
   type Id,
@@ -176,29 +169,10 @@ function memberRow(m: MemberRow | Id): MemberRow {
   return row;
 }
 
-export function memberView(ctx: MockContext, m: MemberRow | Id) {
+/** 글 · 댓글 작성자 (BoardAuthor) */
+export function memberView(_ctx: MockContext, m: MemberRow | Id) {
   const row = memberRow(m);
-  const { clock } = ctx;
-  return {
-    __typename: 'Member' as const,
-    id: row.id,
-    nickname: row.nickname,
-    githubLogin: row.githubLogin,
-    profileImageUrl: row.profileImageUrl,
-    postCount: () => visiblePosts(clock).filter((p) => p.authorId === row.id).length,
-    commentCount: () => allVisibleComments(clock).filter((c) => c.authorId === row.id).length,
-    grassCalendar: () => grassCalendarData(row.id, viewerId(ctx), clock),
-    warningState: () => warningStateView(warningState(row.id, clock)),
-    currentWeek: () => (teamsOfMember(row.id).length > 0 ? weekActivityView(ctx, row.id, clock.currentWeekStart) : null),
-    judgmentHistory: (args: MemberJudgmentHistoryArgs) =>
-      paginate(
-        visibleJudgments(clock, row.id).reverse(),
-        args,
-        (j) => judgmentView(ctx, j),
-        8,
-      ),
-    publicTeams: () => teamsOfMember(row.id).filter((t) => t.isPublic).map((t) => teamView(ctx, t)),
-  };
+  return { id: row.id, nickname: row.nickname, githubLogin: row.githubLogin, profileImageUrl: row.profileImageUrl };
 }
 
 export function meView(_ctx: MockContext, m: MemberRow) {
@@ -372,16 +346,18 @@ export function sentInvitationView(ctx: MockContext, i: InvitationRow) {
   return { id: i.id, invitee: teamPersonView(ctx, i.inviteeId), createdAt: i.createdAt };
 }
 
-/** 백엔드 PersonalExemption (TM-08). 팀 이름은 싣지 않는다 */
-export function teamPersonalExemptionView(_ctx: MockContext, e: PersonalExemptionRow) {
-  const brief = (id: Id) => {
-    const m = memberRow(id);
-    return { id: m.id, nickname: m.nickname, githubLogin: m.githubLogin };
-  };
+/** 관리자 목록에 붙는 회원 표시 (AdminMemberBrief) */
+export function memberBriefView(id: Id) {
+  const m = memberRow(id);
+  return { id: m.id, nickname: m.nickname, githubLogin: m.githubLogin };
+}
+
+/** 백엔드 PersonalExemption (TM-08 · AD-01 ②-3). 팀 이름은 싣지 않는다 */
+export function personalExemptionView(e: PersonalExemptionRow) {
   return {
     id: e.id,
-    member: brief(e.memberId),
-    requester: brief(e.requestedById),
+    member: memberBriefView(e.memberId),
+    requester: memberBriefView(e.requestedById),
     weekStart: e.weekStart,
     weekEnd: addDays(e.weekStart, 6),
     status: e.status,
@@ -441,7 +417,7 @@ export function commentView(ctx: MockContext, c: CommentRow) {
 }
 
 /** 글 + 댓글 혼합 목록 원천 (AD-01 ②-5 · TM-06 ⑧), 최신순 */
-export type ContentItem = { kind: ContentKind; post: PostRow; comment: CommentRow | null; createdAt: string; id: string };
+export type ContentItem = { kind: 'POST' | 'COMMENT'; post: PostRow; comment: CommentRow | null; createdAt: string; id: string };
 
 export function contentItems(ctx: MockContext, o: { teamId?: Id; kind?: 'ALL' | 'POST' | 'COMMENT'; search?: string | null } = {}): ContentItem[] {
   const posts = visiblePosts(ctx.clock).filter((p) => !o.teamId || p.teamId === o.teamId);
@@ -468,15 +444,15 @@ export function contentItems(ctx: MockContext, o: { teamId?: Id; kind?: 'ALL' | 
   return filtered.sort(byNewest);
 }
 
-export function contentRowView(ctx: MockContext, it: ContentItem) {
-  const excerpt = (s: string) => (s.length > 40 ? `${s.slice(0, 40)}…` : s);
+/** 백엔드 AdminPostItem: 글이면 id = postId · content null, 댓글이면 title = 글 제목 · content = 댓글 앞 100자 */
+export function adminPostItemView(it: ContentItem) {
   return {
     kind: it.kind,
-    targetId: it.comment?.id ?? it.post.id,
+    id: it.id,
     postId: it.post.id,
-    postType: it.post.type,
-    title: it.comment ? excerpt(it.comment.content) : it.post.title,
-    author: memberView(ctx, it.comment?.authorId ?? it.post.authorId),
+    title: it.post.title,
+    content: it.comment ? it.comment.content.slice(0, 100) : null,
+    author: memberBriefView(it.comment?.authorId ?? it.post.authorId),
     createdAt: it.createdAt,
   };
 }
@@ -501,7 +477,7 @@ export function noticeView(n: NoticeRow) {
 /* 면제                                                                  */
 /* ================================================================== */
 
-export function exemptionPeriodView(ctx: MockContext, e: ExemptionPeriodRow) {
+export function exemptionPeriodView(e: ExemptionPeriodRow) {
   return {
     id: e.id,
     weekStart: e.weekStart,
@@ -509,24 +485,6 @@ export function exemptionPeriodView(ctx: MockContext, e: ExemptionPeriodRow) {
     reason: e.reason,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
-    isPast: isRetroactiveWeek(e.weekStart, ctx.clock),
-  };
-}
-
-export function personalExemptionView(ctx: MockContext, e: PersonalExemptionRow) {
-  return {
-    id: e.id,
-    member: () => memberView(ctx, e.memberId),
-    requestedBy: () => memberView(ctx, e.requestedById),
-    weekStart: e.weekStart,
-    weekEnd: addDays(e.weekStart, 6),
-    reason: e.reason,
-    status: e.status,
-    rejectReason: e.rejectReason,
-    createdAt: e.createdAt,
-    respondedAt: e.respondedAt,
-    overlapsExemptionPeriod: !!exemptionPeriodOn(e.weekStart),
-    isRetroactive: isRetroactiveWeek(e.weekStart, ctx.clock),
   };
 }
 
@@ -534,66 +492,71 @@ export function personalExemptionView(ctx: MockContext, e: PersonalExemptionRow)
 /* 관리자                                                                */
 /* ================================================================== */
 
+/** 보류 주가 남아 있으면 경고 수를 정하지 않는다 (백엔드 warningCount null · impact.onHold) */
+const hasHold = (ctx: MockContext, memberId: Id) => visibleJudgments(ctx.clock, memberId).some((j) => j.status === 'HOLD');
+
 export function adminJudgmentRowView(ctx: MockContext, j: JudgmentRow) {
-  const r = replayWarnings(j.memberId, ctx.clock);
   return {
-    judgment: judgmentView(ctx, j),
-    member: memberView(ctx, j.memberId),
-    activeWarningCount: r.activeCount,
-    isPenaltyTarget: r.isPenaltyTarget,
-    canRetry: j.status === 'HOLD' && j.holdReason === 'API_ERROR',
-    canCorrect: j.status !== 'HOLD',
+    judgmentId: j.id,
+    member: memberBriefView(j.memberId),
+    status: j.status,
+    skipReason: j.skipReason,
+    holdReason: j.holdReason,
+    verifiedDays: j.verifiedDays,
+    recordCount: j.recordCount,
+    warningCount: hasHold(ctx, j.memberId) ? null : replayWarnings(j.memberId, ctx.clock).activeCount,
+    corrected: j.corrected,
+    manualHold: j.status === 'HOLD',
   };
 }
 
-export function recalcPreviewView(ctx: MockContext, d: RecalcPreviewData) {
+/** AdminRecalcImpact */
+export function impactView(ctx: MockContext, d: RecalcPreviewData) {
+  const onHold = hasHold(ctx, d.memberId);
   return {
-    member: memberView(ctx, d.memberId),
-    warningCountBefore: d.warningCountBefore,
-    warningCountAfter: d.warningCountAfter,
-    penaltyChange: d.penaltyChange,
-    affectedWeekCount: d.affectedWeekCount,
-    frozenByFulfillment: d.frozenByFulfillment,
-    restoresWithoutCategory: d.restoresWithoutCategory,
-    basis: d.basis,
+    onHold,
+    warningCountBefore: onHold ? null : d.warningCountBefore,
+    warningCountAfter: onHold ? null : d.warningCountAfter,
+    entersPenalty: d.penaltyChange === 'ENTER',
+    leavesPenalty: d.penaltyChange === 'RELEASE',
+    recordOnly: d.frozenByFulfillment,
+    affectedWeeks: d.affectedWeekCount,
   };
 }
 
-/** 뮤테이션 결과 RecalcPayload */
-export function recalcPayloadView(ctx: MockContext, memberId: Id, judgment?: JudgmentRow | null) {
-  return {
-    member: memberView(ctx, memberId),
-    warningState: warningStateView(warningState(memberId, ctx.clock)),
-    judgment: judgment ? judgmentView(ctx, judgment) : null,
-  };
-}
+/** 살아 있는 팀만 실명으로 (AdminWarningTeam) */
+const liveTeamsView = (teamIds: Id[]) =>
+  teamIds.flatMap((id) => {
+    const t = findTeam(id);
+    return t && !t.deletedAt ? [{ id: t.id, name: t.name }] : [];
+  });
 
 export function penaltyTargetView(ctx: MockContext, memberId: Id) {
   const r = replayWarnings(memberId, ctx.clock);
   const teamIds = [...new Set(r.active.flatMap((a) => a.teamIds))].sort((a, b) => Number(a) - Number(b));
   return {
-    member: memberView(ctx, memberId),
-    activeWarningCount: r.activeCount,
-    reachedWeekStart: r.reachedWeekStart ?? ctx.clock.currentWeekStart,
-    reachedAt: r.reachedAt,
-    teams: teamIds.map(adminTeamLabel),
+    member: memberBriefView(memberId),
+    warningCount: r.activeCount,
+    reachedWeek: r.reachedWeekStart ?? ctx.clock.currentWeekStart,
+    teams: liveTeamsView(teamIds),
   };
 }
 
 export function deletedWarningView(ctx: MockContext, w: WarningRow) {
+  const restoreTeams = liveTeamsView(w.originalTeamIds);
   return {
-    id: w.id,
-    member: memberView(ctx, w.memberId),
+    warningId: w.id,
+    member: memberBriefView(w.memberId),
     weekStart: w.weekStart,
-    weekEnd: addDays(w.weekStart, 6),
     deleteReason: w.deleted?.reason ?? 'KICKED',
     deletedAt: w.deleted?.at ?? ctx.clock.now,
-    restoreCategories: w.originalTeamIds.map(adminTeamLabel),
+    restoreTeams,
+    teamDeleted: restoreTeams.length === 0,
   };
 }
 
-export function adminMemberRowView(ctx: MockContext, m: MemberRow) {
-  return { member: memberView(ctx, m), status: m.status, appliedAt: m.createdAt };
+export function adminMemberView(m: MemberRow) {
+  return { id: m.id, githubLogin: m.githubLogin, nickname: m.nickname, status: m.status, role: m.role, createdAt: m.createdAt };
 }
 
 /** 'YYYY-MM-DD' 날짜가 now 기준 미래 주인가 */

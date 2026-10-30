@@ -1,9 +1,9 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { useNavigate, useSearchParams } from 'react-router';
-import type { AdminMemberFilter, AdminMembersQueryQuery, MemberStatus } from '@/gql/graphql';
+import type { AdminMembersQueryQuery, MemberApprovalFilter, MemberStatus } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { DEFAULT_PAGE_SIZE, useAction, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, useAction, usePagedList } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
 import { paths, parseAdminMembersSearch, SEARCH_MAX, type AdminMemberStatusParam } from '@/shared/lib/paths';
 import {
@@ -33,9 +33,9 @@ import {
 import { applyMemberStatus } from './cache';
 import s from './Members.module.css';
 
-type Row = AdminMembersQueryQuery['adminMembers']['nodes'][number];
+type Row = AdminMembersQueryQuery['adminMembers']['items'][number];
 
-const FILTER: Record<AdminMemberStatusParam, AdminMemberFilter> = { pending: 'PENDING', rejected: 'REJECTED', all: 'ALL' };
+const FILTER: Record<AdminMemberStatusParam, MemberApprovalFilter> = { pending: 'PENDING', rejected: 'REJECTED', all: 'ALL' };
 
 const STATUS_OPTIONS: { value: AdminMemberStatusParam; label: string }[] = [
   { value: 'pending', label: '승인 대기' },
@@ -65,14 +65,14 @@ export function MembersTab() {
   const go = (next: { status: AdminMemberStatusParam; q?: string }) => navigate(paths.adminMembers(next));
 
   const list = usePagedList(AdminMembersQuery, {
-    variables: { filter: FILTER[status], search: q ?? null },
-    select: (d) => d.adminMembers,
+    variables: { status: FILTER[status], keyword: q ?? null },
+    select: (d) => toPaged(d.adminMembers),
   });
-  const pending = useQuery(AdminMembersSummaryQuery).data?.adminDashboardSummary.pendingMemberCount;
+  const pending = useQuery(AdminMembersSummaryQuery).data?.adminDashboardSummary.pendingMembers;
 
   const columns: Column<Row>[] = [
     { key: 'member', header: '회원', render: (r) => <MemberCell row={r} /> },
-    { key: 'applied', header: '신청', render: (r) => <span className={s.applied}>{formatDateTime(r.appliedAt)}</span> },
+    { key: 'applied', header: '신청', render: (r) => <span className={s.applied}>{formatDateTime(r.createdAt)}</span> },
     { key: 'status', header: '상태', render: (r) => <StatusBadge kind="memberStatus" status={r.status} /> },
     { key: 'actions', header: '처리', align: 'right', render: (r) => <MemberActions row={r} /> },
   ];
@@ -128,7 +128,7 @@ export function MembersTab() {
           ) : (
             <>
               <div className={s.table}>
-                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => r.member.id} caption="가입 신청 회원" />
+                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => r.id} caption="가입 신청 회원" />
               </div>
               <LoadMore
                 hasMore={list.hasMore}
@@ -170,12 +170,11 @@ function MemberSearch({ q, onSearch }: { q: string | undefined; onSearch: (q: st
   );
 }
 
-/** ⑥ "{닉네임} @{githubLogin}" — 아이디는 새 탭으로 GitHub 프로필 */
-function MemberCell({ row }: { row: Row }) {
-  const { member } = row;
+/** ⑥ "{닉네임} @{githubLogin}" — 아이디는 새 탭으로 GitHub 프로필. 백엔드 목록에 사진이 없어 이름 아바타만 */
+function MemberCell({ row: member }: { row: Row }) {
   return (
     <span className={s.member}>
-      <Avatar name={member.nickname} imageUrl={member.profileImageUrl} size={28} />
+      <Avatar name={member.nickname} size={28} />
       <span className={s.nick}>{member.nickname}</span>
       <a className={s.gh} href={`https://github.com/${encodeURIComponent(member.githubLogin)}`} target="_blank" rel="noopener noreferrer">
         @{member.githubLogin}
@@ -192,14 +191,9 @@ function MemberActions({ row }: { row: Row }) {
   const [approveMutation] = useMutation(AdminMembersApprove);
   const [rejectMutation] = useMutation(AdminMembersReject);
   const [revertMutation] = useMutation(AdminMembersRevert);
-  const { member } = row;
+  const member = row;
   const memberId = member.id;
-  const optimistic = (status: MemberStatus) => ({
-    __typename: 'AdminMemberRow' as const,
-    member: { ...member, __typename: 'Member' as const },
-    status,
-    appliedAt: row.appliedAt,
-  });
+  const optimistic = (status: MemberStatus) => ({ ...row, __typename: 'AdminMember' as const, status });
 
   const approve = useAction(
     () =>
@@ -207,7 +201,7 @@ function MemberActions({ row }: { row: Row }) {
         variables: { memberId },
         optimisticResponse: { approveMember: optimistic('ACTIVE') },
         update: (cache, { data }) => {
-          if (data) applyMemberStatus(cache, data.approveMember.member.id, data.approveMember.status);
+          if (data) applyMemberStatus(cache, data.approveMember.id, data.approveMember.status);
         },
         refetchQueries: [ADMIN_COUNTS_QUERY],
       }),
@@ -219,7 +213,7 @@ function MemberActions({ row }: { row: Row }) {
         variables: { memberId },
         optimisticResponse: { rejectMember: optimistic('REJECTED') },
         update: (cache, { data }) => {
-          if (data) applyMemberStatus(cache, data.rejectMember.member.id, data.rejectMember.status);
+          if (data) applyMemberStatus(cache, data.rejectMember.id, data.rejectMember.status);
         },
         refetchQueries: [ADMIN_COUNTS_QUERY],
       }),
@@ -231,7 +225,7 @@ function MemberActions({ row }: { row: Row }) {
         variables: { memberId },
         optimisticResponse: { revertMemberToPending: optimistic('PENDING') },
         update: (cache, { data }) => {
-          if (data) applyMemberStatus(cache, data.revertMemberToPending.member.id, data.revertMemberToPending.status);
+          if (data) applyMemberStatus(cache, data.revertMemberToPending.id, data.revertMemberToPending.status);
         },
         refetchQueries: [ADMIN_COUNTS_QUERY],
       }),

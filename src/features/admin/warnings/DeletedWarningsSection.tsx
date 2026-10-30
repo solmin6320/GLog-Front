@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, usePagedList } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import { Avatar, Button, DataTable, Foot, LoadMore, QueryBoundary, SectionHeader, TableSkeleton, type Column } from '@/shared/ui';
@@ -17,7 +17,7 @@ const NO_VARS = {};
  * 정정 · 소급 면제로 회수된 경고는 서버가 보내지 않는다 — 각주로 알린다.
  */
 export function DeletedWarningsSection() {
-  const list = usePagedList(AdminWarningsDeletedQuery, { variables: NO_VARS, select: (d) => d.deletedWarnings });
+  const list = usePagedList(AdminWarningsDeletedQuery, { variables: NO_VARS, select: (d) => toPaged(d.adminDeletedWarnings) });
   const [restoring, setRestoring] = useState<DeletedWarningRow | null>(null);
 
   const columns: Column<DeletedWarningRow>[] = [
@@ -26,14 +26,14 @@ export function DeletedWarningsSection() {
       header: '회원',
       render: (w) => (
         <Link to={paths.profile(w.member.id)} className={s.member}>
-          <Avatar name={w.member.nickname} imageUrl={w.member.profileImageUrl} size={32} />
+          <Avatar name={w.member.nickname} size={32} />
           <span className={s.memberName}>{w.member.nickname}</span>
         </Link>
       ),
     },
     { key: 'week', header: '부여 주차', render: (w) => <span className={s.nowrap}>{formatWeekRange(w.weekStart)}</span> },
     { key: 'reason', header: '삭제 사유', render: (w) => DELETE_REASON_LABEL[w.deleteReason] },
-    { key: 'category', header: '복구 후 카테고리', render: (w) => <TeamNames teams={w.restoreCategories} emptyText={COPY.deletedTeam} /> },
+    { key: 'category', header: '복구 후 카테고리', render: (w) => <TeamNames teams={w.restoreTeams} emptyText={COPY.deletedTeam} /> },
     {
       key: 'action',
       header: '처리',
@@ -52,7 +52,7 @@ export function DeletedWarningsSection() {
       <QueryBoundary
         loading={list.loading}
         error={list.error}
-        data={list.data?.deletedWarnings}
+        data={list.data?.adminDeletedWarnings}
         skeleton={<TableSkeleton rows={2} cols={5} />}
         onRetry={list.refetch}
       >
@@ -63,7 +63,7 @@ export function DeletedWarningsSection() {
                 caption="삭제된 경고"
                 columns={columns}
                 rows={list.nodes}
-                rowKey={(w) => w.id}
+                rowKey={(w) => w.warningId}
                 empty={COPY.emptyDeleted}
                 footer={<Foot>{COPY.retractedNote}</Foot>}
               />

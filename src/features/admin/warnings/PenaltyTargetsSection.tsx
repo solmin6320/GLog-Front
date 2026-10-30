@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client/react';
+import { useMutation } from '@apollo/client/react';
 import { Link } from 'react-router';
-import { useAction } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, useAction, usePagedList } from '@/shared/api';
 import { paths } from '@/shared/lib/paths';
 import {
   Avatar,
   Button,
   DataTable,
   Foot,
+  LoadMore,
   QueryBoundary,
   SectionHeader,
   StatusBadge,
@@ -24,8 +25,10 @@ import s from './Warnings.module.css';
  * ②-1 ⑤ 벌칙 대상 + ⑥ [이행 완료] (W-16 · ACC-PEN-01 · 03 · 04 · 10).
  * 이행 완료는 되돌릴 수 없는 고정점(E-58) — 단순 확인형을 거치고, 되돌리는 버튼은 두지 않는다.
  */
+const NO_VARS = {};
+
 export function PenaltyTargetsSection() {
-  const q = useQuery(AdminWarningsPenaltyTargetsQuery);
+  const list = usePagedList(AdminWarningsPenaltyTargetsQuery, { variables: NO_VARS, select: (d) => toPaged(d.adminPenaltyTargets) });
   const confirm = useConfirm();
   const [fulfill] = useMutation(AdminWarningsFulfillPenalty);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -33,9 +36,9 @@ export function PenaltyTargetsSection() {
     (memberId: string) => fulfill({ variables: { memberId }, refetchQueries: warningsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.fulfilled,
-      errorOverrides: { NOT_FOUND: COPY.fulfillGone },
+      errorOverrides: { NOT_FOUND: COPY.fulfillGone, NOT_PENALTY_TARGET: COPY.fulfillGone },
       onError: (e) => {
-        if (e.code === 'NOT_FOUND') q.refetch().catch(() => undefined);
+        if (e.code === 'NOT_FOUND' || e.code === 'NOT_PENALTY_TARGET') list.refetch();
       },
     },
   );
@@ -61,7 +64,7 @@ export function PenaltyTargetsSection() {
       header: '회원',
       render: (t) => (
         <Link to={paths.profile(t.member.id)} className={s.member}>
-          <Avatar name={t.member.nickname} imageUrl={t.member.profileImageUrl} size={32} />
+          <Avatar name={t.member.nickname} size={32} />
           <span className={s.memberName}>{t.member.nickname}</span>
         </Link>
       ),
@@ -71,7 +74,7 @@ export function PenaltyTargetsSection() {
       header: '경고',
       render: (t) => (
         <span className={s.warn}>
-          {t.activeWarningCount}
+          {t.warningCount}
           <StatusBadge kind="penalty" />
         </span>
       ),
@@ -96,28 +99,41 @@ export function PenaltyTargetsSection() {
     },
   ];
 
-  const targets = q.data?.penaltyTargets;
   return (
     <section className={s.section} aria-labelledby="admin-penalty-title">
-      <SectionHeader as="h3" id="admin-penalty-title" title="벌칙 대상" right={targets ? `${targets.length}명` : null} />
+      <SectionHeader
+        as="h3"
+        id="admin-penalty-title"
+        title="벌칙 대상"
+        right={list.totalCount != null ? `${list.totalCount}명` : null}
+      />
       <QueryBoundary
-        loading={q.loading}
-        error={q.error}
-        data={targets}
+        loading={list.loading}
+        error={list.error}
+        data={list.data?.adminPenaltyTargets}
         skeleton={<TableSkeleton rows={2} cols={5} />}
-        onRetry={() => q.refetch().catch(() => undefined)}
+        onRetry={list.refetch}
       >
-        {(rows) => (
-          <div className={s.stickyEnds}>
-            <DataTable
-              caption="벌칙 대상"
-              columns={columns}
-              rows={rows}
-              rowKey={(t) => t.member.id}
-              empty={COPY.emptyPenalty}
-              footer={<Foot>{COPY.privateNote}</Foot>}
+        {() => (
+          <>
+            <div className={s.stickyEnds}>
+              <DataTable
+                caption="벌칙 대상"
+                columns={columns}
+                rows={list.nodes}
+                rowKey={(t) => t.member.id}
+                empty={COPY.emptyPenalty}
+                footer={<Foot>{COPY.privateNote}</Foot>}
+              />
+            </div>
+            <LoadMore
+              hasMore={list.hasMore}
+              loading={list.loadingMore}
+              error={list.loadMoreError}
+              onLoadMore={list.loadMore}
+              endText={list.nodes.length > DEFAULT_PAGE_SIZE ? undefined : null}
             />
-          </div>
+          </>
         )}
       </QueryBoundary>
     </section>

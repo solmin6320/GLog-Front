@@ -3,9 +3,9 @@ import type { ApolloCache } from '@apollo/client';
 import { useMutation } from '@apollo/client/react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { MSG } from '@/domain/messages';
-import type { AdminContentFilter, AdminPostsQueryQuery } from '@/gql/graphql';
+import type { AdminPostFilter, AdminPostsQueryQuery } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { DEFAULT_PAGE_SIZE, useAction, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, useAction, usePagedList } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
 import { paths, parseAdminPostsSearch, SEARCH_MAX, type AdminPostKindParam } from '@/shared/lib/paths';
 import {
@@ -24,9 +24,9 @@ import {
 import { AdminPostsDeleteComment, AdminPostsDeletePost, AdminPostsQuery } from './api';
 import s from './Posts.module.css';
 
-type Row = AdminPostsQueryQuery['adminContents']['nodes'][number];
+type Row = AdminPostsQueryQuery['adminPosts']['items'][number];
 
-const FILTER: Record<AdminPostKindParam, AdminContentFilter> = { all: 'ALL', post: 'POST', comment: 'COMMENT' };
+const FILTER: Record<AdminPostKindParam, AdminPostFilter> = { all: 'ALL', post: 'POSTS', comment: 'COMMENTS' };
 
 const KIND_OPTIONS: { value: AdminPostKindParam; label: string }[] = [
   { value: 'all', label: '글 + 댓글' },
@@ -52,8 +52,8 @@ export function PostsTab() {
   const go = (next: { kind: AdminPostKindParam; q?: string }) => navigate(paths.adminPosts(next));
 
   const list = usePagedList(AdminPostsQuery, {
-    variables: { filter: FILTER[kind], search: q ?? null },
-    select: (d) => d.adminContents,
+    variables: { filter: FILTER[kind], keyword: q ?? null },
+    select: (d) => toPaged(d.adminPosts),
   });
 
   const columns: Column<Row>[] = [
@@ -61,9 +61,10 @@ export function PostsTab() {
     {
       key: 'title',
       header: '제목',
+      // 댓글은 댓글 앞부분을 보이고, 글 제목은 툴팁으로
       render: (r) => (
         <Link to={paths.post(r.postId)} className={s.titleLink} title={r.title}>
-          {r.title}
+          {r.content ?? r.title}
         </Link>
       ),
     },
@@ -94,7 +95,6 @@ export function PostsTab() {
             }}
           />
         </div>
-        {list.totalCount != null ? <span className={s.count}>{list.totalCount}건</span> : null}
       </div>
 
       <QueryBoundary
@@ -122,7 +122,7 @@ export function PostsTab() {
           ) : (
             <>
               <div className={s.table}>
-                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => `${r.kind}:${r.targetId}`} caption="글과 댓글" />
+                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => `${r.kind}:${r.id}`} caption="글과 댓글" />
               </div>
               <LoadMore
                 hasMore={list.hasMore}
@@ -164,7 +164,7 @@ function ContentSearch({ q, onSearch }: { q: string | undefined; onSearch: (q: s
   );
 }
 
-/** ⑦ [삭제] → 단순 확인형(danger) → deletePost · deleteComment → 목록 재조회 + "삭제했어요." */
+/** ⑦ [삭제] → 단순 확인형(danger) → adminDeletePost · adminDeleteComment → 목록 재조회 + "삭제했어요." */
 function DeleteContent({ row }: { row: Row }) {
   const confirm = useConfirm();
   const [deletePost] = useMutation(AdminPostsDeletePost);
@@ -174,13 +174,13 @@ function DeleteContent({ row }: { row: Row }) {
 
   // 다른 화면(BD-03 · BD-01)이 지운 글 · 댓글을 캐시에서 다시 보여 주지 않게 한다
   const evict = (cache: ApolloCache) => {
-    const id = cache.identify({ __typename: isPost ? 'Post' : 'Comment', id: row.targetId });
+    const id = cache.identify({ __typename: isPost ? 'Post' : 'Comment', id: row.id });
     if (id) cache.evict({ id });
     cache.gc();
   };
   const remove = useAction(
     async () => {
-      const options = { variables: { id: row.targetId }, refetchQueries: [AdminPostsQuery], awaitRefetchQueries: true, update: evict };
+      const options = { variables: { id: row.id }, refetchQueries: [AdminPostsQuery], awaitRefetchQueries: true, update: evict };
       if (isPost) await deletePost(options);
       else await deleteComment(options);
     },
@@ -192,7 +192,7 @@ function DeleteContent({ row }: { row: Row }) {
       size="xs"
       variant="danger"
       loading={remove.pending}
-      aria-label={`${what} 삭제: ${row.title}`}
+      aria-label={`${what} 삭제: ${row.content ?? row.title}`}
       onClick={async () => {
         const ok = await confirm({
           title: `이 ${what}을 삭제할까요?`,

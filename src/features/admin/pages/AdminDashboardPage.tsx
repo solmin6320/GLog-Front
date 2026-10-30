@@ -5,12 +5,12 @@ import { AdminDashboardSummaryQuery, AdminDashboardWeekQuery } from '@/features/
 import { CorrectionPanel, type PanelTarget } from '@/features/admin/dashboard/CorrectionPanel';
 import { DashboardKpis } from '@/features/admin/dashboard/DashboardKpis';
 import { JudgmentResults } from '@/features/admin/dashboard/JudgmentResults';
-import { JUDGMENT_PAGE_SIZE, RESULT_FILTER, weekOptions, type HeldRow } from '@/features/admin/dashboard/model';
+import { RESULT_FILTER, weekOptions, type HeldRow } from '@/features/admin/dashboard/model';
 import { useRerunHeld } from '@/features/admin/dashboard/useRerunHeld';
 import s from '@/features/admin/dashboard/Dashboard.module.css';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useClock } from '@/session';
-import { usePagedList } from '@/shared/api';
+import { toPaged, usePagedList } from '@/shared/api';
 import { addDays } from '@/shared/lib/kst';
 import { parseAdminDashboardSearch, paths, type AdminResultParam } from '@/shared/lib/paths';
 import { Button, InfoBox, SectionHeader } from '@/shared/ui';
@@ -22,7 +22,7 @@ type FixState = { adminFixFromList?: boolean } | null;
 
 /**
  * AD-01 ②-0 관리자 대시보드 + 판정 정정 패널 + 보류 재시도 (`/admin?week=&q=&result=&fix=`, 목업 W-15).
- * URL이 유일한 상태다. week 생략 = 가장 최근 판정 주(M-07). AdminLayout(폭 1120) 안이라 PageContainer를 두지 않는다.
+ * URL이 유일한 상태다. week 생략 = 판정 주(직전 주, M-07). AdminLayout(폭 1120) 안이라 PageContainer를 두지 않는다.
  */
 export default function AdminDashboardPage() {
   useDocumentTitle('관리자 대시보드');
@@ -37,15 +37,15 @@ export default function AdminDashboardPage() {
 
   const summaryQ = useQuery(AdminDashboardSummaryQuery);
   const summary = summaryQ.data?.adminDashboardSummary;
-  const held = summaryQ.data?.heldJudgments ?? NO_HELD;
-  const latest = summary?.latestJudgedWeekStart ?? undefined;
+  const holds = summaryQ.data?.adminJudgmentHolds;
+  const held = holds?.items ?? NO_HELD;
+  const latest = summary?.judgedWeekStart ?? undefined;
 
   const list = usePagedList(AdminDashboardWeekQuery, {
-    variables: { weekStart: week, filter: RESULT_FILTER[result], search: q },
-    select: (d) => d.adminJudgmentWeek.rows,
-    pageSize: JUDGMENT_PAGE_SIZE,
+    variables: { weekStart: week, filter: RESULT_FILTER[result], keyword: q },
+    select: (d) => toPaged(d.adminJudgments),
   });
-  const shownWeek = week ?? list.data?.adminJudgmentWeek.weekStart ?? latest ?? addDays(clock.currentWeekStart, -7);
+  const shownWeek = week ?? list.data?.adminJudgments.weekStart ?? latest ?? addDays(clock.currentWeekStart, -7);
 
   const rerun = useRerunHeld();
 
@@ -71,7 +71,7 @@ export default function AdminDashboardPage() {
 
   /* ---------- 정정 대상 찾기 ---------- */
 
-  const row = fix ? list.nodes.find((r) => r.judgment.id === fix) : undefined;
+  const row = fix ? list.nodes.find((r) => r.judgmentId === fix) : undefined;
   // 새로고침 등으로 대상이 다음 페이지에 있으면 찾을 때까지 더 불러온다
   const needMore = !!fix && !row && list.hasMore && !list.loadingMore && !list.loadMoreError;
   const loadMore = list.loadMore;
@@ -80,8 +80,7 @@ export default function AdminDashboardPage() {
   }, [needMore, loadMore]);
 
   let target: PanelTarget = { kind: 'missing' };
-  if (row) target = { kind: 'row', row };
-  else if (fix && held.some((h) => h.judgment.id === fix)) target = { kind: 'held' };
+  if (row) target = row.status === 'HOLD' ? { kind: 'held' } : { kind: 'row', row, weekStart: shownWeek };
   else if (list.loading || list.loadingMore || needMore || (!list.data && !list.error)) target = { kind: 'loading' };
 
   // 패널을 닫으면 그 행의 [정정] 버튼으로 포커스를 돌려준다
@@ -109,7 +108,7 @@ export default function AdminDashboardPage() {
           </InfoBox>
         </div>
       ) : (
-        <DashboardKpis summary={summary} currentWeekStart={clock.currentWeekStart} />
+        <DashboardKpis summary={summary} heldCount={holds?.totalCount} currentWeekStart={clock.currentWeekStart} />
       )}
 
       <SectionHeader title="판정 결과" />
@@ -122,10 +121,12 @@ export default function AdminDashboardPage() {
             onChange={changeFilters}
             list={list}
             held={held}
+            heldTotal={holds?.totalCount ?? 0}
+            heldIdentityMismatch={holds?.identityMismatchCount ?? 0}
             fix={fix}
             onFix={openFix}
             running={rerun.running}
-            onRetryOne={(id) => void rerun.retryOne(id)}
+            onRetryOne={(memberId, weekStart) => void rerun.retryOne(memberId, weekStart)}
             onRetryAll={(n) => void rerun.retryAll(n)}
           />
         </div>

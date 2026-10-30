@@ -5,8 +5,8 @@ const ALL_CODES = [
   'UNAUTHENTICATED', 'ACCOUNT_PENDING', 'ACCOUNT_REJECTED', 'FORBIDDEN', 'NOT_FOUND', 'POST_DELETED',
   'AUTH_CODE_INVALID', 'VALIDATION_FAILED', 'TEAM_CODE_NOT_FOUND', 'TEAM_ALREADY_JOINED', 'TEAM_JOIN_BLOCKED',
   'INVITEE_NOT_FOUND', 'INVITEE_ALREADY_MEMBER', 'INVITATION_DUPLICATE', 'INVITATION_ALREADY_JOINED', 'TEAM_GONE',
-  'TEAM_MEMBER_NOT_FOUND', 'LEADER_MUST_TRANSFER', 'LEADER_LAST_MEMBER', 'EXEMPTION_DUPLICATE', 'EXEMPTION_REQUEST_DUPLICATE',
-  'JUDGMENT_NOT_CORRECTABLE', 'SYSTEM_NOTICE_UNDELETABLE', 'PREVIEW_STALE', 'RECALC_BUSY', 'INTERNAL', 'NETWORK',
+  'TEAM_MEMBER_NOT_FOUND', 'LEADER_MUST_TRANSFER', 'LEADER_LAST_MEMBER', 'EXEMPTION_REQUEST_DUPLICATE',
+  'JUDGMENT_NOT_CORRECTABLE', 'SYSTEM_NOTICE_UNDELETABLE', 'INTERNAL', 'NETWORK',
 ];
 
 /** 문구 규칙 (요구사항 5-4): 한 문장 40자 · 기술 용어 금지 · 해요체 */
@@ -88,9 +88,7 @@ describe('messageFor', () => {
     expect(messageFor({ code: 'TEAM_CODE_NOT_FOUND' })).toBe('그런 초대코드가 없어요. 다시 확인해 주세요.');
     expect(messageFor({ code: 'TEAM_JOIN_BLOCKED' })).toBe('이 팀에는 참가할 수 없어요. 팀장에게 문의해 주세요.');
     expect(messageFor({ code: 'EXEMPTION_REQUEST_DUPLICATE' })).toBe('이미 요청한 주간이에요.');
-    expect(messageFor({ code: 'PREVIEW_STALE' })).toBe(MSG.previewStale);
     expect(messageFor({ code: 'NETWORK' })).toBe(MSG.network);
-    expect(messageFor({ code: 'RECALC_BUSY' })).toBe(MSG.server);
     expect(messageFor({ code: 'POST_DELETED' })).toBe('삭제된 글이에요.');
   });
 

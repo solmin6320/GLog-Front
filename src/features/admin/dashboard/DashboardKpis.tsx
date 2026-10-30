@@ -8,23 +8,30 @@ type Kpi = { key: string; label: string; value: number | null; to: string; red?:
 
 /**
  * ⑤ 처리 대기 요약 4칸 (W-15 · ACC-ADM-01). 누르면 해당 탭으로.
- * 두 번째 칸은 '가장 최근 판정 주'의 미달 수다 (M-07) — 그 주의 미달만 거른 판정 결과로 간다.
+ * 두 번째 칸은 판정 주(직전 주)의 미달 수다 (M-07) — 그 주의 미달만 거른 판정 결과로 간다.
  */
-export function DashboardKpis({ summary, currentWeekStart }: { summary: DashboardSummary | undefined; currentWeekStart: string }) {
+export function DashboardKpis({
+  summary,
+  heldCount,
+  currentWeekStart,
+}: {
+  summary: DashboardSummary | undefined;
+  heldCount: number | undefined;
+  currentWeekStart: string;
+}) {
   const kpis: Kpi[] = [
-    { key: 'pending', label: '승인 대기', value: summary?.pendingMemberCount ?? null, to: paths.adminMembers() },
+    { key: 'pending', label: '승인 대기', value: summary?.pendingMembers ?? null, to: paths.adminMembers() },
     {
       key: 'fail',
-      label: failKpiLabel(summary?.latestJudgedWeekStart, currentWeekStart),
-      value: summary?.latestWeekFailCount ?? null,
+      label: failKpiLabel(summary?.judgedWeekStart, currentWeekStart),
+      value: summary?.failedMembers ?? null,
       to: paths.admin({ result: 'fail' }),
     },
-    { key: 'penalty', label: '벌칙 대상', value: summary?.penaltyTargetCount ?? null, to: paths.adminWarnings(), red: true },
-    { key: 'exemption', label: '면제 요청 대기', value: summary?.pendingExemptionRequestCount ?? null, to: paths.adminExemptions() },
+    { key: 'penalty', label: '벌칙 대상', value: summary?.penaltyTargets ?? null, to: paths.adminWarnings(), red: true },
+    { key: 'exemption', label: '면제 요청 대기', value: summary?.pendingExemptions ?? null, to: paths.adminExemptions() },
   ];
   const nothingToDo =
-    !!summary &&
-    summary.pendingMemberCount + summary.penaltyTargetCount + summary.pendingExemptionRequestCount + summary.heldJudgmentCount === 0;
+    !!summary && heldCount !== undefined && summary.pendingMembers + summary.penaltyTargets + summary.pendingExemptions + heldCount === 0;
 
   return (
     <section aria-label="처리 대기 요약">

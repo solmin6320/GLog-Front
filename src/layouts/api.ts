@@ -7,9 +7,9 @@ import { graphql } from '@/gql';
 export const AdminLayoutCountsQuery = graphql(`
   query AdminLayoutCountsQuery {
     adminDashboardSummary {
-      pendingMemberCount
-      penaltyTargetCount
-      pendingExemptionRequestCount
+      pendingMembers
+      penaltyTargets
+      pendingExemptions
     }
   }
 `);

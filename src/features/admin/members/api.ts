@@ -9,24 +9,19 @@ import { graphql } from '@/gql';
 /** 관리자 탭 배지 쿼리 이름. features → layouts import는 의존 방향 위반이라 이름으로만 부른다 */
 export const ADMIN_COUNTS_QUERY = 'AdminLayoutCountsQuery';
 
-/** ⑤ 상태 필터 + 검색 · ⑥ 목록. 신청(첫 로그인) 오래된 순 */
+/** ⑤ 상태 필터 + 검색 · ⑥ 목록. 신청(첫 로그인) 오래된 순 20개씩 */
 export const AdminMembersQuery = graphql(`
-  query AdminMembersQuery($filter: AdminMemberFilter!, $search: String, $first: Int, $after: String) {
-    adminMembers(filter: $filter, search: $search, first: $first, after: $after) {
-      nodes {
-        member {
-          id
-          nickname
-          githubLogin
-          profileImageUrl
-        }
+  query AdminMembersQuery($status: MemberApprovalFilter!, $keyword: String, $after: String) {
+    adminMembers(status: $status, keyword: $keyword, after: $after) {
+      items {
+        id
+        nickname
+        githubLogin
         status
-        appliedAt
+        role
+        createdAt
       }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+      nextCursor
       totalCount
     }
   }
@@ -36,7 +31,7 @@ export const AdminMembersQuery = graphql(`
 export const AdminMembersSummaryQuery = graphql(`
   query AdminMembersSummaryQuery {
     adminDashboardSummary {
-      pendingMemberCount
+      pendingMembers
     }
   }
 `);
@@ -45,14 +40,12 @@ export const AdminMembersSummaryQuery = graphql(`
 export const AdminMembersApprove = graphql(`
   mutation AdminMembersApprove($memberId: ID!) {
     approveMember(memberId: $memberId) {
-      member {
-        id
-        nickname
-        githubLogin
-        profileImageUrl
-      }
+      id
+      nickname
+      githubLogin
       status
-      appliedAt
+      role
+      createdAt
     }
   }
 `);
@@ -61,14 +54,12 @@ export const AdminMembersApprove = graphql(`
 export const AdminMembersReject = graphql(`
   mutation AdminMembersReject($memberId: ID!) {
     rejectMember(memberId: $memberId) {
-      member {
-        id
-        nickname
-        githubLogin
-        profileImageUrl
-      }
+      id
+      nickname
+      githubLogin
       status
-      appliedAt
+      role
+      createdAt
     }
   }
 `);
@@ -77,14 +68,26 @@ export const AdminMembersReject = graphql(`
 export const AdminMembersRevert = graphql(`
   mutation AdminMembersRevert($memberId: ID!) {
     revertMemberToPending(memberId: $memberId) {
-      member {
-        id
-        nickname
-        githubLogin
-        profileImageUrl
-      }
+      id
+      nickname
+      githubLogin
       status
-      appliedAt
+      role
+      createdAt
+    }
+  }
+`);
+
+/** 활성 일반 회원을 관리자로 지정 (프로필 화면). 대기 · 거절 · 이미 관리자면 CONFLICT */
+export const AdminMembersPromote = graphql(`
+  mutation AdminMembersPromote($memberId: ID!) {
+    promoteMemberToAdmin(memberId: $memberId) {
+      id
+      nickname
+      githubLogin
+      status
+      role
+      createdAt
     }
   }
 `);

@@ -1,38 +1,30 @@
-import { useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
-import { MSG } from '@/domain/messages';
 import { useAction } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import { Button, InfoBox, Modal, Skeleton } from '@/shared/ui';
 import { AdminWarningsRestorePreviewQuery, AdminWarningsRestoreWarning, warningsRefetch } from './api';
-import { COPY, PENALTY_CHANGE_LABEL, type DeletedWarningRow, type RestorePreview } from './model';
+import { PENALTY_CHANGE_LABEL, penaltyChangeOf, warningChangeText } from '../impact';
+import { COPY, type DeletedWarningRow, type RestorePreview } from './model';
 import { TeamNames } from './TeamNames';
 import s from './Warnings.module.css';
 
 /**
- * ②-1 ⑧ [복구] → 복구 미리보기(쿼리) → 영향 미리보기형 확인 → restoreWarning(expectedBasis) (ACC-PEN-06 ~ 09).
- * 확정 전에는 뮤테이션이 나가지 않는다. 그새 다른 변경이 반영되면(PREVIEW_STALE) 미리보기를 다시 받아 알린다.
+ * ②-1 ⑧ [복구] → 복구 미리보기(쿼리) → 영향 미리보기형 확인 → restoreWarning (ACC-PEN-06 ~ 09).
+ * 확정 전에는 뮤테이션이 나가지 않는다. 그새 이미 복구됐으면 ALREADY_HANDLED — 목록을 다시 받고 닫는다.
  */
 export function RestoreWarningDialog({ warning, onClose }: { warning: DeletedWarningRow; onClose: () => void }) {
   const client = useApolloClient();
-  const preview = useQuery(AdminWarningsRestorePreviewQuery, { variables: { warningId: warning.id }, fetchPolicy: 'network-only' });
-  const p = preview.loading ? undefined : preview.data?.restoreWarningPreview;
-  const [stale, setStale] = useState(false);
+  const preview = useQuery(AdminWarningsRestorePreviewQuery, { variables: { warningId: warning.warningId }, fetchPolicy: 'network-only' });
+  const p = preview.loading ? undefined : preview.data?.previewWarningRestore;
 
   const [restore] = useMutation(AdminWarningsRestoreWarning);
   const action = useAction(
-    (expectedBasis: string | null) =>
-      restore({ variables: { warningId: warning.id, expectedBasis }, refetchQueries: warningsRefetch(), awaitRefetchQueries: true }),
+    () => restore({ variables: { warningId: warning.warningId }, refetchQueries: warningsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.restored,
-      errorOverrides: { NOT_FOUND: COPY.restoreGone },
+      errorOverrides: { NOT_FOUND: COPY.restoreGone, ALREADY_HANDLED: COPY.restoreGone },
       onError: (e) => {
-        if (e.code === 'PREVIEW_STALE') {
-          setStale(true);
-          preview.refetch().catch(() => undefined);
-          return true;
-        }
-        if (e.code === 'NOT_FOUND') {
+        if (e.code === 'NOT_FOUND' || e.code === 'ALREADY_HANDLED') {
           client.refetchQueries({ include: warningsRefetch() }).catch(() => undefined);
           onClose();
         }
@@ -43,8 +35,7 @@ export function RestoreWarningDialog({ warning, onClose }: { warning: DeletedWar
 
   const submit = async () => {
     if (!p) return;
-    setStale(false);
-    const r = await action.run(p.basis ?? null);
+    const r = await action.run();
     if (r) onClose();
   };
 
@@ -83,52 +74,46 @@ export function RestoreWarningDialog({ warning, onClose }: { warning: DeletedWar
       ) : (
         <RestorePreviewDetails p={p} warning={warning} />
       )}
-      {stale ? (
-        <div className={s.notes}>
-          <InfoBox tone="warn" icon="alert" role="alert">
-            {MSG.previewStale}
-          </InfoBox>
-        </div>
-      ) : null}
     </Modal>
   );
 }
 
 /** 바뀌는 수치를 항목별로 (공통 요소 '영향 미리보기형') + E-42 · E-43 · E-59 안내 */
 function RestorePreviewDetails({ p, warning }: { p: RestorePreview | undefined; warning: DeletedWarningRow }) {
+  const change = p ? penaltyChangeOf(p.impact) : 'NONE';
   return (
     <section aria-label="복구 미리보기" aria-busy={p ? undefined : true}>
       <dl className={s.previewTable}>
         <div className={s.previewRow}>
           <dt>경고</dt>
-          <dd>{p ? `${p.warningCountBefore}회 → ${p.warningCountAfter}회` : <Skeleton width={64} height={16} />}</dd>
+          <dd>{p ? warningChangeText(p.impact) : <Skeleton width={64} height={16} />}</dd>
         </div>
         <div className={s.previewRow}>
           <dt>벌칙 대상</dt>
-          <dd className={p?.penaltyChange === 'ENTER' ? s.enter : p?.penaltyChange === 'RELEASE' ? s.release : undefined}>
-            {p ? PENALTY_CHANGE_LABEL[p.penaltyChange] : <Skeleton width={48} height={16} />}
+          <dd className={change === 'ENTER' ? s.enter : change === 'RELEASE' ? s.release : undefined}>
+            {p ? PENALTY_CHANGE_LABEL[change] : <Skeleton width={48} height={16} />}
           </dd>
         </div>
         <div className={s.previewRow}>
           <dt>복구 후 카테고리</dt>
           <dd>
-            <TeamNames teams={warning.restoreCategories} emptyText={COPY.deletedTeam} />
+            <TeamNames teams={p?.restoreTeams ?? warning.restoreTeams} emptyText={COPY.deletedTeam} />
           </dd>
         </div>
       </dl>
-      {p && (p.penaltyChange === 'ENTER' || p.restoresWithoutCategory || p.frozenByFulfillment) ? (
+      {p && (change === 'ENTER' || p.teamDeleted || p.impact.recordOnly) ? (
         <div className={s.notes}>
-          {p.frozenByFulfillment ? (
+          {p.impact.recordOnly ? (
             <InfoBox tone="warn" icon="lock">
               {COPY.frozen}
             </InfoBox>
           ) : null}
-          {p.penaltyChange === 'ENTER' ? (
+          {change === 'ENTER' ? (
             <InfoBox tone="red" icon="alert">
               {COPY.reenter}
             </InfoBox>
           ) : null}
-          {p.restoresWithoutCategory ? (
+          {p.teamDeleted ? (
             <InfoBox tone="mute" icon="info">
               {COPY.noCategory}
             </InfoBox>

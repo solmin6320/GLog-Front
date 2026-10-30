@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { useMutation } from '@apollo/client/react';
 import { useBlocker, useNavigate, type BlockerFunction } from 'react-router';
 import { MSG, messageFor } from '@/domain/messages';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
@@ -8,12 +7,11 @@ import { uploadProfileImage, useAction } from '@/shared/api';
 import { paths } from '@/shared/lib/paths';
 import { PROFILE_IMAGE, validateProfileImage } from '@/shared/lib/validators';
 import { Avatar, Button, Card, Hint, PageContainer, PageTitle, useConfirm } from '@/shared/ui';
-import { ProfileResetImage } from '../api';
 import { PROFILE_EDIT_COPY as C } from '../copy';
 import s from '../profile.module.css';
 
-/** 저장 전 바꾼 내용 — 고른 사진 · 기본 이미지로 되돌리기 */
-type Change = { kind: 'none' } | { kind: 'file'; file: File; previewUrl: string | null } | { kind: 'reset' };
+/** 저장 전 바꾼 내용 — 고른 사진. 기본 이미지로 되돌리기(resetProfileImage)는 백엔드에 없어 뺐다 */
+type Change = { kind: 'none' } | { kind: 'file'; file: File; previewUrl: string | null };
 
 const NONE: Change = { kind: 'none' };
 const ACCEPT = PROFILE_IMAGE.types.join(',');
@@ -38,7 +36,7 @@ function revokePreview(url: string): void {
 /**
  * PR-02 프로필 수정 (화면설계서 5-1-20) — 본인 사진만. 닉네임 · GitHub 아이디는 고칠 수 없다.
  * 사진은 고르는 즉시 형식 · 크기를 먼저 보고(E-56, 요청 0건) 미리보기만 바꾼다. [저장] 때
- * REST 업로드(uploadProfileImage) 또는 resetProfileImage → 세션 재조회(헤더 사진) → PR-01 + "저장했어요."
+ * REST 업로드(uploadProfileImage) → 세션 재조회(헤더 사진) → PR-01 + "저장했어요."
  * 저장 안 한 변경이 있을 때만 이탈 확인(useBlocker).
  */
 export default function ProfileEditPage() {
@@ -47,7 +45,6 @@ export default function ProfileEditPage() {
   const { refresh } = useSession();
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const [resetImage] = useMutation(ProfileResetImage);
 
   const [change, setChange] = useState<Change>(NONE);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -92,7 +89,6 @@ export default function ProfileEditPage() {
   const save = useAction(
     async (c: Change): Promise<true> => {
       if (c.kind === 'file') await uploadProfileImage(c.file);
-      else if (c.kind === 'reset') await resetImage();
       // 헤더 사진은 세션(me)을 본다 — 실패해도 저장은 끝났다
       await refresh().catch(() => undefined);
       return true;
@@ -133,14 +129,14 @@ export default function ProfileEditPage() {
     setChange({ kind: 'file', file, previewUrl: createPreview(file) });
   };
 
+  /** 고르기만 한 사진을 취소한다 */
   const onReset = () => {
     setFileError(null);
-    // 올려 둔 사진이 있으면 [저장] 때 지운다. 고르기만 했으면 고른 것을 취소한다
-    setChange(viewer.profileImageUrl ? { kind: 'reset' } : NONE);
+    setChange(NONE);
   };
 
-  const shownUrl = change.kind === 'file' ? change.previewUrl : change.kind === 'reset' ? null : viewer.profileImageUrl;
-  const canReset = change.kind === 'file' || (change.kind === 'none' && !!viewer.profileImageUrl);
+  const shownUrl = change.kind === 'file' ? change.previewUrl : viewer.profileImageUrl;
+  const canReset = change.kind === 'file';
 
   return (
     <PageContainer width="md">

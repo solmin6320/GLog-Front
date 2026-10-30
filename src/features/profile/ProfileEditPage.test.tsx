@@ -49,7 +49,7 @@ describe('PR-02 프로필 수정', () => {
     expect(screen.getByRole('button', { name: '취소' })).toBeEnabled();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     // 올린 사진이 없으면 ③도 없다 (ACC-PR02-06)
-    expect(screen.queryByRole('button', { name: '기본 이미지로 되돌리기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '고른 사진 취소' })).not.toBeInTheDocument();
     expect(cardImage()).toBeNull();
   });
 
@@ -96,25 +96,20 @@ describe('PR-02 프로필 수정', () => {
     expect(cardImage()).toHaveAttribute('src', 'blob:preview');
   });
 
-  it('ACC-PR02-06: 올린 사진이 있으면 [기본 이미지로 되돌리기] → 미리보기만 바뀌고 [저장] 때 반영(헤더 사진도)', async () => {
+  it('ACC-PR02-06: 고른 사진은 [고른 사진 취소]로 되돌린다 — 기본 이미지로 되돌리기는 백엔드에 없어 뺐다', async () => {
     const me = db.members.find((m) => m.id === '1');
     if (!me) throw new Error('seed member missing');
     me.profileImageUrl = 'https://img.test/old.png';
-    const { user, router } = await open();
+    const { user } = await open();
     expect(cardImage()).toHaveAttribute('src', 'https://img.test/old.png');
+    expect(screen.queryByRole('button', { name: '고른 사진 취소' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '기본 이미지로 되돌리기' }));
-    expect(cardImage()).toBeNull();
-    expect(me.profileImageUrl).toBe('https://img.test/old.png'); // 아직 저장 전
-
-    await user.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/profile/me'));
-    expect(await screen.findByText('저장했어요.')).toBeInTheDocument();
-    expect(me.profileImageUrl).toBeNull();
+    await user.upload(fileInput(), fileOf('me.png', 'image/png'));
+    expect(cardImage()).toHaveAttribute('src', 'blob:preview');
+    await user.click(screen.getByRole('button', { name: '고른 사진 취소' }));
+    expect(cardImage()).toHaveAttribute('src', 'https://img.test/old.png');
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
     expect(upload).not.toHaveBeenCalled();
-    // 세션을 다시 불러 헤더 사진도 기본 이미지로
-    const headerLink = screen.getByRole('link', { name: '한동관 내 프로필' });
-    await waitFor(() => expect(headerLink.querySelector('img')).toBeNull());
   });
 
   it('ACC-PR02-07: 바꾼 것이 없으면 [취소] → 바로 /profile/me', async () => {

@@ -2,8 +2,8 @@
  * 커서 목록 훅 (설계서 3-3 · 요구사항 6-5). 화면은 Connection 모양을 모른다.
  *   const list = usePagedList(PostListQuery, { variables: { filter }, select: (d) => d.posts });
  *   list.nodes · list.totalCount · list.hasMore · list.loadMore() · list.loadingMore · list.loadMoreError · list.refetch()
- * 문서는 `$first: Int` · `$after: String` 변수를 받아야 한다(이름 고정). first = pageSize(기본 20).
- * 이어 붙이기는 캐시 정책(nodesConnection)이 한다. [더 보기] 실패는 목록을 지우지 않는다(loadMoreError).
+ * 문서는 `$after: String` 변수를 받는다. 페이지 크기는 백엔드가 정한다(20) — pageSize는 [더 보기] 끝 문구 판단용이고, 문서에 없는 first는 Apollo가 보내지 않는다.
+ * 이어 붙이기는 캐시 정책(itemsPage)이 한다. [더 보기] 실패는 목록을 지우지 않는다(loadMoreError).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NetworkStatus } from '@apollo/client';

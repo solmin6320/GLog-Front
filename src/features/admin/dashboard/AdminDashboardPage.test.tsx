@@ -214,7 +214,7 @@ describe('AD-01 ⑩ 판정 정정', () => {
     expect(screen.getByRole('button', { name: '박지훈 판정 정정' })).toHaveFocus();
   });
 
-  it('ACC-FIX-11: 미리보기 뒤 다른 변경이 먼저 반영되면 반영하지 않고 미리보기를 다시 받아 알린다', async () => {
+  it('ACC-FIX-11: 미리보기 뒤 판정이 먼저 바뀌면(JUDGMENT_CHANGED) 반영하지 않고 다시 받아 알린다', async () => {
     const t = trackOps();
     const { user } = renderRoute('/admin');
     const p = await openPanelFor(user, '박지훈');
@@ -224,12 +224,14 @@ describe('AD-01 ⑩ 판정 정정', () => {
     const previews = () => t.ops.filter((o) => o.name === 'AdminDashboardCorrectionPreviewQuery').length;
     const before = previews();
 
-    touch(); // 다른 관리자가 먼저 무언가를 바꿨다 → basis가 달라진다
+    // 다른 관리자가 먼저 면제로 정정했다 → expectedStatus(FAIL)가 맞지 않는다
+    Object.assign(judgmentOf('6'), { status: 'EXEMPT', skipReason: 'PERSONAL_EXEMPTION', corrected: true });
+    touch();
     await user.click(within(p).getByRole('button', { name: '정정하고 재계산' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '정정하기' }));
 
     expect(await within(p).findByText(MSG.previewStale)).toBeInTheDocument();
-    expect(db.judgments.find((j) => j.id === judgmentOf('6').id)?.status).toBe('FAIL');
+    expect(db.judgments.find((j) => j.id === judgmentOf('6').id)?.status).toBe('EXEMPT');
     await waitFor(() => expect(previews()).toBe(before + 1));
     expect(screen.queryByText('정정했어요.')).not.toBeInTheDocument();
 
@@ -242,13 +244,14 @@ describe('AD-01 ⑩ 판정 정정', () => {
     expect(t.mutations()).toEqual(['AdminDashboardCorrectJudgment', 'AdminDashboardCorrectJudgment']);
   });
 
-  it('ACC-FIX-16: 첫 참가 행은 통과 · 미달 · 면제 3종으로만 정정한다 (다음 페이지 행도 ?fix=로 바로 연다)', async () => {
+  it('ACC-FIX-16: 첫 참가(제외) 행은 면제로만 정정한다 (다음 페이지 행도 ?fix=로 바로 연다)', async () => {
     renderRoute(`/admin?fix=${judgmentOf('5').id}`);
     const p = await screen.findByRole('complementary', { name: '판정 정정' });
     expect(await within(p).findByText('서연')).toBeInTheDocument();
     expect(within(p).getByRole('radio', { name: '첫 참가' })).toBeChecked();
-    for (const name of ['통과로 정정', '미달로 정정', '면제로 정정']) expect(within(p).getByRole('radio', { name })).toBeInTheDocument();
-    expect(within(p).getAllByRole('radio')).toHaveLength(4);
+    // 백엔드: 제외(첫 참가 · 팀 없음) 판정은 면제로만 정정한다
+    expect(within(p).getByRole('radio', { name: '면제로 정정' })).toBeInTheDocument();
+    expect(within(p).getAllByRole('radio')).toHaveLength(2);
     expect(within(p).queryByText(/제외/)).not.toBeInTheDocument();
   });
 
@@ -299,7 +302,7 @@ describe('AD-01 ⑦⑧⑨ 보류', () => {
     expect(t.mutations()).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: '전체 재시도' }));
     expect(await screen.findByText('1명 처리했어요.')).toBeInTheDocument();
-    expect(t.mutations()).toEqual(['AdminDashboardRerunHeld']);
+    expect(t.mutations()).toEqual(['AdminDashboardRetryAllHolds']);
     // 남은 보류는 아이디 변경 1명뿐 → 문구가 바뀌고 [전체 재시도]가 없다
     await waitFor(() => expect(screen.getByText('보류 1명').closest('p')).toHaveTextContent('보류 1명 · 본인이 다시 로그인해야 풀려요.'));
     expect(screen.queryByRole('button', { name: '전체 재시도' })).not.toBeInTheDocument();

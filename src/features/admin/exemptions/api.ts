@@ -2,47 +2,46 @@ import { graphql } from '@/gql';
 
 /**
  * AD-01 ②-3 면제 관리 (화면설계서 5-1-10 ②-3 · E-44 · E-45 · E-48). 연산 이름은 `AdminExemptions*`.
- * 판정이 끝난 주를 건드리는 조작(소급 면제)은 미리보기 쿼리 → 확인 → expectedBasis를 실어 반영 →
- * 목록 · 탭 배지를 다시 부른다(awaitRefetchQueries). PREVIEW_STALE이면 미리보기를 다시 받아 보여 준다 (설계서 3-6).
+ * 판정이 끝난 주를 건드리는 조작(소급 면제)은 미리보기 쿼리 → 확인 → 반영 → 목록 · 탭 배지를 다시 부른다(awaitRefetchQueries).
+ * 백엔드 미리보기는 등록 주 · 개인 승인만 있다. 기간 삭제 · 다른 주로 옮기기는 이미 면제로 바뀐 판정을 되돌리지 않는다.
  */
 
-/** ⑤ 면제 기간 목록 (최근 주부터) */
+/** ⑤ 면제 기간 목록 (최근 주부터 20개씩) */
 export const AdminExemptionsPeriodsQuery = graphql(`
-  query AdminExemptionsPeriodsQuery($first: Int, $after: String) {
-    exemptionPeriods(first: $first, after: $after) {
-      nodes {
+  query AdminExemptionsPeriodsQuery($after: String) {
+    exemptionPeriods(after: $after) {
+      items {
         id
         weekStart
         weekEnd
         reason
-        isPast
       }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+      nextCursor
     }
   }
 `);
 
-/** ⑥ 등록 · 수정 · 삭제 전 영향 미리보기 (계산만 한다). 수정이면 periodId, 삭제면 removing */
+/** 그 주를 면제 기간으로 등록하면 바뀌는 판정 (계산만 한다). 판정 전 주면 retroactive=false · items 빈 배열 */
 export const AdminExemptionsPeriodPreviewQuery = graphql(`
-  query AdminExemptionsPeriodPreviewQuery($weekStart: Date!, $periodId: ID, $removing: Boolean) {
-    exemptionPeriodPreview(weekStart: $weekStart, periodId: $periodId, removing: $removing) {
+  query AdminExemptionsPeriodPreviewQuery($weekStart: String!) {
+    previewExemptionPeriod(weekStart: $weekStart) {
       weekStart
-      isRetroactive
-      affectedMemberCount
-      basis
-      changes {
+      retroactive
+      items {
         member {
           id
           nickname
         }
-        warningCountBefore
-        warningCountAfter
-        penaltyChange
-        affectedWeekCount
-        frozenByFulfillment
+        currentStatus
+        impact {
+          onHold
+          warningCountBefore
+          warningCountAfter
+          entersPenalty
+          leavesPenalty
+          recordOnly
+          affectedWeeks
+        }
       }
     }
   }
@@ -55,7 +54,6 @@ export const AdminExemptionsCreatePeriod = graphql(`
       weekStart
       weekEnd
       reason
-      isPast
     }
   }
 `);
@@ -67,29 +65,27 @@ export const AdminExemptionsUpdatePeriod = graphql(`
       weekStart
       weekEnd
       reason
-      isPast
     }
   }
 `);
 
 export const AdminExemptionsDeletePeriod = graphql(`
-  mutation AdminExemptionsDeletePeriod($id: ID!, $expectedBasis: String) {
-    deleteExemptionPeriod(id: $id, expectedBasis: $expectedBasis)
+  mutation AdminExemptionsDeletePeriod($id: ID!) {
+    deleteExemptionPeriod(id: $id)
   }
 `);
 
-/** ⑦ 개인 면제 요청. 팀 이름은 묻지 않는다(②-3 ⑦ · ACC-ADM-07) */
+/** ⑦ 개인 면제 요청 (대기, 최신순 20개씩). 팀 이름은 묻지 않는다(②-3 ⑦ · ACC-ADM-07) */
 export const AdminExemptionsRequestsQuery = graphql(`
-  query AdminExemptionsRequestsQuery($status: PersonalExemptionStatus!, $first: Int, $after: String) {
-    personalExemptionRequests(status: $status, first: $first, after: $after) {
-      nodes {
+  query AdminExemptionsRequestsQuery($status: PersonalExemptionStatus!, $after: String) {
+    personalExemptionRequests(status: $status, after: $after) {
+      items {
         id
         member {
           id
           nickname
-          profileImageUrl
         }
-        requestedBy {
+        requester {
           id
           nickname
         }
@@ -101,38 +97,41 @@ export const AdminExemptionsRequestsQuery = graphql(`
         createdAt
         respondedAt
         overlapsExemptionPeriod
-        isRetroactive
       }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      totalCount
+      nextCursor
     }
   }
 `);
 
-/** ⑦ 판정이 끝난 주의 승인(소급) 미리보기. 소급이 아니면 null */
+/** ⑦ 승인 미리보기 (계산만 한다). 판정 전 주면 retroactive=false */
 export const AdminExemptionsApprovalPreviewQuery = graphql(`
-  query AdminExemptionsApprovalPreviewQuery($requestId: ID!) {
-    personalExemptionApprovalPreview(requestId: $requestId) {
-      member {
-        id
-        nickname
+  query AdminExemptionsApprovalPreviewQuery($id: ID!) {
+    previewPersonalExemptionApproval(id: $id) {
+      weekStart
+      retroactive
+      items {
+        member {
+          id
+          nickname
+        }
+        currentStatus
+        impact {
+          onHold
+          warningCountBefore
+          warningCountAfter
+          entersPenalty
+          leavesPenalty
+          recordOnly
+          affectedWeeks
+        }
       }
-      warningCountBefore
-      warningCountAfter
-      penaltyChange
-      affectedWeekCount
-      frozenByFulfillment
-      basis
     }
   }
 `);
 
 export const AdminExemptionsApprove = graphql(`
-  mutation AdminExemptionsApprove($requestId: ID!, $expectedBasis: String) {
-    approvePersonalExemption(requestId: $requestId, expectedBasis: $expectedBasis) {
+  mutation AdminExemptionsApprove($id: ID!) {
+    approvePersonalExemption(id: $id) {
       id
       status
       respondedAt
@@ -141,8 +140,8 @@ export const AdminExemptionsApprove = graphql(`
 `);
 
 export const AdminExemptionsReject = graphql(`
-  mutation AdminExemptionsReject($requestId: ID!, $reason: String!) {
-    rejectPersonalExemption(requestId: $requestId, reason: $reason) {
+  mutation AdminExemptionsReject($id: ID!, $reason: String!) {
+    rejectPersonalExemption(id: $id, reason: $reason) {
       id
       status
       rejectReason
@@ -155,7 +154,7 @@ export const AdminExemptionsReject = graphql(`
 export const AdminExemptionsSummaryQuery = graphql(`
   query AdminExemptionsSummaryQuery {
     adminDashboardSummary {
-      pendingExemptionRequestCount
+      pendingExemptions
     }
   }
 `);

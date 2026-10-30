@@ -1,11 +1,12 @@
 import { useId, useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { useAction, usePagedList, type PagedList } from '@/shared/api';
+import { useClock } from '@/session';
+import { toPaged, useAction, usePagedList, type PagedList } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import { Button, DataTable, EmptyState, Icon, LoadMore, QueryBoundary, TableSkeleton, type Column } from '@/shared/ui';
 import { AdminExemptionsApprove, AdminExemptionsPeriodsQuery, AdminExemptionsRequestsQuery, AdminExemptionsSummaryQuery } from './api';
-import { COPY, exemptionsRefetch, requestLine, type PeriodRow, type RequestRow } from './model';
+import { COPY, exemptionsRefetch, isPastWeek, requestLine, type PeriodRow, type RequestRow } from './model';
 import { DeletePeriodDialog, PeriodDialog } from './PeriodDialogs';
 import { ApproveDialog, RejectDialog } from './RequestDialogs';
 import s from './Exemptions.module.css';
@@ -27,12 +28,12 @@ export function ExemptionsTab() {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const close = () => setDialog(null);
 
-  const periods = usePagedList(AdminExemptionsPeriodsQuery, { variables: {}, select: (d) => d.exemptionPeriods });
+  const periods = usePagedList(AdminExemptionsPeriodsQuery, { variables: {}, select: (d) => toPaged(d.exemptionPeriods) });
   const requests = usePagedList(AdminExemptionsRequestsQuery, {
     variables: { status: 'PENDING' },
-    select: (d) => d.personalExemptionRequests,
+    select: (d) => toPaged(d.personalExemptionRequests),
   });
-  const pending = useQuery(AdminExemptionsSummaryQuery).data?.adminDashboardSummary.pendingExemptionRequestCount;
+  const pending = useQuery(AdminExemptionsSummaryQuery).data?.adminDashboardSummary.pendingExemptions;
 
   const bothLoaded = !!periods.data && !!requests.data;
   const allEmpty = bothLoaded && periods.nodes.length === 0 && requests.nodes.length === 0;
@@ -87,6 +88,7 @@ function PeriodsSection({
   onDelete: (p: PeriodRow) => void;
 }) {
   const headingId = useId();
+  const clock = useClock();
   const columns: Column<PeriodRow>[] = [
     {
       key: 'week',
@@ -94,7 +96,7 @@ function PeriodsSection({
       render: (r) => (
         <span className={s.week}>
           {formatWeekRange(r.weekStart)}
-          {r.isPast ? <span className={s.pastTag}>{COPY.pastWeek}</span> : null}
+          {isPastWeek(r.weekStart, clock.currentWeekStart) ? <span className={s.pastTag}>{COPY.pastWeek}</span> : null}
         </span>
       ),
     },
@@ -158,23 +160,24 @@ function RequestsSection({
   onReject: (r: RequestRow) => void;
 }) {
   const headingId = useId();
+  const clock = useClock();
   const client = useApolloClient();
   const [approve] = useMutation(AdminExemptionsApprove);
-  // 판정 전 주는 바로 승인한다 — 행이 빠지고 탭 배지 · 대기 수가 준다 (ACC-ADM-08)
+  // 이번 주 이후는 판정 전이라 바로 승인한다 — 행이 빠지고 탭 배지 · 대기 수가 준다 (ACC-ADM-08)
   const direct = useAction(
-    (requestId: string) => approve({ variables: { requestId, expectedBasis: null }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
+    (id: string) => approve({ variables: { id }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.approved,
-      errorOverrides: { NOT_FOUND: COPY.gone },
+      errorOverrides: { NOT_FOUND: COPY.gone, ALREADY_HANDLED: COPY.gone },
       onError: (e) => {
-        if (e.code === 'NOT_FOUND') client.refetchQueries({ include: exemptionsRefetch() }).catch(() => undefined);
+        if (e.code === 'NOT_FOUND' || e.code === 'ALREADY_HANDLED') client.refetchQueries({ include: exemptionsRefetch() }).catch(() => undefined);
         return false;
       },
     },
   );
 
   const onApprove = (r: RequestRow) => {
-    if (r.isRetroactive) onApproveRetro(r);
+    if (isPastWeek(r.weekStart, clock.currentWeekStart)) onApproveRetro(r);
     else void direct.run(r.id);
   };
 
@@ -186,7 +189,7 @@ function RequestsSection({
       render: (r) => (
         <span className={s.week}>
           {formatWeekRange(r.weekStart)}
-          {r.isRetroactive ? <span className={s.pastTag}>{COPY.pastWeek}</span> : null}
+          {isPastWeek(r.weekStart, clock.currentWeekStart) ? <span className={s.pastTag}>{COPY.pastWeek}</span> : null}
         </span>
       ),
     },
@@ -231,7 +234,6 @@ function RequestsSection({
         <h3 id={headingId} className={s.sectionTitle}>
           {COPY.requestsTitle}
         </h3>
-        {list.totalCount != null ? <span className={s.meta}>대기 {list.totalCount}건</span> : null}
       </div>
       <QueryBoundary loading={list.loading} error={list.error} data={list.data} skeleton={<TableSkeleton rows={2} cols={4} />} onRetry={list.refetch}>
         {() =>

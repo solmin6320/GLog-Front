@@ -6,25 +6,23 @@
  * - "언제 보이는가"는 목 시각(control.now) 기준이다: 시드 행 중 createdAt/executedAt이 now보다 뒤면 안 보인다.
  *   (조회 헬퍼 `visiblePosts()` 등이 처리한다. 새로 만드는 행은 createdAt = clock.now라 항상 보인다.)
  */
-import type {
-  GrassFetchStatus,
-  HoldReason,
-  JudgmentStatus,
-  MemberRole,
-  MemberStatus,
-  PersonalExemptionStatus,
-  PostType,
-  SkipReason,
-  WarningDeleteReason,
-  WarningStanding,
-} from '../__generated__/schema-types';
+import type { JudgmentStatus, MemberRole, MemberStatus, PersonalExemptionStatus, PostType } from '../__generated__/schema-types';
 import { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';
-
-/** 글 본문 항목 키 (백엔드 PostSections 필드 이름) */
-export type PostSectionKey = 'problem' | 'cause' | 'solution' | 'did' | 'learned';
 import { createSeed } from './seed';
 
 export { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';
+
+/* 목 DB 안에서만 쓰는 값 종류 (백엔드 DB enum과 같은 글자. GraphQL 스키마에는 그대로 나오지 않는다) */
+/** 글 본문 항목 키 (백엔드 PostSections 필드 이름) */
+export type PostSectionKey = 'problem' | 'cause' | 'solution' | 'did' | 'learned';
+export type SkipReason = 'NO_TEAM' | 'FIRST_WEEK' | 'EXEMPTION_PERIOD' | 'PERSONAL_EXEMPTION';
+export type HoldReason = 'API_ERROR' | 'IDENTITY_MISMATCH';
+export type GrassFetchStatus = 'OK' | 'FAILED' | 'IDENTITY_MISMATCH';
+export type WarningDeleteReason = 'KICKED' | 'TEAM_DELETED';
+export type WarningStanding = 'ACTIVE' | 'DEDUCTED' | 'FULFILLED';
+export type LiveWeekStatus = 'CONDITION_MET' | 'NOT_YET' | 'EXCLUDED' | 'EXEMPT';
+export type PenaltyChange = 'NONE' | 'ENTER' | 'RELEASE';
+export type TeamLabelKind = 'PUBLIC' | 'PRIVATE' | 'DELETED';
 
 export type Id = string;
 export type DateStr = string; // YYYY-MM-DD (KST)

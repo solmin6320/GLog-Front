@@ -1,12 +1,11 @@
 import { useId, useState, type FormEvent } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
-import { MSG } from '@/domain/messages';
 import { useAction } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
 import { validateRequiredText } from '@/shared/lib/validators';
 import { Button, InfoBox, Modal, TextArea } from '@/shared/ui';
 import { AdminExemptionsApprovalPreviewQuery, AdminExemptionsApprove, AdminExemptionsReject } from './api';
-import { ApprovalImpact } from './ImpactSummary';
+import { RetroImpact } from './ImpactSummary';
 import { COPY, REJECT_REASON_MAX, exemptionsRefetch, requestLine, type RequestRow } from './model';
 import s from './Exemptions.module.css';
 
@@ -22,30 +21,22 @@ function useGoneHandler(onClose: () => void) {
 }
 
 /**
- * ⑦ [승인] — 판정이 끝난 주의 요청(소급, ACC-ADM-09 · E-45). 미리보기 쿼리 → 영향 미리보기형 확인 →
- * approvePersonalExemption(expectedBasis). 판정 전 주의 요청은 이 다이얼로그 없이 바로 승인한다.
+ * ⑦ [승인] — 지난 주의 요청(소급일 수 있음, ACC-ADM-09 · E-45). 미리보기 쿼리 → 영향 미리보기형 확인 →
+ * approvePersonalExemption. 이번 주 이후의 요청은 이 다이얼로그 없이 바로 승인한다.
  */
 export function ApproveDialog({ request, onClose }: { request: RequestRow; onClose: () => void }) {
   const gone = useGoneHandler(onClose);
-  const preview = useQuery(AdminExemptionsApprovalPreviewQuery, { variables: { requestId: request.id }, fetchPolicy: 'network-only' });
-  const loaded = !preview.loading && !preview.error;
-  const p = loaded ? (preview.data?.personalExemptionApprovalPreview ?? null) : undefined;
-  const [stale, setStale] = useState(false);
+  const preview = useQuery(AdminExemptionsApprovalPreviewQuery, { variables: { id: request.id }, fetchPolicy: 'network-only' });
+  const p = !preview.loading && !preview.error ? preview.data?.previewPersonalExemptionApproval : undefined;
 
   const [approve] = useMutation(AdminExemptionsApprove);
   const action = useAction(
-    (expectedBasis: string | null) =>
-      approve({ variables: { requestId: request.id, expectedBasis }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
+    () => approve({ variables: { id: request.id }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.approved,
-      errorOverrides: { NOT_FOUND: COPY.gone },
+      errorOverrides: { NOT_FOUND: COPY.gone, ALREADY_HANDLED: COPY.gone },
       onError: (e) => {
-        if (e.code === 'PREVIEW_STALE') {
-          setStale(true);
-          preview.refetch().catch(() => undefined);
-          return true;
-        }
-        if (e.code === 'NOT_FOUND') gone();
+        if (e.code === 'NOT_FOUND' || e.code === 'ALREADY_HANDLED') gone();
         return false;
       },
     },
@@ -53,8 +44,7 @@ export function ApproveDialog({ request, onClose }: { request: RequestRow; onClo
 
   const submit = async () => {
     if (p === undefined || action.pending) return;
-    setStale(false);
-    if (await action.run(p?.basis ?? null)) onClose();
+    if (await action.run()) onClose();
   };
 
   return (
@@ -77,7 +67,6 @@ export function ApproveDialog({ request, onClose }: { request: RequestRow; onClo
       <p className={s.lead}>
         {requestLine(request)} · {formatWeekRange(request.weekStart)}
       </p>
-      <p className={s.affected}>{COPY.approveRetroLead}</p>
       {preview.error && !preview.loading ? (
         <InfoBox
           tone="red"
@@ -90,16 +79,9 @@ export function ApproveDialog({ request, onClose }: { request: RequestRow; onClo
         >
           {COPY.previewFailed}
         </InfoBox>
-      ) : p === null ? null : (
-        <ApprovalImpact p={p} />
+      ) : (
+        <RetroImpact p={p} single />
       )}
-      {stale ? (
-        <div className={s.notes}>
-          <InfoBox tone="warn" icon="alert" role="alert">
-            {MSG.previewStale}
-          </InfoBox>
-        </div>
-      ) : null}
     </Modal>
   );
 }
@@ -116,12 +98,12 @@ export function RejectDialog({ request, onClose }: { request: RequestRow; onClos
   const [reject] = useMutation(AdminExemptionsReject);
   const action = useAction(
     (text: string) =>
-      reject({ variables: { requestId: request.id, reason: text }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
+      reject({ variables: { id: request.id, reason: text }, refetchQueries: exemptionsRefetch(), awaitRefetchQueries: true }),
     {
       success: COPY.rejected,
-      errorOverrides: { NOT_FOUND: COPY.gone },
+      errorOverrides: { NOT_FOUND: COPY.gone, ALREADY_HANDLED: COPY.gone },
       onError: (e) => {
-        if (e.code === 'NOT_FOUND') gone();
+        if (e.code === 'NOT_FOUND' || e.code === 'ALREADY_HANDLED') gone();
         return false;
       },
     },
