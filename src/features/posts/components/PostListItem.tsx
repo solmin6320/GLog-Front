@@ -8,7 +8,7 @@ import { NOT_RECORD_TIP, splitByQuery } from '../postText';
 import { useProfilePath } from '../useProfilePath';
 import s from './PostListItem.module.css';
 
-export type PostListNode = PostListQueryQuery['posts']['nodes'][number];
+export type PostListNode = PostListQueryQuery['posts']['items'][number];
 
 /** E-25 '인증 미포함' 배지 + 툴팁 */
 export function NotRecordBadge() {
@@ -26,7 +26,7 @@ export function NotRecordBadge() {
  */
 export function PostListItem({ post, q, type }: { post: PostListNode; q?: string; type: PostTypeParam }) {
   const profilePath = useProfilePath();
-  const hasMeta = post.tags.length > 0 || !!post.publicTeam;
+  const hasMeta = post.tags.length > 0 || !!post.teamName;
   return (
     <li className={s.item}>
       <div className={s.head}>
@@ -50,7 +50,7 @@ export function PostListItem({ post, q, type }: { post: PostListNode; q?: string
           {post.tags.map((tag) => (
             <Tag key={tag} label={tag} to={paths.posts({ type, q, tag })} />
           ))}
-          <TeamTag label={post.publicTeam} />
+          <TeamTag label={post.teamName ? { name: post.teamName } : null} />
         </div>
       ) : null}
       <p className={s.by}>

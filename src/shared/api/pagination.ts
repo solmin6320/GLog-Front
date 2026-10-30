@@ -37,8 +37,12 @@ export function itemsPage(keyArgs: KeyArgs = false): FieldPolicy<ItemsPageShape>
   };
 }
 
-/** `{ items, nextCursor }`를 usePagedList가 읽는 `{ nodes, pageInfo }` 모양으로 바꾼다 */
-export function toPaged<T>(page: { items: T[]; nextCursor?: string | null } | null | undefined) {
+/** `{ items, nextCursor, totalCount? }`를 usePagedList가 읽는 `{ nodes, pageInfo, totalCount }` 모양으로 바꾼다 */
+export function toPaged<T>(page: { items: T[]; nextCursor?: string | null; totalCount?: number } | null | undefined) {
   if (!page) return page;
-  return { nodes: page.items, pageInfo: { hasNextPage: !!page.nextCursor, endCursor: page.nextCursor ?? null } };
+  return {
+    nodes: page.items,
+    pageInfo: { hasNextPage: !!page.nextCursor, endCursor: page.nextCursor ?? null },
+    totalCount: page.totalCount,
+  };
 }

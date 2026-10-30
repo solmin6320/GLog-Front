@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { skipToken, useQuery } from '@apollo/client/react';
 import { useNavigate, useSearchParams } from 'react-router';
-import type { PostFilter } from '@/gql/graphql';
-import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
+import { DEFAULT_PAGE_SIZE, toPaged, usePagedList } from '@/shared/api';
 import { parsePostsSearch, paths, postTypeToEnum, type PostTypeParam } from '@/shared/lib/paths';
 import { EmptyState, LinkButton, LoadMore, PageContainer, QueryBoundary, Segmented, TextLink } from '@/shared/ui';
 import { PostListQuery, PostTagsQuery, PostTypeCountsQuery } from '../api';
@@ -25,19 +24,19 @@ export default function PostListPage() {
   const { type, q, tag } = parsePostsSearch(sp);
   const go = (next: { type: PostTypeParam; q?: string; tag?: string }) => void navigate(paths.posts(next));
 
-  const where: PostFilter = { ...(q ? { query: q } : {}), ...(tag ? { tag } : {}) };
+  const where = { q: q ?? null, tag: tag ?? null };
   const filtered = !!q || !!tag;
 
   const list = usePagedList(PostListQuery, {
-    variables: { filter: { type: postTypeToEnum(type), ...where } },
-    select: (d) => d.posts,
+    variables: { type: postTypeToEnum(type), ...where },
+    select: (d) => toPaged(d.posts),
   });
   // 탭별 건수(①)와 "다른 탭에 n건"(⑫)은 거를 때만
-  const counts = useQuery(PostTypeCountsQuery, filtered ? { variables: { filter: where } } : skipToken);
+  const counts = useQuery(PostTypeCountsQuery, filtered ? { variables: where, fetchPolicy: 'no-cache' } : skipToken);
   const tags = useQuery(PostTagsQuery);
 
   const countOf = (t: PostTypeParam) =>
-    t === 'devlog' ? counts.data?.postTypeCounts.devlog : counts.data?.postTypeCounts.troubleshooting;
+    t === 'devlog' ? counts.data?.devlog.totalCount : counts.data?.troubleshooting.totalCount;
 
   const board = (body: ReactNode) => (
     <>

@@ -207,7 +207,7 @@ describe('BD-03 글 상세', () => {
   it('ACC-BD03-11 본문의 HTML 문자열은 글자 그대로, 줄바꿈 유지', async () => {
     const { db } = await import('@/mocks/db/store');
     const post = db.posts.find((p) => p.id === seedPostId('graphqlN1'));
-    if (post) post.sections.PROBLEM = '<script>alert(1)</script>\n둘째 줄';
+    if (post) post.sections.problem = '<script>alert(1)</script>\n둘째 줄';
     renderRoute(postPath('graphqlN1'));
     await title('GraphQL N+1을 @BatchMapping으로 해결하기');
     const body = screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === '<script>alert(1)</script>\n둘째 줄');

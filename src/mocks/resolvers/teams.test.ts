@@ -194,8 +194,8 @@ describe('teams 목 리졸버 — 나가기 · 추방 · 위임 · 공개 · 삭
     const posts = db.posts.filter((p) => p.teamId === '1' && !p.deletedAt);
     expect(posts.length).toBeGreaterThan(0);
     const post = posts[0];
-    expect(await ok(`{ post(id: "${post?.id}") { ... on Post { id publicTeam { id } } } }`, 'plain')).toEqual({
-      post: { id: post?.id, publicTeam: null },
+    expect(await ok(`{ post(id: "${post?.id}") { id teamName } }`, 'plain')).toEqual({
+      post: { id: post?.id, teamName: null },
     });
     expect(db.warnings.some((w) => !w.deleted && w.teamIds.includes('1'))).toBe(false);
     expect(db.warnings.filter((w) => w.memberId === '3' && w.deleted?.reason === 'TEAM_DELETED').length).toBeGreaterThan(0);

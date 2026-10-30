@@ -2,7 +2,8 @@ import { useMutation } from '@apollo/client/react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { MSG } from '@/domain/messages';
 import type { PostDetailQueryQuery } from '@/gql/graphql';
-import { useAction, usePagedList } from '@/shared/api';
+import { useClock } from '@/session';
+import { toPaged, useAction, usePagedList } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
 import { isObjectId } from '@/shared/lib/ids';
 import { paths, postTypeFromEnum } from '@/shared/lib/paths';
@@ -20,22 +21,22 @@ import {
   VisuallyHidden,
   useConfirm,
 } from '@/shared/ui';
-import { PostDelete, PostDetailQuery, removePostFromLists } from '../api';
+import { PostAdminDelete, PostDelete, PostDetailQuery, removePostFromLists } from '../api';
 import { Comments } from '../components/Comments';
 import { CommitCard } from '../components/CommitCard';
 import { NotRecordBadge } from '../components/PostListItem';
-import { isFilled, POST_TYPE_LABEL, SECTION_LABEL } from '../postText';
+import { inPastWeek, usePostPermissions } from '../permissions';
+import { isFilled, POST_TYPE_LABEL, REQUIRED_SECTIONS, SECTION_LABEL } from '../postText';
 import { useProfilePath } from '../useProfilePath';
 import s from './PostDetailPage.module.css';
 
-type PostNode = Extract<NonNullable<PostDetailQueryQuery['post']>, { __typename: 'Post' }>;
-type CommentNode = PostNode['comments']['nodes'][number];
-
-const COMMENT_PAGE = 50;
+type PostNode = PostDetailQueryQuery['post'];
+type CommentNode = PostNode['comments']['items'][number];
+type MyTeam = PostDetailQueryQuery['myTeams'][number];
 
 /**
  * BD-03 글 상세 (화면설계서 5-1-8 · W-12). postId 형식이 틀리면 부르지 않고 404(요구사항 3-2).
- * 삭제된 글(DeletedPost)은 404가 아니라 삭제 안내(E-31), 댓글 영역은 없다.
+ * 삭제된 글(POST_DELETED 오류)은 404가 아니라 삭제 안내(E-31), 댓글 영역은 없다.
  */
 export default function PostDetailPage() {
   const { postId } = useParams();
@@ -53,33 +54,29 @@ function PostDetail({ postId }: { postId: string }) {
   // 상세와 댓글을 한 문서로 받고, 댓글 [더 보기]는 같은 문서로 이어 붙인다
   const detail = usePagedList(PostDetailQuery, {
     variables: { id: postId },
-    select: (d) => (d.post?.__typename === 'Post' ? d.post.comments : null),
-    pageSize: COMMENT_PAGE,
+    select: (d) => toPaged(d.post.comments),
   });
   return (
     <PageContainer width="md">
       <QueryBoundary
         loading={detail.loading}
         error={detail.error}
-        data={detail.data ? detail.data.post : undefined}
+        data={detail.data}
         onRetry={detail.refetch}
         skeleton={<DetailSkeleton />}
       >
-        {(post) =>
-          post.__typename === 'Post' ? (
-            <PostView
-              post={post}
-              comments={detail.nodes}
-              hasMore={detail.hasMore}
-              loadingMore={detail.loadingMore}
-              loadMoreError={detail.loadMoreError}
-              onLoadMore={detail.loadMore}
-              onPostGone={detail.refetch}
-            />
-          ) : (
-            <FullState kind="deleted" />
-          )
-        }
+        {(d) => (
+          <PostView
+            post={d.post}
+            myTeams={d.myTeams}
+            comments={detail.nodes}
+            hasMore={detail.hasMore}
+            loadingMore={detail.loadingMore}
+            loadMoreError={detail.loadMoreError}
+            onLoadMore={detail.loadMore}
+            onPostGone={detail.refetch}
+          />
+        )}
       </QueryBoundary>
     </PageContainer>
   );
@@ -87,6 +84,7 @@ function PostDetail({ postId }: { postId: string }) {
 
 function PostView({
   post,
+  myTeams,
   comments,
   hasMore,
   loadingMore,
@@ -95,6 +93,7 @@ function PostView({
   onPostGone,
 }: {
   post: PostNode;
+  myTeams: MyTeam[];
   comments: CommentNode[];
   hasMore: boolean;
   loadingMore: boolean;
@@ -105,13 +104,18 @@ function PostView({
   const navigate = useNavigate();
   const confirm = useConfirm();
   const profilePath = useProfilePath();
+  const clock = useClock();
+  const can = usePostPermissions(post.teamId, myTeams);
   const typeParam = postTypeFromEnum(post.type);
   const typeLabel = POST_TYPE_LABEL[post.type] as string | undefined;
 
   const [deletePost] = useMutation(PostDelete);
+  const [adminDeletePost] = useMutation(PostAdminDelete);
   const remove = useAction(
     async () => {
-      await deletePost({ variables: { id: post.id }, update: (cache) => removePostFromLists(cache, post.id) });
+      const update = (cache: Parameters<typeof removePostFromLists>[0]) => removePostFromLists(cache, post.id);
+      if (can.deletesAsAdmin(post.authorId)) await adminDeletePost({ variables: { postId: post.id }, update });
+      else await deletePost({ variables: { id: post.id }, update });
       return true as const;
     },
     {
@@ -130,7 +134,7 @@ function PostView({
         <>
           <p>삭제한 글은 되돌릴 수 없어요.</p>
           {/* E-28 · ACC-BD03-04 — 확정 판정은 다시 계산하지 않는다 */}
-          {post.inFinalizedWeek ? <p>이미 끝난 주의 인증 결과는 바뀌지 않아요.</p> : null}
+          {inPastWeek(post.writtenDate, clock.currentWeekStart) ? <p>이미 끝난 주의 인증 결과는 바뀌지 않아요.</p> : null}
         </>
       ),
       confirmLabel: '삭제',
@@ -141,7 +145,9 @@ function PostView({
   };
 
   const author = post.author;
-  const hasMeta = post.tags.length > 0 || !!post.publicTeam;
+  const hasMeta = post.tags.length > 0 || !!post.teamName;
+  const canEdit = can.canEdit(post.authorId);
+  const canDelete = can.canDelete(post.authorId);
 
   return (
     <article className={s.article}>
@@ -162,16 +168,16 @@ function PostView({
         </Link>
         <span className={s.date}>
           {formatDateTime(post.createdAt)}
-          {post.updatedAt ? ' (수정됨)' : null}
+          {post.updatedAt !== post.createdAt ? ' (수정됨)' : null}
         </span>
-        {post.viewerCanEdit || post.viewerCanDelete ? (
+        {canEdit || canDelete ? (
           <span className={s.actions}>
-            {post.viewerCanEdit ? (
+            {canEdit ? (
               <LinkButton to={paths.postEdit(post.id)} variant="outline" size="sm">
                 수정
               </LinkButton>
             ) : null}
-            {post.viewerCanDelete ? (
+            {canDelete ? (
               <Button variant="danger" size="sm" loading={remove.pending} onClick={() => void onDelete()}>
                 삭제
               </Button>
@@ -185,22 +191,17 @@ function PostView({
           {post.tags.map((tag) => (
             <Tag key={tag} label={tag} to={paths.posts({ type: typeParam, tag })} />
           ))}
-          <TeamTag label={post.publicTeam} />
+          <TeamTag label={post.teamName ? { name: post.teamName } : null} />
         </div>
       ) : null}
 
       <div className={s.sections}>
-        {post.sections.map((section) => {
-          const label = SECTION_LABEL[section.key] as string | undefined;
-          if (!label) return null; // 모르는 항목은 숨긴다(요구사항 6-3 ⑤)
+        {REQUIRED_SECTIONS[post.type].map((key) => {
+          const body = post.sections[key];
           return (
-            <section key={section.key} className={s.section}>
-              <h2 className={s.sectionTitle}>{label}</h2>
-              {isFilled(section.body) ? (
-                <p className={s.body}>{section.body}</p>
-              ) : (
-                <p className={s.unwritten}>작성되지 않음</p>
-              )}
+            <section key={key} className={s.section}>
+              <h2 className={s.sectionTitle}>{SECTION_LABEL[key]}</h2>
+              {isFilled(body) ? <p className={s.body}>{body}</p> : <p className={s.unwritten}>작성되지 않음</p>}
             </section>
           );
         })}
@@ -214,6 +215,7 @@ function PostView({
         postId={post.id}
         count={post.commentCount}
         comments={comments}
+        can={can}
         hasMore={hasMore}
         loadingMore={loadingMore}
         loadMoreError={loadMoreError}

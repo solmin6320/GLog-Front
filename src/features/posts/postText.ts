@@ -1,7 +1,10 @@
 /**
  * 게시판 표시 규칙 (BD-01 · BD-03 · BD-04). 화면 라벨은 프론트가 enum → 문구로 바꾼다.
  */
-import type { PostSectionKey, PostType } from '@/gql/graphql';
+import type { PostType } from '@/gql/graphql';
+
+/** 본문 항목 키 (백엔드 PostSections 필드 이름) */
+export type PostSectionKey = 'problem' | 'cause' | 'solution' | 'did' | 'learned';
 
 export const POST_TYPE_LABEL: Record<PostType, string> = {
   TROUBLESHOOTING: '트러블슈팅',
@@ -9,26 +12,26 @@ export const POST_TYPE_LABEL: Record<PostType, string> = {
 };
 
 export const SECTION_LABEL: Record<PostSectionKey, string> = {
-  PROBLEM: '문제',
-  CAUSE: '원인',
-  SOLUTION: '해결',
-  DID: '한 일',
-  LEARNED: '배운 점',
+  problem: '문제',
+  cause: '원인',
+  solution: '해결',
+  did: '한 일',
+  learned: '배운 점',
 };
 
 /** BD-04 입력칸 안내 문구 */
 export const SECTION_PLACEHOLDER: Record<PostSectionKey, string> = {
-  PROBLEM: '어떤 문제가 있었는지 적어 주세요',
-  CAUSE: '원인을 적어 주세요',
-  SOLUTION: '어떻게 해결했는지 적어 주세요',
-  DID: '한 일을 적어 주세요',
-  LEARNED: '배운 점을 적어 주세요',
+  problem: '어떤 문제가 있었는지 적어 주세요',
+  cause: '원인을 적어 주세요',
+  solution: '어떻게 해결했는지 적어 주세요',
+  did: '한 일을 적어 주세요',
+  learned: '배운 점을 적어 주세요',
 };
 
 /** 기록글 인정에 필요한 항목 (작성 항목 순서). 서버 isRecord 규칙과 같다(R-08) */
 export const REQUIRED_SECTIONS: Record<PostType, PostSectionKey[]> = {
-  TROUBLESHOOTING: ['PROBLEM', 'CAUSE', 'SOLUTION'],
-  DEVLOG: ['DID', 'LEARNED'],
+  TROUBLESHOOTING: ['problem', 'cause', 'solution'],
+  DEVLOG: ['did', 'learned'],
 };
 
 /** E-25 · BD-01 ⑩ 툴팁 */

@@ -10,7 +10,6 @@ import type {
   ContentKind,
   MemberJudgmentHistoryArgs,
   PostCommentsArgs,
-  PostSectionKey,
   PostType,
 } from './__generated__/schema-types';
 import { grassUpdatedAt } from './clock';
@@ -22,8 +21,6 @@ import {
   exemptionPeriodOn,
   grassCalendarData,
   grassStatusOf,
-  inFinalizedWeek,
-  isPostVisible,
   isRecord,
   isRetroactiveWeek,
   judgmentHasActiveWarning,
@@ -61,6 +58,7 @@ import {
   type NoticeRow,
   type PersonalExemptionRow,
   type PostRow,
+  type PostSectionKey,
   type TeamRow,
   type WarningRow,
 } from './db/store';
@@ -157,12 +155,6 @@ export function requireTeamLeader(ctx: MockContext, teamId: Id): void {
 export function canEditPost(ctx: MockContext, p: PostRow): boolean {
   const v = viewerId(ctx);
   return !!v && (p.authorId === v || (!!p.teamId && isTeamLeader(p.teamId, v)));
-}
-
-/** 글 · 댓글 삭제 권한: 작성자 또는 관리자 (팀장은 삭제 불가) */
-export function canDelete(ctx: MockContext, authorId: Id): boolean {
-  const v = viewerId(ctx);
-  return !!v && (authorId === v || isAdmin(ctx));
 }
 
 /** 댓글 수정 권한: 작성자 또는 그 글 연결 팀의 팀장 */
@@ -407,62 +399,44 @@ export function teamPersonalExemptionView(_ctx: MockContext, e: PersonalExemptio
 
 const nonEmpty = (s: string | null | undefined) => (s && s.trim().length > 0 ? s : null);
 
-export function postSectionsView(type: PostType, sections: PostRow['sections']): { key: PostSectionKey; body: string | null }[] {
-  return sectionKeysOf(type).map((key) => ({ key, body: nonEmpty(sections[key]) }));
+/** 백엔드 PostSections: 그 종류의 항목만 값, 나머지는 null */
+export function postSectionsView(type: PostType, sections: PostRow['sections']) {
+  const keys = sectionKeysOf(type);
+  const pick = (key: PostSectionKey) => (keys.includes(key) ? nonEmpty(sections[key]) : null);
+  return { problem: pick('problem'), cause: pick('cause'), solution: pick('solution'), did: pick('did'), learned: pick('learned') };
 }
 
 export function postView(ctx: MockContext, p: PostRow) {
-  const v = viewerId(ctx);
-  const canEdit = canEditPost(ctx, p);
   return {
     __typename: 'Post' as const,
     id: p.id,
+    authorId: p.authorId,
+    author: () => memberView(ctx, p.authorId),
+    teamId: p.teamId,
+    teamName: () => publicTeamOf(p)?.name ?? null,
     type: p.type,
     title: p.title,
     sections: postSectionsView(p.type, p.sections),
     tags: p.tags,
     commitUrls: p.commitUrls,
-    author: () => memberView(ctx, p.authorId),
-    publicTeam: () => {
-      const t = publicTeamOf(p);
-      return t ? teamView(ctx, t) : null;
-    },
     isRecord: isRecord(p),
     writtenDate: writtenDateOf(p),
-    inFinalizedWeek: () => inFinalizedWeek(p, ctx.clock),
     createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
+    updatedAt: p.updatedAt ?? p.createdAt,
     commentCount: () => visibleComments(p.id, ctx.clock).length,
-    comments: (args: PostCommentsArgs) => paginate(visibleComments(p.id, ctx.clock), args, (c) => commentView(ctx, c), 50),
-    viewerCanEdit: canEdit,
-    viewerCanDelete: canDelete(ctx, p.authorId),
-    viewerIsAuthor: !!v && p.authorId === v,
-    editTeamId: canEdit ? p.teamId : null,
+    comments: ({ after }: PostCommentsArgs) => itemsPage(visibleComments(p.id, ctx.clock), after, (c) => commentView(ctx, c)),
   };
-}
-
-export function deletedPostView(p: PostRow) {
-  return { __typename: 'DeletedPost' as const, id: p.id, deletedAt: p.deletedAt };
-}
-
-/** post(id) 결과: 보이는 글 → Post · 삭제된 글 → DeletedPost · 없음(또는 미래 글) → null */
-export function postLookupView(ctx: MockContext, id: Id) {
-  const p = findPost(id);
-  if (!p) return null;
-  if (p.deletedAt) return deletedPostView(p);
-  return isPostVisible(p, ctx.clock) ? postView(ctx, p) : null;
 }
 
 export function commentView(ctx: MockContext, c: CommentRow) {
   return {
     id: c.id,
     postId: c.postId,
+    authorId: c.authorId,
     content: c.content,
     author: () => memberView(ctx, c.authorId),
     createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-    viewerCanEdit: canEditComment(ctx, c),
-    viewerCanDelete: canDelete(ctx, c.authorId),
+    updatedAt: c.updatedAt ?? c.createdAt,
   };
 }
 

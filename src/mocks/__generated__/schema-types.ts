@@ -173,25 +173,20 @@ export type CategoryWarningCount = {
 
 export type Comment = {
   __typename?: 'Comment';
-  author: Member;
-  /** 1~500자(BD-03 ⑫ 제안) */
+  author: BoardAuthor;
+  authorId: Scalars['ID']['output'];
   content: Scalars['String']['output'];
-  createdAt: Scalars['DateTime']['output'];
+  createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  /** 댓글이 달린 글 */
   postId: Scalars['ID']['output'];
-  updatedAt: Maybe<Scalars['DateTime']['output']>;
-  /** 작성자 또는 관리자 */
-  viewerCanDelete: Scalars['Boolean']['output'];
-  /** 작성자 또는 그 글이 연결된 팀의 팀장 */
-  viewerCanEdit: Scalars['Boolean']['output'];
+  updatedAt: Scalars['String']['output'];
 };
 
-export type CommentConnection = {
-  __typename?: 'CommentConnection';
-  nodes: Array<Comment>;
-  pageInfo: PageInfo;
-  totalCount: Scalars['Int']['output'];
+export type CommentPage = {
+  __typename?: 'CommentPage';
+  items: Array<Comment>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
 };
 
 /** 글 + 댓글 혼합 목록의 행 종류 (AD-01 ②-5, TM-06 ⑧) */
@@ -239,17 +234,16 @@ export type CorrectableJudgmentStatus =
   | 'FAIL'
   | 'PASS';
 
-/**
- * 글 작성 (BD-04). 필수 항목이 비어도 저장은 허용(E-24 추측) — isRecord는 서버가 계산한다(DB 1-5).
- * type과 맞지 않는 section key는 VALIDATION_FAILED.
- */
 export type CreatePostInput = {
-  commitUrls: Array<Scalars['String']['input']>;
-  sections: Array<PostSectionInput>;
-  tags: Array<Scalars['String']['input']>;
-  /** 본인이 속한 팀만. null = 연결 안 함(BD-04 ⑨) */
+  /** https://github.com/{owner}/{repo}/commit/{sha} 형식만 허용. 실제 존재 여부는 확인하지 않는다 */
+  commitUrls?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** 글 종류에 해당하는 항목만 쓰이고 나머지는 무시된다 */
+  sections: PostSectionsInput;
+  /** 최대 5개, 개당 20자 */
+  tags?: InputMaybe<Array<Scalars['String']['input']>>;
+  /** 연결할 팀 id (선택). 지금 내가 소속인 삭제되지 않은 팀만 가능하고, 아니면 POST_TEAM_INVALID */
   teamId?: InputMaybe<Scalars['ID']['input']>;
-  /** 1~60자(BD-04 ③ 제안). 제목만 진짜 필수 */
+  /** 1~60자 */
   title: Scalars['String']['input'];
   type: PostType;
 };
@@ -288,13 +282,6 @@ export type DayActivity = {
   recordCount: Maybe<Scalars['Int']['output']>;
   /** hasGrass OR hasRecord. 같은 날 둘 다여도 1일(기능명세서 5장) */
   verified: Scalars['Boolean']['output'];
-};
-
-/** E-31 삭제된 글 안내(404와 구분). 본문 · 댓글은 내려주지 않는다 */
-export type DeletedPost = {
-  __typename?: 'DeletedPost';
-  deletedAt: Maybe<Scalars['DateTime']['output']>;
-  id: Scalars['ID']['output'];
 };
 
 /** AD-01 ②-1 ⑦ 삭제된 경고(추방 · 팀 삭제로 카테고리가 모두 빠진 것). 회수된 경고는 나오지 않는다 */
@@ -524,8 +511,10 @@ export type Mutation = {
   __typename?: 'Mutation';
   /** 받은 초대를 수락해 바로 참가한다 (TM-04). INVITATION_ALREADY_JOINED · TEAM_GONE */
   acceptTeamInvitation: Team;
-  /** BD-03 ⑫ */
-  addComment: Comment;
+  /** 댓글을 삭제한다 (관리자, 소프트 삭제). 없거나 이미 삭제된 댓글은 NOT_FOUND. 관리자 행동 로그가 남는다 */
+  adminDeleteComment: Scalars['Boolean']['output'];
+  /** 글을 삭제한다 (관리자, 소프트 삭제). 이미 삭제된 글은 POST_DELETED, 없는 글은 NOT_FOUND. 관리자 행동 로그가 남는다 */
+  adminDeletePost: Scalars['Boolean']['output'];
   approveMember: AdminMemberRow;
   /** AD-01 ②-3 ⑦ [승인]. 소급이면 미리보기 후 (추측) */
   approvePersonalExemption: PersonalExemptionRequest;
@@ -533,23 +522,25 @@ export type Mutation = {
   cancelTeamInvitation: Scalars['Boolean']['output'];
   /** AD-01 ⑩ [정정하고 재계산]. 사유 필수. 연쇄 재계산(E-49 · E-50 · E-58 · E-60) */
   correctJudgment: RecalcPayload;
+  /** 댓글을 쓴다. 삭제된 글에는 달 수 없다 (1~500자) */
+  createComment: Comment;
   /** 과거 주간이면 exemptionPeriodPreview를 먼저 거친다(AD-01 ②-3 ⑥, E-45) */
   createExemptionPeriod: ExemptionPeriod;
   createNotice: Notice;
-  /** BD-04 등록 */
+  /** 글을 쓴다. 필수 항목을 모두 채우지 않아도 저장되지만 기록글로 인정되지 않는다(isRecord=false) */
   createPost: Post;
   /** 팀을 만든다. 만든 사람이 팀장이고, 초대코드가 이때 한 번 발급된다 (TM-02) */
   createTeam: CreateTeamPayload;
   /** 받은 초대를 거절한다 */
   declineTeamInvitation: Scalars['Boolean']['output'];
-  /** BD-03 ⑪ · AD-01 ②-5 작성자 또는 관리자 */
-  deleteComment: Scalars['ID']['output'];
+  /** 댓글을 지운다 (작성자 본인만, 소프트 삭제). 팀장도 지울 수 없다 */
+  deleteComment: Scalars['Boolean']['output'];
   /** [미결] 이미 판정된 주의 면제 기간을 지우면 그 주를 어떻게 판정할지 명세에 없다(계약서 9장 C-05) */
   deleteExemptionPeriod: Scalars['ID']['output'];
   /** isSystem이면 SYSTEM_NOTICE_UNDELETABLE(EX-AD01-02) */
   deleteNotice: Scalars['Boolean']['output'];
-  /** BD-03 ④ 작성자 또는 관리자(AD-01 ②-5). 확정 판정 불변(E-28) */
-  deletePost: Scalars['ID']['output'];
+  /** 글을 지운다 (작성자 본인만, 소프트 삭제). 팀장도 지울 수 없다 */
+  deletePost: Scalars['Boolean']['output'];
   /** 팀을 삭제한다 (팀장과 시스템 관리자만) */
   deleteTeam: Scalars['Boolean']['output'];
   /** GitHub 로그인 뒤 받은 일회용 코드를 액세스 토큰으로 바꾼다. 한 번만 쓸 수 있다. 재사용 · 만료 AUTH_CODE_INVALID, 거절 회원 ACCOUNT_REJECTED */
@@ -582,11 +573,14 @@ export type Mutation = {
   setNoticePinned: Notice;
   /** 팀장을 다른 팀원에게 넘긴다 (팀장과 시스템 관리자만). 되돌릴 수 없다 */
   transferTeamLeadership: Team;
-  /** BD-03 ⑪ · TM-06 ⑧ 작성자 또는 팀장 */
+  /** 댓글을 고친다 (작성자 본인 또는 그 글이 연결된 팀의 현재 팀장) */
   updateComment: Comment;
   updateExemptionPeriod: ExemptionPeriod;
   updateNotice: Notice;
-  /** BD-04 수정. 작성자 또는 연결 팀 팀장 */
+  /**
+   * 글을 고친다 (작성자 본인 또는 그 글이 연결된 팀의 현재 팀장). 글 종류와 작성일은 바뀌지 않는다.
+   * 팀장이 남의 글을 고칠 때는 teamId를 읽지 않고 기존 팀 연결을 유지한다. 그 밖의 사람은 FORBIDDEN
+   */
   updatePost: Post;
   /** 팀의 공개·비공개를 바꾼다 (팀장과 시스템 관리자만, TM-06 ⑦) */
   updateTeam: Team;
@@ -598,8 +592,12 @@ export type MutationAcceptTeamInvitationArgs = {
 };
 
 
-export type MutationAddCommentArgs = {
-  content: Scalars['String']['input'];
+export type MutationAdminDeleteCommentArgs = {
+  commentId: Scalars['ID']['input'];
+};
+
+
+export type MutationAdminDeletePostArgs = {
   postId: Scalars['ID']['input'];
 };
 
@@ -622,6 +620,12 @@ export type MutationCancelTeamInvitationArgs = {
 
 export type MutationCorrectJudgmentArgs = {
   input: CorrectJudgmentInput;
+};
+
+
+export type MutationCreateCommentArgs = {
+  content: Scalars['String']['input'];
+  postId: Scalars['ID']['input'];
 };
 
 
@@ -902,116 +906,71 @@ export type PersonalExemptionStatus =
   | 'PENDING'
   | 'REJECTED';
 
-/**
- * 게시글 (MongoDB posts 3-1 + MariaDB post_index 1-5)
- * 권한 판단은 서버 계산 필드(viewerCan*)로 받는다 — 비공개 팀 글은 팀 정보가 숨겨져 클라이언트가
- * '이 글 팀의 팀장인가'를 스스로 계산할 수 없다(BD-03 ④ · ⑪, 5-2-4).
- */
 export type Post = {
   __typename?: 'Post';
-  author: Member;
+  author: BoardAuthor;
+  /** 작성자 회원 id. 본인 글 여부(수정·삭제 버튼) 판단에 쓴다 */
+  authorId: Scalars['ID']['output'];
   commentCount: Scalars['Int']['output'];
-  /** BD-03 ⑩ 등록순. 페이지 크기는 명세 없음 (제안: 50) */
-  comments: CommentConnection;
-  /** DB는 배열(3-1), 화면은 1칸(BD-04 ⑧) → 1차 구현은 0~1개 (제안, 계약서 9장 C-08) */
+  /** 댓글 목록. 오래된 순, 커서 기반 20개. 대댓글 없음 */
+  comments: CommentPage;
   commitUrls: Array<Scalars['String']['output']>;
-  createdAt: Scalars['DateTime']['output'];
-  /** BD-04 수정 모드의 ⑨ 소속 팀 기본값. viewerCanEdit일 때만 값(비공개 팀이어도 id만) (제안) */
-  editTeamId: Maybe<Scalars['ID']['output']>;
+  /** 작성 시각 (KST, ISO-8601) */
+  createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
-  /** writtenDate가 속한 주가 이미 판정 확정됐으면 true. E-28 '이미 끝난 주의 인증 결과는 바뀌지 않아요' 안내 판단용. 월요일 00:00~판정 실행 사이 · 보류 주는 false (M-03, 제안) */
-  inFinalizedWeek: Scalars['Boolean']['output'];
-  /** false면 '인증 미포함' 배지(E-25) */
+  /** 필수 항목을 모두 채웠는가. false면 '인증 미포함' 배지 (E-25) */
   isRecord: Scalars['Boolean']['output'];
-  /** 공개 팀에 연결된 글만 값. 비공개 · 삭제 · 미연결이면 null(BD-01 ⑧, BD-03 ⑥, E-23) */
-  publicTeam: Maybe<Team>;
-  /** 작성 항목 순서대로(TROUBLESHOOTING 3칸 · DEVLOG 2칸) */
-  sections: Array<PostSection>;
-  /** 최대 5개 · 개당 20자(BD-04 ⑦ 제안) */
+  sections: PostSections;
+  /** 정규화된 태그(앞뒤 공백 제거, 소문자). 글당 최대 5개 */
   tags: Array<Scalars['String']['output']>;
+  /** 연결된 팀 id. 없으면 null. 팀 이름은 teamName(비공개 팀은 숨김) */
+  teamId: Maybe<Scalars['ID']['output']>;
+  /** 연결된 팀 이름. 비공개 팀·삭제된 팀·연결 없는 글은 null (열람자와 무관, E-23) */
+  teamName: Maybe<Scalars['String']['output']>;
   title: Scalars['String']['output'];
   type: PostType;
-  /** 값이 있으면 '(수정됨)'(BD-03 ③ 제안) */
-  updatedAt: Maybe<Scalars['DateTime']['output']>;
-  /** 작성자 본인 또는 관리자. 팀장은 삭제 불가(BD-03 비고) */
-  viewerCanDelete: Scalars['Boolean']['output'];
-  /** 작성자 본인 또는 연결 팀의 팀장(BD-03 ④, 기능명세서 2장) */
-  viewerCanEdit: Scalars['Boolean']['output'];
-  /** 팀장이 남의 글을 수정하는 경우 배너(BD-04 비고) 판단용 */
-  viewerIsAuthor: Scalars['Boolean']['output'];
-  /** 주차 귀속 날짜(KST, 서버 저장 시각 기준 E-27) [Q-11: 작성일 기준인지 필수 항목을 다 채운 날 기준인지 미정] */
-  writtenDate: Scalars['Date']['output'];
+  /** 수정 시각 (KST, ISO-8601). 수정 전에는 createdAt과 같다 */
+  updatedAt: Scalars['String']['output'];
+  /** 최초 저장일(KST, yyyy-MM-dd). 수정해도 바뀌지 않는다 */
+  writtenDate: Scalars['String']['output'];
 };
 
 
-/**
- * 게시글 (MongoDB posts 3-1 + MariaDB post_index 1-5)
- * 권한 판단은 서버 계산 필드(viewerCan*)로 받는다 — 비공개 팀 글은 팀 정보가 숨겨져 클라이언트가
- * '이 글 팀의 팀장인가'를 스스로 계산할 수 없다(BD-03 ④ · ⑪, 5-2-4).
- */
 export type PostCommentsArgs = {
   after: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Int']['input']>;
 };
 
-export type PostConnection = {
-  __typename?: 'PostConnection';
-  nodes: Array<Post>;
-  pageInfo: PageInfo;
-  /** BD-01 ⑬ '검색 결과 n건'(현재 탭 기준) */
+export type PostPage = {
+  __typename?: 'PostPage';
+  items: Array<Post>;
+  /** 다음 페이지 커서. null이면 마지막 */
+  nextCursor: Maybe<Scalars['String']['output']>;
+  /** 현재 조건(종류·태그·검색어)의 전체 글 수. 요청했을 때만 센다 */
   totalCount: Scalars['Int']['output'];
 };
 
-/** BD-01 · 헤더 검색(5-1-0-1) 공통 필터. 헤더 검색은 서버에 따로 묻지 않고 이 필터로 BD-01에 들어온다 */
-export type PostFilter = {
-  /** [Q-12] PR-01 ⑥ '작성자 필터' */
-  authorId?: InputMaybe<Scalars['ID']['input']>;
-  /** 제목 · 내용 · 태그 검색. 앞뒤 공백 제거 후 2~50자(E-61 · E-63) */
-  query?: InputMaybe<Scalars['String']['input']>;
-  tag?: InputMaybe<Scalars['String']['input']>;
-  /** [Q-12] TM-05 ⑧ '전체보기(팀 필터)'. A안이면 사용, B안이면 남겨두고 쓰지 않는다 */
-  teamId?: InputMaybe<Scalars['ID']['input']>;
-  /** null이면 종류 무관(관리자 · 프로필용) */
-  type?: InputMaybe<PostType>;
+/** 종류별 본문 항목. 트러블슈팅은 problem·cause·solution, 개발일지는 did·learned만 값이 있다 */
+export type PostSections = {
+  __typename?: 'PostSections';
+  cause: Maybe<Scalars['String']['output']>;
+  did: Maybe<Scalars['String']['output']>;
+  learned: Maybe<Scalars['String']['output']>;
+  problem: Maybe<Scalars['String']['output']>;
+  solution: Maybe<Scalars['String']['output']>;
 };
 
-/** post(id) 결과. null = 없는 글(E-53) */
-export type PostLookup = DeletedPost | Post;
-
-/** 빈 항목은 body = null → '작성되지 않음'(BD-03 ⑦) */
-export type PostSection = {
-  __typename?: 'PostSection';
-  body: Maybe<Scalars['String']['output']>;
-  key: PostSectionKey;
+export type PostSectionsInput = {
+  cause?: InputMaybe<Scalars['String']['input']>;
+  did?: InputMaybe<Scalars['String']['input']>;
+  learned?: InputMaybe<Scalars['String']['input']>;
+  problem?: InputMaybe<Scalars['String']['input']>;
+  solution?: InputMaybe<Scalars['String']['input']>;
 };
-
-export type PostSectionInput = {
-  body?: InputMaybe<Scalars['String']['input']>;
-  key: PostSectionKey;
-};
-
-/**
- * posts.sections 의 키(DB 3-1: problem/cause/solution/did/learned)를 enum으로 올린 것 (제안)
- * TROUBLESHOOTING = PROBLEM · CAUSE · SOLUTION / DEVLOG = DID · LEARNED (기능명세서 3장 작성 항목)
- */
-export type PostSectionKey =
-  | 'CAUSE'
-  | 'DID'
-  | 'LEARNED'
-  | 'PROBLEM'
-  | 'SOLUTION';
 
 /** DB post_index.post_type · posts.type (1-5, 3-1). URL 쿼리(?type=troubleshooting|devlog)는 소문자이므로 라우터에서 변환한다 */
 export type PostType =
   | 'DEVLOG'
   | 'TROUBLESHOOTING';
-
-/** BD-01 ① 검색 시 탭별 결과 수(제안 — 목업 W-05) */
-export type PostTypeCounts = {
-  __typename?: 'PostTypeCounts';
-  devlog: Scalars['Int']['output'];
-  troubleshooting: Scalars['Int']['output'];
-};
 
 export type Profile = {
   __typename?: 'Profile';
@@ -1161,14 +1120,16 @@ export type Query = {
   personalExemptionApprovalPreview: Maybe<RecalcPreview>;
   /** AD-01 ②-3 ⑦ */
   personalExemptionRequests: PersonalExemptionRequestConnection;
-  /** BD-01 ④. type 생략 = 전체 (제안: 현재 탭 기준) */
+  /** 태그 필터에 보여줄 많이 쓰인 태그 상위 10개. type을 생략하면 두 종류 전체 */
   popularTags: Array<TagCount>;
-  /** BD-03 · BD-04 수정 모드 */
-  post: Maybe<PostLookup>;
-  /** BD-01 ① 검색 시 탭별 건수 (제안) */
-  postTypeCounts: PostTypeCounts;
-  /** 최신순 고정(BD-01 비고 제안). 20개씩(BD-01 ⑪ 제안) [Q-06] */
-  posts: PostConnection;
+  /** 글 상세. 없으면 NOT_FOUND, 삭제된 글은 POST_DELETED */
+  post: Post;
+  /**
+   * 게시판 목록. 최신순, 커서 기반 20개.
+   * tag는 정확히 일치하는 태그, q는 제목·내용·태그 검색(앞뒤 공백 제외 2~50자, 공백으로 나눈 단어를 모두 포함한 글).
+   * q·tag는 함께 쓰면 둘 다 만족하는 글만 나온다
+   */
+  posts: PostPage;
   /** 프로필 (승인된 회원 누구나, 본인 · 타인 같은 모양). 없는 회원이나 승인되지 않은 회원은 NOT_FOUND */
   profile: Profile;
   /** 받은 초대 목록 (TM-04). 최신순, 커서 기반 20개 */
@@ -1286,7 +1247,6 @@ export type QueryPersonalExemptionRequestsArgs = {
 
 
 export type QueryPopularTagsArgs = {
-  first?: InputMaybe<Scalars['Int']['input']>;
   type: InputMaybe<PostType>;
 };
 
@@ -1296,15 +1256,11 @@ export type QueryPostArgs = {
 };
 
 
-export type QueryPostTypeCountsArgs = {
-  filter: PostFilter;
-};
-
-
 export type QueryPostsArgs = {
   after: InputMaybe<Scalars['String']['input']>;
-  filter: PostFilter;
-  first?: InputMaybe<Scalars['Int']['input']>;
+  q: InputMaybe<Scalars['String']['input']>;
+  tag: InputMaybe<Scalars['String']['input']>;
+  type: PostType;
 };
 
 
@@ -1443,7 +1399,6 @@ export type SkipReason =
   | 'NO_TEAM'
   | 'PERSONAL_EXEMPTION';
 
-/** BD-01 ④ 많이 쓰인 태그 상위 10개(제안) */
 export type TagCount = {
   __typename?: 'TagCount';
   count: Scalars['Int']['output'];
@@ -1598,15 +1553,11 @@ export type TeamWeekSummary = {
   weekStart: Scalars['String']['output'];
 };
 
-/**
- * 글 수정. 종류는 바꿀 수 없다(BD-04 ② 제안).
- * 전체 치환(필드 전부 보냄) 방식 (제안) — 'teamId 생략'과 'teamId: null(연결 해제)'을 헷갈리지 않기 위해.
- * 팀장이 남의 글을 수정할 때 teamId는 서버가 무시한다(BD-04 비고: ②⑨ 비활성).
- */
+/** 모든 값을 통째로 바꾼다. 생략한 tags·commitUrls·teamId는 비워진다. 팀장이 남의 글을 고칠 때 teamId는 무시된다 */
 export type UpdatePostInput = {
-  commitUrls: Array<Scalars['String']['input']>;
-  sections: Array<PostSectionInput>;
-  tags: Array<Scalars['String']['input']>;
+  commitUrls?: InputMaybe<Array<Scalars['String']['input']>>;
+  sections: PostSectionsInput;
+  tags?: InputMaybe<Array<Scalars['String']['input']>>;
   teamId?: InputMaybe<Scalars['ID']['input']>;
   title: Scalars['String']['input'];
 };

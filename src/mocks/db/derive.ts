@@ -15,7 +15,6 @@ import type {
   JudgmentStatus,
   LiveWeekStatus,
   PenaltyChange,
-  PostSectionKey,
   PostType,
   SkipReason,
   TeamLabelKind,
@@ -38,6 +37,7 @@ import {
   type JudgmentRow,
   type NoticeRow,
   type PostRow,
+  type PostSectionKey,
   type TeamRow,
   type WarningRow,
 } from './store';
@@ -94,8 +94,8 @@ export function byNewest<T extends { createdAt: string; id: string }>(a: T, b: T
 /* ================================================================== */
 
 const REQUIRED: Record<PostType, PostSectionKey[]> = {
-  TROUBLESHOOTING: ['PROBLEM', 'CAUSE', 'SOLUTION'],
-  DEVLOG: ['DID', 'LEARNED'],
+  TROUBLESHOOTING: ['problem', 'cause', 'solution'],
+  DEVLOG: ['did', 'learned'],
 };
 
 export const requiredSections = (type: PostType): PostSectionKey[] => REQUIRED[type];

@@ -70,18 +70,6 @@ enum PostType {
   DEVLOG
 }
 
-"""
-posts.sections 의 키(DB 3-1: problem/cause/solution/did/learned)를 enum으로 올린 것 (제안)
-TROUBLESHOOTING = PROBLEM · CAUSE · SOLUTION / DEVLOG = DID · LEARNED (기능명세서 3장 작성 항목)
-"""
-enum PostSectionKey {
-  PROBLEM
-  CAUSE
-  SOLUTION
-  DID
-  LEARNED
-}
-
 "DB weekly_judgment.status (1-6). HOLD는 확정 상태가 아니다(E-35)"
 enum JudgmentStatus {
   PASS
@@ -887,96 +875,67 @@ type PersonalExemptionPage {
 # 8. 게시판
 # ---------------------------------------------------------------------
 
-"빈 항목은 body = null → '작성되지 않음'(BD-03 ⑦)"
-type PostSection {
-  key: PostSectionKey!
-  body: String
+"종류별 본문 항목. 트러블슈팅은 problem·cause·solution, 개발일지는 did·learned만 값이 있다"
+type PostSections {
+  problem: String
+  cause: String
+  solution: String
+  did: String
+  learned: String
 }
 
-"""
-게시글 (MongoDB posts 3-1 + MariaDB post_index 1-5)
-권한 판단은 서버 계산 필드(viewerCan*)로 받는다 — 비공개 팀 글은 팀 정보가 숨겨져 클라이언트가
-'이 글 팀의 팀장인가'를 스스로 계산할 수 없다(BD-03 ④ · ⑪, 5-2-4).
-"""
 type Post {
   id: ID!
+  "작성자 회원 id. 본인 글 여부(수정·삭제 버튼) 판단에 쓴다"
+  authorId: ID!
+  author: BoardAuthor!
+  "연결된 팀 id. 없으면 null. 팀 이름은 teamName(비공개 팀은 숨김)"
+  teamId: ID
+  "연결된 팀 이름. 비공개 팀·삭제된 팀·연결 없는 글은 null (열람자와 무관, E-23)"
+  teamName: String
   type: PostType!
   title: String!
-  "작성 항목 순서대로(TROUBLESHOOTING 3칸 · DEVLOG 2칸)"
-  sections: [PostSection!]!
-  "최대 5개 · 개당 20자(BD-04 ⑦ 제안)"
+  sections: PostSections!
+  "정규화된 태그(앞뒤 공백 제거, 소문자). 글당 최대 5개"
   tags: [String!]!
-  "DB는 배열(3-1), 화면은 1칸(BD-04 ⑧) → 1차 구현은 0~1개 (제안, 계약서 9장 C-08)"
   commitUrls: [String!]!
-  author: Member!
-  "공개 팀에 연결된 글만 값. 비공개 · 삭제 · 미연결이면 null(BD-01 ⑧, BD-03 ⑥, E-23)"
-  publicTeam: Team
-  "false면 '인증 미포함' 배지(E-25)"
+  "필수 항목을 모두 채웠는가. false면 '인증 미포함' 배지 (E-25)"
   isRecord: Boolean!
-  "주차 귀속 날짜(KST, 서버 저장 시각 기준 E-27) [Q-11: 작성일 기준인지 필수 항목을 다 채운 날 기준인지 미정]"
-  writtenDate: Date!
-  "writtenDate가 속한 주가 이미 판정 확정됐으면 true. E-28 '이미 끝난 주의 인증 결과는 바뀌지 않아요' 안내 판단용. 월요일 00:00~판정 실행 사이 · 보류 주는 false (M-03, 제안)"
-  inFinalizedWeek: Boolean!
-  createdAt: DateTime!
-  "값이 있으면 '(수정됨)'(BD-03 ③ 제안)"
-  updatedAt: DateTime
+  "최초 저장일(KST, yyyy-MM-dd). 수정해도 바뀌지 않는다"
+  writtenDate: String!
+  "작성 시각 (KST, ISO-8601)"
+  createdAt: String!
+  "수정 시각 (KST, ISO-8601). 수정 전에는 createdAt과 같다"
+  updatedAt: String!
   commentCount: Int!
-  "BD-03 ⑩ 등록순. 페이지 크기는 명세 없음 (제안: 50)"
-  comments(first: Int = 50, after: String): CommentConnection!
-  "작성자 본인 또는 연결 팀의 팀장(BD-03 ④, 기능명세서 2장)"
-  viewerCanEdit: Boolean!
-  "작성자 본인 또는 관리자. 팀장은 삭제 불가(BD-03 비고)"
-  viewerCanDelete: Boolean!
-  "팀장이 남의 글을 수정하는 경우 배너(BD-04 비고) 판단용"
-  viewerIsAuthor: Boolean!
-  "BD-04 수정 모드의 ⑨ 소속 팀 기본값. viewerCanEdit일 때만 값(비공개 팀이어도 id만) (제안)"
-  editTeamId: ID
+  "댓글 목록. 오래된 순, 커서 기반 20개. 대댓글 없음"
+  comments("이전 페이지의 nextCursor" after: String): CommentPage!
 }
-
-"E-31 삭제된 글 안내(404와 구분). 본문 · 댓글은 내려주지 않는다"
-type DeletedPost {
-  id: ID!
-  deletedAt: DateTime
-}
-
-"post(id) 결과. null = 없는 글(E-53)"
-union PostLookup = Post | DeletedPost
 
 type Comment {
   id: ID!
-  "댓글이 달린 글"
   postId: ID!
-  "1~500자(BD-03 ⑫ 제안)"
+  authorId: ID!
+  author: BoardAuthor!
   content: String!
-  author: Member!
-  createdAt: DateTime!
-  updatedAt: DateTime
-  "작성자 또는 그 글이 연결된 팀의 팀장"
-  viewerCanEdit: Boolean!
-  "작성자 또는 관리자"
-  viewerCanDelete: Boolean!
+  createdAt: String!
+  updatedAt: String!
 }
 
-type PostConnection {
-  nodes: [Post!]!
-  pageInfo: PageInfo!
-  "BD-01 ⑬ '검색 결과 n건'(현재 탭 기준)"
+type CommentPage {
+  items: [Comment!]!
+  "다음 페이지 커서. null이면 마지막"
+  nextCursor: String
+}
+
+type PostPage {
+  items: [Post!]!
+  "다음 페이지 커서. null이면 마지막"
+  nextCursor: String
+  "현재 조건(종류·태그·검색어)의 전체 글 수. 요청했을 때만 센다"
   totalCount: Int!
 }
 
-type CommentConnection {
-  nodes: [Comment!]!
-  pageInfo: PageInfo!
-  totalCount: Int!
-}
-
-"BD-01 ① 검색 시 탭별 결과 수(제안 — 목업 W-05)"
-type PostTypeCounts {
-  troubleshooting: Int!
-  devlog: Int!
-}
-
-"BD-01 ④ 많이 쓰인 태그 상위 10개(제안)"
 type TagCount {
   tag: String!
   count: Int!
@@ -1234,49 +1193,34 @@ type RerunResult {
 # 12. 입력 타입
 # ---------------------------------------------------------------------
 
-"BD-01 · 헤더 검색(5-1-0-1) 공통 필터. 헤더 검색은 서버에 따로 묻지 않고 이 필터로 BD-01에 들어온다"
-input PostFilter {
-  "null이면 종류 무관(관리자 · 프로필용)"
-  type: PostType
-  tag: String
-  "제목 · 내용 · 태그 검색. 앞뒤 공백 제거 후 2~50자(E-61 · E-63)"
-  query: String
-  "[Q-12] TM-05 ⑧ '전체보기(팀 필터)'. A안이면 사용, B안이면 남겨두고 쓰지 않는다"
-  teamId: ID
-  "[Q-12] PR-01 ⑥ '작성자 필터'"
-  authorId: ID
+input PostSectionsInput {
+  problem: String
+  cause: String
+  solution: String
+  did: String
+  learned: String
 }
 
-input PostSectionInput {
-  key: PostSectionKey!
-  body: String
-}
-
-"""
-글 작성 (BD-04). 필수 항목이 비어도 저장은 허용(E-24 추측) — isRecord는 서버가 계산한다(DB 1-5).
-type과 맞지 않는 section key는 VALIDATION_FAILED.
-"""
 input CreatePostInput {
   type: PostType!
-  "1~60자(BD-04 ③ 제안). 제목만 진짜 필수"
+  "1~60자"
   title: String!
-  sections: [PostSectionInput!]!
-  tags: [String!]!
-  commitUrls: [String!]!
-  "본인이 속한 팀만. null = 연결 안 함(BD-04 ⑨)"
+  "글 종류에 해당하는 항목만 쓰이고 나머지는 무시된다"
+  sections: PostSectionsInput!
+  "최대 5개, 개당 20자"
+  tags: [String!]
+  "https://github.com/{owner}/{repo}/commit/{sha} 형식만 허용. 실제 존재 여부는 확인하지 않는다"
+  commitUrls: [String!]
+  "연결할 팀 id (선택). 지금 내가 소속인 삭제되지 않은 팀만 가능하고, 아니면 POST_TEAM_INVALID"
   teamId: ID
 }
 
-"""
-글 수정. 종류는 바꿀 수 없다(BD-04 ② 제안).
-전체 치환(필드 전부 보냄) 방식 (제안) — 'teamId 생략'과 'teamId: null(연결 해제)'을 헷갈리지 않기 위해.
-팀장이 남의 글을 수정할 때 teamId는 서버가 무시한다(BD-04 비고: ②⑨ 비활성).
-"""
+"모든 값을 통째로 바꾼다. 생략한 tags·commitUrls·teamId는 비워진다. 팀장이 남의 글을 고칠 때 teamId는 무시된다"
 input UpdatePostInput {
   title: String!
-  sections: [PostSectionInput!]!
-  tags: [String!]!
-  commitUrls: [String!]!
+  sections: PostSectionsInput!
+  tags: [String!]
+  commitUrls: [String!]
   teamId: ID
 }
 
@@ -1377,14 +1321,16 @@ type Query {
   profile(memberId: ID!): Profile!
 
   # --- 게시판 (BD-01 · BD-03 · BD-04, 헤더 검색) ----------------------
-  "최신순 고정(BD-01 비고 제안). 20개씩(BD-01 ⑪ 제안) [Q-06]"
-  posts(filter: PostFilter!, first: Int = 20, after: String): PostConnection!
-  "BD-01 ① 검색 시 탭별 건수 (제안)"
-  postTypeCounts(filter: PostFilter!): PostTypeCounts!
-  "BD-01 ④. type 생략 = 전체 (제안: 현재 탭 기준)"
-  popularTags(type: PostType, first: Int = 10): [TagCount!]!
-  "BD-03 · BD-04 수정 모드"
-  post(id: ID!): PostLookup
+  """
+  게시판 목록. 최신순, 커서 기반 20개.
+  tag는 정확히 일치하는 태그, q는 제목·내용·태그 검색(앞뒤 공백 제외 2~50자, 공백으로 나눈 단어를 모두 포함한 글).
+  q·tag는 함께 쓰면 둘 다 만족하는 글만 나온다
+  """
+  posts(type: PostType!, tag: String, q: String, "이전 페이지의 nextCursor" after: String): PostPage!
+  "글 상세. 없으면 NOT_FOUND, 삭제된 글은 POST_DELETED"
+  post(id: ID!): Post!
+  "태그 필터에 보여줄 많이 쓰인 태그 상위 10개. type을 생략하면 두 종류 전체"
+  popularTags(type: PostType): [TagCount!]!
 
   # --- 공지 (NT-01 · NT-02 · CM-01 ⑦) --------------------------------
   "공지 목록. 고정 공지가 위, 그 아래 최신순. 커서 기반 20개 (백엔드 notice.graphqls)"
@@ -1478,18 +1424,25 @@ type Mutation {
   requestPersonalExemption(teamId: ID!, memberId: ID!, weekStart: String!, reason: String!): PersonalExemption!
 
   # --- 게시판 ---------------------------------------------------------
-  "BD-04 등록"
+  "글을 쓴다. 필수 항목을 모두 채우지 않아도 저장되지만 기록글로 인정되지 않는다(isRecord=false)"
   createPost(input: CreatePostInput!): Post!
-  "BD-04 수정. 작성자 또는 연결 팀 팀장"
+  """
+  글을 고친다 (작성자 본인 또는 그 글이 연결된 팀의 현재 팀장). 글 종류와 작성일은 바뀌지 않는다.
+  팀장이 남의 글을 고칠 때는 teamId를 읽지 않고 기존 팀 연결을 유지한다. 그 밖의 사람은 FORBIDDEN
+  """
   updatePost(id: ID!, input: UpdatePostInput!): Post!
-  "BD-03 ④ 작성자 또는 관리자(AD-01 ②-5). 확정 판정 불변(E-28)"
-  deletePost(id: ID!): ID!
-  "BD-03 ⑫"
-  addComment(postId: ID!, content: String!): Comment!
-  "BD-03 ⑪ · TM-06 ⑧ 작성자 또는 팀장"
+  "글을 지운다 (작성자 본인만, 소프트 삭제). 팀장도 지울 수 없다"
+  deletePost(id: ID!): Boolean!
+  "댓글을 쓴다. 삭제된 글에는 달 수 없다 (1~500자)"
+  createComment(postId: ID!, content: String!): Comment!
+  "댓글을 고친다 (작성자 본인 또는 그 글이 연결된 팀의 현재 팀장)"
   updateComment(id: ID!, content: String!): Comment!
-  "BD-03 ⑪ · AD-01 ②-5 작성자 또는 관리자"
-  deleteComment(id: ID!): ID!
+  "댓글을 지운다 (작성자 본인만, 소프트 삭제). 팀장도 지울 수 없다"
+  deleteComment(id: ID!): Boolean!
+  "글을 삭제한다 (관리자, 소프트 삭제). 이미 삭제된 글은 POST_DELETED, 없는 글은 NOT_FOUND. 관리자 행동 로그가 남는다"
+  adminDeletePost(postId: ID!): Boolean!
+  "댓글을 삭제한다 (관리자, 소프트 삭제). 없거나 이미 삭제된 댓글은 NOT_FOUND. 관리자 행동 로그가 남는다"
+  adminDeleteComment(commentId: ID!): Boolean!
 
   # --- 프로필 ---------------------------------------------------------
   "PR-02 ③ 기본 이미지로. 파일 업로드는 REST(계약서 5장)"

@@ -7,23 +7,24 @@ import { useAction } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
 import { LIMITS } from '@/shared/lib/validators';
 import { Avatar, Button, LoadMore, SectionHeader, useConfirm } from '@/shared/ui';
-import { PostAddComment, PostDeleteComment, PostDetailQuery, PostUpdateComment } from '../api';
+import { PostAddComment, PostAdminDeleteComment, PostDeleteComment, PostDetailQuery, PostUpdateComment } from '../api';
+import type { PostPermissions } from '../permissions';
 import { useProfilePath } from '../useProfilePath';
 import s from './Comments.module.css';
 
-type PostNode = Extract<NonNullable<PostDetailQueryQuery['post']>, { __typename: 'Post' }>;
-export type CommentNode = PostNode['comments']['nodes'][number];
+export type CommentNode = PostDetailQueryQuery['post']['comments']['items'][number];
 
 /** 댓글을 바꾸면 상세(목록 · 댓글 수)를 다시 받는다 */
 const refetchDetail = () => ({ refetchQueries: [PostDetailQuery], awaitRefetchQueries: true });
 
 /**
- * BD-03 ⑨~⑫ 댓글 (1단계, 등록순). 작성자 [수정][삭제] · 팀장 [수정] · 관리자 [삭제] — 서버 플래그(viewerCan*)대로.
+ * BD-03 ⑨~⑫ 댓글 (1단계, 등록순). 작성자 [수정][삭제] · 팀장 [수정] · 관리자 [삭제] — 권한은 usePostPermissions로 계산한다.
  */
 export function Comments({
   postId,
   count,
   comments,
+  can,
   hasMore,
   loadingMore,
   loadMoreError,
@@ -33,6 +34,7 @@ export function Comments({
   postId: string;
   count: number;
   comments: CommentNode[];
+  can: PostPermissions;
   hasMore: boolean;
   loadingMore: boolean;
   loadMoreError: boolean;
@@ -49,7 +51,7 @@ export function Comments({
       ) : (
         <ul className={s.list} aria-label="댓글 목록">
           {comments.map((c) => (
-            <CommentItem key={c.id} comment={c} onPostGone={onPostGone} />
+            <CommentItem key={c.id} comment={c} can={can} onPostGone={onPostGone} />
           ))}
         </ul>
       )}
@@ -59,13 +61,16 @@ export function Comments({
   );
 }
 
-function CommentItem({ comment, onPostGone }: { comment: CommentNode; onPostGone: () => void }) {
+function CommentItem({ comment, can, onPostGone }: { comment: CommentNode; can: PostPermissions; onPostGone: () => void }) {
   const profilePath = useProfilePath();
   const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.content);
   const [updateComment] = useMutation(PostUpdateComment);
   const [deleteComment] = useMutation(PostDeleteComment);
+  const [adminDeleteComment] = useMutation(PostAdminDeleteComment);
+  const canEdit = can.canEdit(comment.authorId);
+  const canDelete = can.canDelete(comment.authorId);
   const onError = (e: { code: string }) => {
     if (e.code === 'POST_DELETED') onPostGone();
     return false;
@@ -79,7 +84,8 @@ function CommentItem({ comment, onPostGone }: { comment: CommentNode; onPostGone
   );
   const remove = useAction(
     async () => {
-      await deleteComment({ variables: { id: comment.id }, ...refetchDetail() });
+      if (can.deletesAsAdmin(comment.authorId)) await adminDeleteComment({ variables: { commentId: comment.id }, ...refetchDetail() });
+      else await deleteComment({ variables: { id: comment.id }, ...refetchDetail() });
       return true as const;
     },
     { success: MSG.deleted, onError },
@@ -121,16 +127,16 @@ function CommentItem({ comment, onPostGone }: { comment: CommentNode; onPostGone
           </Link>
           <span className={s.date}>
             {formatDateTime(comment.createdAt)}
-            {comment.updatedAt ? ' (수정됨)' : null}
+            {comment.updatedAt !== comment.createdAt ? ' (수정됨)' : null}
           </span>
-          {!editing && (comment.viewerCanEdit || comment.viewerCanDelete) ? (
+          {!editing && (canEdit || canDelete) ? (
             <span className={s.actions}>
-              {comment.viewerCanEdit ? (
+              {canEdit ? (
                 <button type="button" className={s.action} onClick={startEdit} aria-label={`${name} 댓글 수정`}>
                   수정
                 </button>
               ) : null}
-              {comment.viewerCanDelete ? (
+              {canDelete ? (
                 <button
                   type="button"
                   className={`${s.action} ${s.danger}`}

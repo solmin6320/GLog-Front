@@ -8,7 +8,7 @@
  * 이 파일은 순수 데이터다 — 다른 목 모듈(derive · clock)을 import하지 않는다.
  */
 import { addDays, kstIso, weekDates } from '@/shared/lib/kst';
-import type { PostSectionKey, PostType, SkipReason } from '../__generated__/schema-types';
+import type { PostType, SkipReason } from '../__generated__/schema-types';
 import { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';
 import type {
   CommentRow,
@@ -23,6 +23,7 @@ import type {
   NoticeRow,
   PersonalExemptionRow,
   PostRow,
+  PostSectionKey,
   TeamRow,
   WarningRow,
 } from './store';
@@ -708,8 +709,8 @@ const POSTS: PostSeed[] = [
   },
 ];
 
-const TS_KEYS: PostSectionKey[] = ['PROBLEM', 'CAUSE', 'SOLUTION'];
-const DEVLOG_KEYS: PostSectionKey[] = ['DID', 'LEARNED'];
+const TS_KEYS: PostSectionKey[] = ['problem', 'cause', 'solution'];
+const DEVLOG_KEYS: PostSectionKey[] = ['did', 'learned'];
 export const sectionKeysOf = (type: PostType): PostSectionKey[] => (type === 'TROUBLESHOOTING' ? TS_KEYS : DEVLOG_KEYS);
 
 function posts(): { rows: PostRow[]; idByKey: Record<string, Id> } {

@@ -91,11 +91,12 @@ describe('BD-04 글쓰기', () => {
     expect(await screen.findByText('등록했어요.')).toBeInTheDocument();
     expect(await heading('캐시 정리 일지')).toBeInTheDocument();
     expect(screen.queryByText('인증 미포함')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '#Apollo' })).toBeInTheDocument();
+    // 백엔드처럼 태그는 소문자로 저장된다
+    expect(screen.getByRole('link', { name: '#apollo' })).toBeInTheDocument();
     expect(screen.getByText('사이드 프로젝트 A팀')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /jandilog\/web · abcdef1/ })).toBeInTheDocument();
     const saved = db.posts.find((p) => p.id === postIdIn(router.state.location.pathname));
-    expect(saved).toMatchObject({ type: 'DEVLOG', teamId: '1', tags: ['Apollo', 'React'] });
+    expect(saved).toMatchObject({ type: 'DEVLOG', teamId: '1', tags: ['apollo', 'react'] });
   });
 
   it('ACC-BD04-10 태그 5개면 입력칸이 막히고 "태그는 5개까지 달 수 있어요." · 21자는 입력이 막힌다', async () => {

@@ -1,19 +1,19 @@
-/** 게시판 (BD-01 · BD-03 · BD-04 · 헤더 검색) */
-import { LIMITS, validateCommitUrl, validateTags } from '@/shared/lib/validators';
+/** 게시판 (BD-01 · BD-03 · BD-04 · 헤더 검색, 백엔드 post.graphqls) */
+import { LIMITS } from '@/shared/lib/validators';
 import type {
-  MutationAddCommentArgs,
+  MutationAdminDeleteCommentArgs,
+  MutationAdminDeletePostArgs,
+  MutationCreateCommentArgs,
   MutationCreatePostArgs,
   MutationDeleteCommentArgs,
   MutationDeletePostArgs,
   MutationUpdateCommentArgs,
   MutationUpdatePostArgs,
-  PostFilter,
-  PostSectionInput,
+  PostSectionsInput,
   PostType,
   QueryPopularTagsArgs,
   QueryPostArgs,
   QueryPostsArgs,
-  QueryPostTypeCountsArgs,
 } from '../__generated__/schema-types';
 import { isPostVisible, visiblePosts } from '../db/derive';
 import { sectionKeysOf } from '../db/seed';
@@ -21,7 +21,6 @@ import {
   db,
   findComment,
   findPost,
-  findTeam,
   liveTeam,
   membershipOf,
   nextObjectId,
@@ -29,10 +28,11 @@ import {
   type CommentRow,
   type Id,
   type PostRow,
+  type PostSectionKey,
 } from '../db/store';
-import { gqlError, invalid } from '../errors';
+import { gqlError, type ErrorCode } from '../errors';
 import type { MockContext, Resolvers } from '../types';
-import { canDelete, canEditComment, canEditPost, commentView, paginate, postLookupView, postView, requireViewer, viewerId } from '../views';
+import { canEditComment, canEditPost, commentView, isAdmin, itemsPage, postView, requireViewer, viewerId } from '../views';
 
 /** 목업 TAGS 순서 — 같은 개수면 이 순서로 (W-11) */
 const TAG_ORDER = ['Spring', 'Redis', 'GraphQL', 'React', 'Expo', 'MariaDB', 'Docker', '배포', 'Flyway', 'MongoDB'];
@@ -40,32 +40,22 @@ const TAG_ORDER = ['Spring', 'Redis', 'GraphQL', 'React', 'Expo', 'MariaDB', 'Do
 const SEARCH_MIN = 2;
 const SEARCH_MAX = 50;
 
-/** PostFilter 적용 (최신순 유지). ignoreType = 탭별 건수 계산용 */
-export function filterPosts(ctx: MockContext, filter: PostFilter, o: { ignoreType?: boolean } = {}): PostRow[] {
-  let q: string | null = null;
-  if (filter.query != null) {
-    const trimmed = filter.query.trim();
-    if (trimmed.length > 0) {
-      if (trimmed.length < SEARCH_MIN || trimmed.length > SEARCH_MAX) throw invalid('query', 'mock: query must be 2~50 chars');
-      q = trimmed.toLowerCase();
-    }
+/** 종류 · 태그 · 검색어로 거른다 (최신순 유지). q는 공백으로 나눈 단어를 모두 포함한 글 */
+export function filterPosts(ctx: MockContext, o: { type?: PostType | null; tag?: string | null; q?: string | null }): PostRow[] {
+  let words: string[] = [];
+  if (o.q != null) {
+    const trimmed = o.q.trim();
+    if (trimmed.length < SEARCH_MIN) throw gqlError('SEARCH_TOO_SHORT');
+    if (trimmed.length > SEARCH_MAX) throw gqlError('SEARCH_TOO_LONG');
+    words = trimmed.toLowerCase().split(/\s+/);
   }
-  const tag = filter.tag?.trim().toLowerCase() || null;
-  if (filter.teamId) {
-    const t = findTeam(filter.teamId);
-    // 비공개 팀 글 목록은 소속자만 (팀 연결이 새지 않게)
-    if (t && !t.isPublic && !t.deletedAt && !membershipOf(t.id, viewerId(ctx) ?? '')) {
-      throw gqlError('FORBIDDEN', { message: 'mock: private team filter' });
-    }
-  }
+  const tag = o.tag?.trim().toLowerCase() || null;
   return visiblePosts(ctx.clock).filter((p) => {
-    if (!o.ignoreType && filter.type && p.type !== filter.type) return false;
-    if (filter.teamId && p.teamId !== filter.teamId) return false;
-    if (filter.authorId && p.authorId !== filter.authorId) return false;
+    if (o.type && p.type !== o.type) return false;
     if (tag && !p.tags.some((x) => x.toLowerCase() === tag)) return false;
-    if (q) {
-      const hay = [p.title, ...p.tags, ...Object.values(p.sections).map((s) => s ?? '')];
-      if (!hay.some((s) => s.toLowerCase().includes(q))) return false;
+    if (words.length > 0) {
+      const hay = [p.title, ...p.tags, ...Object.values(p.sections).map((s) => s ?? '')].join('\n').toLowerCase();
+      if (!words.every((w) => hay.includes(w))) return false;
     }
     return true;
   });
@@ -78,7 +68,17 @@ const isObjectIdLike = (id: string) => /^[0-9a-f]{24}$/i.test(id);
 /* ------------------------------------------------------------------ */
 
 const COMMENT_MAX = LIMITS.comment;
-const COMMIT_URLS_MAX = 1; // M-18 화면 1칸 → 0~1개
+const SECTION_MAX = 5000;
+const COMMIT_URLS_MAX = 5;
+const COMMIT_URL = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/commit\/[0-9a-fA-F]{7,40}\/?$/;
+
+const SECTION_TOO_LONG: Record<PostSectionKey, ErrorCode> = {
+  problem: 'POST_PROBLEM_TOO_LONG',
+  cause: 'POST_CAUSE_TOO_LONG',
+  solution: 'POST_SOLUTION_TOO_LONG',
+  did: 'POST_DID_TOO_LONG',
+  learned: 'POST_LEARNED_TOO_LONG',
+};
 
 /** 글 찾기: 형식이 틀리거나 없거나 아직 안 보이는 글 → NOT_FOUND · 삭제된 글 → POST_DELETED */
 function livePost(ctx: MockContext, id: string): PostRow {
@@ -98,67 +98,62 @@ function liveComment(ctx: MockContext, id: string): { comment: CommentRow; post:
 
 function cleanTitle(raw: string): string {
   const title = raw.trim();
-  if (title.length < 1 || title.length > LIMITS.title) throw invalid('title');
+  if (title.length < 1) throw gqlError('TITLE_REQUIRED');
+  if (title.length > LIMITS.title) throw gqlError('INVALID_INPUT');
   return title;
 }
 
-/** type에 맞는 키만, 중복 없이. 빈 문자열 → null(작성되지 않음) */
-function cleanSections(type: PostType, input: PostSectionInput[]): PostRow['sections'] {
-  const allowed = sectionKeysOf(type);
-  const out: PostRow['sections'] = Object.fromEntries(allowed.map((k) => [k, null]));
-  const seen = new Set<string>();
-  for (const s of input) {
-    if (!allowed.includes(s.key) || seen.has(s.key)) throw invalid('sections');
-    seen.add(s.key);
-    const body = (s.body ?? '').trim();
-    out[s.key] = body.length > 0 ? body : null;
+/** 그 종류의 항목만 쓰고 나머지는 무시한다. 빈 문자열 → null(작성되지 않음) */
+function cleanSections(type: PostType, input: PostSectionsInput): PostRow['sections'] {
+  const out: PostRow['sections'] = {};
+  for (const key of sectionKeysOf(type)) {
+    const body = (input[key] ?? '').trim();
+    if (body.length > SECTION_MAX) throw gqlError(SECTION_TOO_LONG[key]);
+    out[key] = body.length > 0 ? body : null;
   }
   return out;
 }
 
-function cleanTags(input: string[]): string[] {
-  const tags = input.map((t) => t.trim());
-  if (validateTags(tags) !== null) throw invalid('tags');
+/** 앞뒤 공백 제거 · 소문자 · 중복 제거. 최대 5개, 개당 20자 */
+function cleanTags(input: string[] | null | undefined): string[] {
+  const tags = [...new Set((input ?? []).map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0))];
+  if (tags.length > LIMITS.tagCount) throw gqlError('TAG_LIMIT_EXCEEDED');
+  if (tags.some((t) => t.length > LIMITS.tagLength)) throw gqlError('TAG_TOO_LONG');
   return tags;
 }
 
-function cleanCommitUrls(input: string[]): string[] {
-  const urls = input.map((u) => u.trim()).filter((u) => u.length > 0);
-  if (urls.length > COMMIT_URLS_MAX || urls.some((u) => validateCommitUrl(u) !== null)) throw invalid('commitUrls');
+function cleanCommitUrls(input: string[] | null | undefined): string[] {
+  const urls = (input ?? []).map((u) => u.trim()).filter((u) => u.length > 0);
+  if (urls.length > COMMIT_URLS_MAX) throw gqlError('POST_COMMIT_URLS_LIMIT_EXCEEDED');
+  if (urls.some((u) => !COMMIT_URL.test(u))) throw gqlError('INVALID_COMMIT_URL');
   return urls;
 }
 
-/** 연결할 팀: null = 연결 안 함 · 삭제된 팀 → TEAM_GONE · 소속 아님 → FORBIDDEN. keep = 지금 연결된 팀은 그대로 허용 */
-function cleanTeamId(ctx: MockContext, teamId: Id | null | undefined, keep?: Id | null): Id | null {
+/** 연결할 팀: null = 연결 안 함 · 지금 소속인 삭제되지 않은 팀만, 아니면 POST_TEAM_INVALID */
+function cleanTeamId(ctx: MockContext, teamId: Id | null | undefined): Id | null {
   if (!teamId) return null;
-  if (keep && teamId === keep) return keep;
-  const team = findTeam(teamId);
-  if (!team) throw invalid('teamId');
-  if (!liveTeam(teamId)) throw gqlError('TEAM_GONE');
-  if (!membershipOf(teamId, viewerId(ctx) ?? '')) throw gqlError('FORBIDDEN', { message: 'mock: not a team member' });
+  if (!liveTeam(teamId) || !membershipOf(teamId, viewerId(ctx) ?? '')) throw gqlError('POST_TEAM_INVALID');
   return teamId;
 }
 
 function cleanComment(raw: string): string {
   const text = raw.trim();
-  if (text.length < 1 || text.length > COMMENT_MAX) throw invalid('content');
+  if (text.length < 1 || text.length > COMMENT_MAX) throw gqlError('INVALID_INPUT');
   return text;
+}
+
+function requireAdmin(ctx: MockContext): void {
+  requireViewer(ctx);
+  if (!isAdmin(ctx)) throw gqlError('FORBIDDEN', { message: 'mock: admin only' });
 }
 
 export const postsResolvers: Resolvers = {
   Query: {
-    posts: (_: unknown, { filter, first, after }: QueryPostsArgs, ctx: MockContext) =>
-      paginate(filterPosts(ctx, filter), { first, after }, (p) => postView(ctx, p)),
-    postTypeCounts: (_: unknown, { filter }: QueryPostTypeCountsArgs, ctx: MockContext) => {
-      const rows = filterPosts(ctx, filter, { ignoreType: true });
-      return {
-        troubleshooting: rows.filter((p) => p.type === 'TROUBLESHOOTING').length,
-        devlog: rows.filter((p) => p.type === 'DEVLOG').length,
-      };
+    posts: (_: unknown, { type, tag, q, after }: QueryPostsArgs, ctx: MockContext) => {
+      const rows = filterPosts(ctx, { type, tag, q });
+      return { ...itemsPage(rows, after, (p) => postView(ctx, p)), totalCount: rows.length };
     },
-    popularTags: (_: unknown, { type, first }: QueryPopularTagsArgs, ctx: MockContext) => {
-      const n = first ?? 10;
-      if (!Number.isInteger(n) || n < 0 || n > 50) throw invalid('first');
+    popularTags: (_: unknown, { type }: QueryPopularTagsArgs, ctx: MockContext) => {
       const counts = new Map<string, number>();
       for (const p of visiblePosts(ctx.clock)) {
         if (type && p.type !== type) continue;
@@ -170,35 +165,48 @@ export const postsResolvers: Resolvers = {
       };
       return [...counts.entries()]
         .sort((a, b) => b[1] - a[1] || rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]))
-        .slice(0, n)
+        .slice(0, 10)
         .map(([tag, count]) => ({ tag, count }));
     },
-    // 없는 글 → null(E-53) · 삭제된 글 → DeletedPost(E-31)
-    post: (_: unknown, { id }: QueryPostArgs, ctx: MockContext) => (isObjectIdLike(id) ? postLookupView(ctx, id.toLowerCase()) : null),
-  },
-  PostLookup: {
-    __resolveType: (obj: { __typename?: string }) => obj.__typename ?? 'Post',
+    // 없는 글 → NOT_FOUND(E-53) · 삭제된 글 → POST_DELETED(E-31)
+    post: (_: unknown, { id }: QueryPostArgs, ctx: MockContext) => postView(ctx, livePost(ctx, id)),
   },
   Mutation: {
-    // BD-03 ④ · AD-01 ②-5 — 작성자 · 관리자. 소프트 삭제(이후 post(id) = DeletedPost). 확정 판정은 그대로(E-28)
+    // BD-03 ④ — 작성자 본인만. 소프트 삭제. 확정 판정은 그대로(E-28)
     deletePost: (_: unknown, { id }: MutationDeletePostArgs, ctx: MockContext) => {
-      requireViewer(ctx);
+      const viewer = requireViewer(ctx);
       const p = livePost(ctx, id);
-      if (!canDelete(ctx, p.authorId)) throw gqlError('FORBIDDEN', { message: 'mock: cannot delete post' });
+      if (p.authorId !== viewer.id) throw gqlError('FORBIDDEN', { message: 'mock: not the author' });
       p.deletedAt = ctx.clock.now;
       touch();
-      return p.id;
+      return true;
     },
-    // BD-03 ⑪ · AD-01 ②-5 — 작성자 · 관리자 (팀장은 불가)
+    // BD-03 ⑪ — 작성자 본인만 (팀장 · 관리자는 불가, 관리자는 adminDeleteComment)
     deleteComment: (_: unknown, { id }: MutationDeleteCommentArgs, ctx: MockContext) => {
-      requireViewer(ctx);
+      const viewer = requireViewer(ctx);
       const { comment } = liveComment(ctx, id);
-      if (!canDelete(ctx, comment.authorId)) throw gqlError('FORBIDDEN', { message: 'mock: cannot delete comment' });
+      if (comment.authorId !== viewer.id) throw gqlError('FORBIDDEN', { message: 'mock: not the author' });
       comment.deletedAt = ctx.clock.now;
       touch();
-      return comment.id;
+      return true;
     },
-    // BD-04 등록 — 제목 1~60자 · 태그 ≤5(개당 ≤20) · 커밋 0~1개 · 본인 소속 팀만. 필수 항목이 비어도 저장(E-24)
+    // AD-01 게시물 관리 · BD-03 관리자 삭제
+    adminDeletePost: (_: unknown, { postId }: MutationAdminDeletePostArgs, ctx: MockContext) => {
+      requireAdmin(ctx);
+      const p = livePost(ctx, postId);
+      p.deletedAt = ctx.clock.now;
+      touch();
+      return true;
+    },
+    adminDeleteComment: (_: unknown, { commentId }: MutationAdminDeleteCommentArgs, ctx: MockContext) => {
+      requireAdmin(ctx);
+      const c = isObjectIdLike(commentId) ? findComment(commentId.toLowerCase()) : undefined;
+      if (!c || c.deletedAt) throw gqlError('NOT_FOUND');
+      c.deletedAt = ctx.clock.now;
+      touch();
+      return true;
+    },
+    // BD-04 등록 — 제목 1~60자 · 태그 ≤5(개당 ≤20) · 커밋 ≤5개 · 본인 소속 팀만. 필수 항목이 비어도 저장(E-24)
     createPost: (_: unknown, { input }: MutationCreatePostArgs, ctx: MockContext) => {
       const viewer = requireViewer(ctx);
       const row: PostRow = {
@@ -218,7 +226,7 @@ export const postsResolvers: Resolvers = {
       touch();
       return postView(ctx, row);
     },
-    // BD-04 수정 — 작성자 · 연결 팀 팀장. 종류는 그대로. 팀장이 남의 글을 고칠 때 teamId는 무시(BD-04 비고)
+    // BD-04 수정 — 작성자 · 연결 팀 팀장. 종류는 그대로. 팀장이 남의 글을 고칠 때 teamId는 무시
     updatePost: (_: unknown, { id, input }: MutationUpdatePostArgs, ctx: MockContext) => {
       const viewer = requireViewer(ctx);
       const p = livePost(ctx, id);
@@ -228,14 +236,14 @@ export const postsResolvers: Resolvers = {
         sections: cleanSections(p.type, input.sections),
         tags: cleanTags(input.tags),
         commitUrls: cleanCommitUrls(input.commitUrls),
-        teamId: p.authorId === viewer.id ? cleanTeamId(ctx, input.teamId, p.teamId) : p.teamId,
+        teamId: p.authorId === viewer.id ? (input.teamId === p.teamId ? p.teamId : cleanTeamId(ctx, input.teamId)) : p.teamId,
       };
       Object.assign(p, next, { updatedAt: ctx.clock.now });
       touch();
       return postView(ctx, p);
     },
     // BD-03 ⑫ — 1~500자. 삭제된 글 → POST_DELETED
-    addComment: (_: unknown, { postId, content }: MutationAddCommentArgs, ctx: MockContext) => {
+    createComment: (_: unknown, { postId, content }: MutationCreateCommentArgs, ctx: MockContext) => {
       const viewer = requireViewer(ctx);
       const p = livePost(ctx, postId);
       const row: CommentRow = {

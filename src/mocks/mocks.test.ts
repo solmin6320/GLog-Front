@@ -30,10 +30,9 @@ const MEMBER_FIELDS = `
 `;
 
 const POST_FIELDS = `
-  id type title sections { key body } tags commitUrls author { id nickname } publicTeam { id name }
-  isRecord writtenDate inFinalizedWeek createdAt updatedAt commentCount
-  comments(first: 2) { nodes { id content author { nickname } createdAt viewerCanEdit viewerCanDelete } pageInfo { hasNextPage endCursor } totalCount }
-  viewerCanEdit viewerCanDelete viewerIsAuthor editTeamId
+  id authorId author { id nickname profileImageUrl } teamId teamName type title sections { problem cause solution did learned }
+  tags commitUrls isRecord writtenDate createdAt updatedAt commentCount
+  comments { items { id postId authorId content author { nickname } createdAt updatedAt } nextCursor }
 `;
 
 const PREVIEW = 'member { id nickname } warningCountBefore warningCountAfter penaltyChange affectedWeekCount frozenByFulfillment restoresWithoutCategory basis';
@@ -71,10 +70,9 @@ const EVERY_QUERY_FIELD = /* GraphQL */ `
       nextCursor
     }
     member(id: "1") { ${MEMBER_FIELDS} }
-    posts(filter: { type: TROUBLESHOOTING }) { nodes { ${POST_FIELDS} } pageInfo { hasNextPage endCursor } totalCount }
-    postTypeCounts(filter: { query: "Redis" }) { troubleshooting devlog }
+    posts(type: TROUBLESHOOTING) { items { ${POST_FIELDS} } nextCursor totalCount }
     popularTags(type: TROUBLESHOOTING) { tag count }
-    post(id: $postId) { __typename ... on Post { ${POST_FIELDS} } ... on DeletedPost { id deletedAt } }
+    post(id: $postId) { ${POST_FIELDS} }
     notices { items { id title content isPinned isSystem createdAt updatedAt } nextCursor }
     notice(id: "6") { id title }
     adminDashboardSummary { pendingMemberCount latestWeekFailCount latestJudgedWeekStart penaltyTargetCount pendingExemptionRequestCount heldJudgmentCount }
@@ -204,33 +202,33 @@ describe('한동관 (member) — 목업 숫자', () => {
 
 describe('게시판', () => {
   it('트러블슈팅 목록은 20개 넘어서 [더 보기]가 생긴다 · 첫 글은 목업 순서', async () => {
-    const d = await ok<{ posts: { nodes: Json[]; pageInfo: Json; totalCount: number } }>(
-      `{ posts(filter: { type: TROUBLESHOOTING }) { nodes { title isRecord commentCount publicTeam { name } author { nickname } } pageInfo { hasNextPage endCursor } totalCount } }`,
+    const d = await ok<{ posts: { items: Json[]; nextCursor: string | null; totalCount: number } }>(
+      `{ posts(type: TROUBLESHOOTING) { items { title isRecord commentCount teamName author { nickname } } nextCursor totalCount } }`,
     );
     expect(d.posts.totalCount).toBeGreaterThan(20);
-    expect(d.posts.nodes).toHaveLength(20);
-    expect(d.posts.pageInfo.hasNextPage).toBe(true);
-    expect(d.posts.nodes.slice(0, 4).map((p) => [p.title, p.isRecord, p.commentCount, (p.publicTeam as Json | null)?.name ?? null, (p.author as Json).nickname])).toEqual([
+    expect(d.posts.items).toHaveLength(20);
+    expect(d.posts.nextCursor).not.toBeNull();
+    expect(d.posts.items.slice(0, 4).map((p) => [p.title, p.isRecord, p.commentCount, p.teamName, (p.author as Json).nickname])).toEqual([
       ['Redis TTL이 적용되지 않던 문제', true, 3, '사이드 프로젝트 A팀', '한동관'],
       ['GraphQL N+1을 @BatchMapping으로 해결하기', false, 0, null, '김철수'],
       ['Expo 딥링크가 안드로이드에서만 열리지 않을 때', true, 5, '사이드 프로젝트 A팀', '박민수'],
       ['Flyway 체크섬 불일치로 서버가 안 뜨는 문제', true, 2, null, '이영희'],
     ]);
-    const next = await ok<{ posts: { nodes: Json[]; pageInfo: Json } }>(
-      `query($after: String) { posts(filter: { type: TROUBLESHOOTING }, after: $after) { nodes { title } pageInfo { hasNextPage } } }`,
+    const next = await ok<{ posts: { items: Json[]; nextCursor: string | null } }>(
+      `query($after: String) { posts(type: TROUBLESHOOTING, after: $after) { items { title } nextCursor } }`,
       'member',
-      { after: d.posts.pageInfo.endCursor },
+      { after: d.posts.nextCursor },
     );
-    expect(next.posts.nodes.length).toBe(d.posts.totalCount - 20);
-    expect(next.posts.pageInfo.hasNextPage).toBe(false);
+    expect(next.posts.items.length).toBe(d.posts.totalCount - 20);
+    expect(next.posts.nextCursor).toBeNull();
   });
 
   it("'Redis' 검색: 트러블슈팅 3 · 개발일지 1 (W-05)", async () => {
-    const d = await ok<{ postTypeCounts: Json; posts: { nodes: Json[] } }>(
-      `{ postTypeCounts(filter: { query: "Redis" }) { troubleshooting devlog } posts(filter: { type: TROUBLESHOOTING, query: "Redis" }) { nodes { title } } }`,
+    const d = await ok<{ ts: { totalCount: number; items: Json[] }; devlog: { totalCount: number } }>(
+      `{ ts: posts(type: TROUBLESHOOTING, q: "Redis") { totalCount items { title } } devlog: posts(type: DEVLOG, q: "Redis") { totalCount } }`,
     );
-    expect(d.postTypeCounts).toEqual({ troubleshooting: 3, devlog: 1 });
-    expect(d.posts.nodes.map((p) => p.title)).toEqual([
+    expect([d.ts.totalCount, d.devlog.totalCount]).toEqual([3, 1]);
+    expect(d.ts.items.map((p) => p.title)).toEqual([
       'Redis TTL이 적용되지 않던 문제',
       'Upstash Redis 명령 수가 갑자기 늘어난 이유',
       '헬스체크에서 캐시 서버를 뺀 이유',
@@ -242,40 +240,31 @@ describe('게시판', () => {
     expect(d.popularTags.map((t) => t.tag)).toEqual(['Spring', 'Redis', 'GraphQL', 'React', 'Expo', 'MariaDB', 'Docker', '배포', 'Flyway', 'MongoDB']);
   });
 
-  it('검색어 1자는 VALIDATION_FAILED(query)', async () => {
-    const r = await run(`{ posts(filter: { query: "R" }) { totalCount } }`);
-    expect(r.codes).toEqual(['VALIDATION_FAILED']);
-    expect(r.errors?.[0]?.extensions?.field).toBe('query');
+  it('검색어 1자는 SEARCH_TOO_SHORT · 51자는 SEARCH_TOO_LONG', async () => {
+    expect((await run(`{ posts(type: DEVLOG, q: "R") { totalCount } }`)).codes).toEqual(['SEARCH_TOO_SHORT']);
+    expect((await run(`{ posts(type: DEVLOG, q: "${'a'.repeat(51)}") { totalCount } }`)).codes).toEqual(['SEARCH_TOO_LONG']);
   });
 
-  it('글 상세: 권한 플래그 · 삭제된 글 · 없는 글', async () => {
+  it('검색어는 공백으로 나눈 단어를 모두 포함한 글', async () => {
+    const d = await ok<{ posts: { items: Json[] } }>(`{ posts(type: TROUBLESHOOTING, q: "Redis TTL") { items { title } } }`);
+    expect(d.posts.items.map((p) => p.title)).toEqual(['Redis TTL이 적용되지 않던 문제']);
+  });
+
+  it('글 상세: 작성자 · 팀 id · 삭제된 글 POST_DELETED · 없는 글 NOT_FOUND', async () => {
     const id = seedPostId('redisTtl');
-    const mine = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { ... on Post { viewerCanEdit viewerCanDelete viewerIsAuthor editTeamId inFinalizedWeek } } }`, 'member', { id });
-    expect(mine.post).toEqual({ viewerCanEdit: true, viewerCanDelete: true, viewerIsAuthor: true, editTeamId: '1', inFinalizedWeek: false });
-    const other = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { ... on Post { viewerCanEdit viewerCanDelete viewerIsAuthor editTeamId } } }`, 'plain', { id });
-    expect(other.post).toEqual({ viewerCanEdit: false, viewerCanDelete: false, viewerIsAuthor: false, editTeamId: null });
-    // 팀장(한동관)은 A팀 글을 수정할 수 있지만 지울 수는 없다 — 관리자라 삭제는 된다
-    const leader = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { ... on Post { viewerCanEdit viewerCanDelete viewerIsAuthor } } }`, 'member', { id: seedPostId('expoDeeplink') });
-    expect(leader.post).toEqual({ viewerCanEdit: true, viewerCanDelete: true, viewerIsAuthor: false });
-    const deleted = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { __typename ... on DeletedPost { id deletedAt } } }`, 'member', { id: seedPostId('deletedMemo') });
-    expect(deleted.post.__typename).toBe('DeletedPost');
-    const missing = await ok<{ post: null }>(`{ post(id: "000000000000000000000000") { __typename } }`);
-    expect(missing.post).toBeNull();
-    const finalized = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { ... on Post { inFinalizedWeek } } }`, 'member', { id: seedPostId('dockerCompose') });
-    expect(finalized.post.inFinalizedWeek).toBe(true);
+    const mine = await ok<{ post: Json }>(`query($id: ID!) { post(id: $id) { authorId teamId teamName } }`, 'plain', { id });
+    expect(mine.post).toEqual({ authorId: '1', teamId: '1', teamName: '사이드 프로젝트 A팀' });
+    expect((await run(`query($id: ID!) { post(id: $id) { id } }`, 'member', { id: seedPostId('deletedMemo') })).codes).toEqual(['POST_DELETED']);
+    expect((await run(`{ post(id: "000000000000000000000000") { id } }`)).codes).toEqual(['NOT_FOUND']);
   });
 
-  it('마스킹: 비공개 팀(알고리즘 스터디) 글은 누구에게나 publicTeam null', async () => {
-    const q = `{ posts(filter: { type: DEVLOG }) { nodes { title publicTeam { name } } } }`;
+  it('마스킹: 비공개 팀(알고리즘 스터디) 글은 누구에게나 teamName null, teamId는 그대로', async () => {
+    const q = `{ posts(type: DEVLOG) { items { title teamId teamName } } }`;
     for (const as of ['plain', 'member'] as const) {
-      const d = await ok<{ posts: { nodes: Json[] } }>(q, as);
-      const seg = d.posts.nodes.find((p) => p.title === '세그먼트 트리 지연 전파 정리');
-      expect(seg).toEqual({ title: '세그먼트 트리 지연 전파 정리', publicTeam: null });
+      const d = await ok<{ posts: { items: Json[] } }>(q, as);
+      const seg = d.posts.items.find((p) => p.title === '세그먼트 트리 지연 전파 정리');
+      expect(seg).toEqual({ title: '세그먼트 트리 지연 전파 정리', teamId: '2', teamName: null });
     }
-    const forbidden = await run(`{ posts(filter: { teamId: "2" }) { totalCount } }`, 'plain');
-    expect(forbidden.codes).toEqual(['FORBIDDEN']);
-    const allowed = await ok<{ posts: { totalCount: number } }>(`{ posts(filter: { teamId: "2" }) { totalCount } }`, 'member');
-    expect(allowed.posts.totalCount).toBeGreaterThan(0);
   });
 });
 

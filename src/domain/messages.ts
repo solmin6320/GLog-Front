@@ -76,6 +76,21 @@ const BY_CODE: Record<string, string> = {
   POST_DELETED: MSG.deletedPost, // E-31
   AUTH_CODE_INVALID: '로그인 정보가 만료됐어요. 처음부터 다시 해 주세요.', // E-05 · E-06
   VALIDATION_FAILED: '입력한 내용을 다시 확인해 주세요.',
+  // 게시판 입력 오류 (백엔드 ErrorCode 문구)
+  INVALID_INPUT: '요청 내용을 확인해 주세요.',
+  TITLE_REQUIRED: '제목을 입력해 주세요.',
+  INVALID_COMMIT_URL: 'GitHub 커밋 주소 형식이 아니에요.',
+  POST_COMMIT_URLS_LIMIT_EXCEEDED: '관련 커밋 링크는 5개까지 달 수 있어요.',
+  TAG_LIMIT_EXCEEDED: '태그는 5개까지 달 수 있어요.',
+  TAG_TOO_LONG: '태그는 20자까지 쓸 수 있어요.',
+  POST_TEAM_INVALID: '연결할 수 없는 팀이에요. 내가 속한 팀만 고를 수 있어요.',
+  POST_PROBLEM_TOO_LONG: '문제는 5000자까지 쓸 수 있어요.',
+  POST_CAUSE_TOO_LONG: '원인은 5000자까지 쓸 수 있어요.',
+  POST_SOLUTION_TOO_LONG: '해결은 5000자까지 쓸 수 있어요.',
+  POST_DID_TOO_LONG: '한 일은 5000자까지 쓸 수 있어요.',
+  POST_LEARNED_TOO_LONG: '배운 점은 5000자까지 쓸 수 있어요.',
+  SEARCH_TOO_SHORT: MSG.searchTooShort,
+  SEARCH_TOO_LONG: '검색어는 50자까지 쓸 수 있어요.',
   TEAM_CODE_NOT_FOUND: '그런 초대코드가 없어요. 다시 확인해 주세요.', // E-10
   TEAM_ALREADY_JOINED: '이미 참가한 팀이에요.', // E-11
   TEAM_JOIN_BLOCKED: '이 팀에는 참가할 수 없어요. 팀장에게 문의해 주세요.', // E-12

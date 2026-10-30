@@ -15,6 +15,20 @@ export type ErrorCode =
   | 'POST_DELETED'
   | 'AUTH_CODE_INVALID'
   | 'VALIDATION_FAILED'
+  | 'INVALID_INPUT'
+  | 'TITLE_REQUIRED'
+  | 'INVALID_COMMIT_URL'
+  | 'POST_COMMIT_URLS_LIMIT_EXCEEDED'
+  | 'TAG_LIMIT_EXCEEDED'
+  | 'TAG_TOO_LONG'
+  | 'POST_TEAM_INVALID'
+  | 'POST_PROBLEM_TOO_LONG'
+  | 'POST_CAUSE_TOO_LONG'
+  | 'POST_SOLUTION_TOO_LONG'
+  | 'POST_DID_TOO_LONG'
+  | 'POST_LEARNED_TOO_LONG'
+  | 'SEARCH_TOO_SHORT'
+  | 'SEARCH_TOO_LONG'
   | 'TEAM_CODE_NOT_FOUND'
   | 'TEAM_ALREADY_JOINED'
   | 'TEAM_JOIN_BLOCKED'
@@ -52,6 +66,20 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   TEAM_GONE: 'notFound',
   TEAM_MEMBER_NOT_FOUND: 'notFound',
   VALIDATION_FAILED: 'validation',
+  INVALID_INPUT: 'validation',
+  TITLE_REQUIRED: 'validation',
+  INVALID_COMMIT_URL: 'validation',
+  POST_COMMIT_URLS_LIMIT_EXCEEDED: 'validation',
+  TAG_LIMIT_EXCEEDED: 'validation',
+  TAG_TOO_LONG: 'validation',
+  POST_TEAM_INVALID: 'validation',
+  POST_PROBLEM_TOO_LONG: 'validation',
+  POST_CAUSE_TOO_LONG: 'validation',
+  POST_SOLUTION_TOO_LONG: 'validation',
+  POST_DID_TOO_LONG: 'validation',
+  POST_LEARNED_TOO_LONG: 'validation',
+  SEARCH_TOO_SHORT: 'validation',
+  SEARCH_TOO_LONG: 'validation',
   AUTH_CODE_INVALID: 'validation',
   TEAM_CODE_NOT_FOUND: 'validation',
   TEAM_ALREADY_JOINED: 'validation',

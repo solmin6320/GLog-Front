@@ -13,13 +13,15 @@ import type {
   MemberRole,
   MemberStatus,
   PersonalExemptionStatus,
-  PostSectionKey,
   PostType,
   SkipReason,
   WarningDeleteReason,
   WarningStanding,
 } from '../__generated__/schema-types';
 import { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';
+
+/** 글 본문 항목 키 (백엔드 PostSections 필드 이름) */
+export type PostSectionKey = 'problem' | 'cause' | 'solution' | 'did' | 'learned';
 import { createSeed } from './seed';
 
 export { COMMENT_OID_PREFIX, objectId, POST_OID_PREFIX } from './ids';

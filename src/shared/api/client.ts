@@ -44,7 +44,7 @@ export function createTypePolicies(): TypePolicies {
     Me: { keyFields: [] }, // 싱글턴 Me:{} — 로그인한 본인은 하나뿐
     Query: {
       fields: {
-        posts: nodesConnection(['filter', 'first']),
+        posts: itemsPage(['type', 'tag', 'q']),
         notices: itemsPage(),
         myJudgmentHistory: itemsPage(),
         myWarningHistory: itemsPage(),
@@ -63,7 +63,7 @@ export function createTypePolicies(): TypePolicies {
     },
     Member: { fields: { judgmentHistory: nodesConnection(['first']) } },
     Profile: { fields: { judgmentHistory: itemsPage() } },
-    Post: { fields: { comments: nodesConnection(['first']) } },
+    Post: { fields: { comments: itemsPage() } },
   };
   for (const t of VALUE_OBJECTS) policies[t] = { keyFields: false };
   for (const t of MERGED_VALUE_OBJECTS) policies[t] = { ...policies[t], keyFields: false, merge: true };

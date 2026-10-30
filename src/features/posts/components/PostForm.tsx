@@ -1,7 +1,8 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useMutation } from '@apollo/client/react';
 import { useBlocker, useNavigate } from 'react-router';
-import type { PostSectionKey, PostType } from '@/gql/graphql';
+import type { PostType } from '@/gql/graphql';
+import { messageFor } from '@/domain/messages';
 import { useClock } from '@/session';
 import { useAction } from '@/shared/api';
 import { paths, postTypeFromEnum, postTypeToEnum, type PostTypeParam } from '@/shared/lib/paths';
@@ -20,7 +21,7 @@ import {
   useConfirm,
 } from '@/shared/ui';
 import { dropPostLists, PostCreate, PostUpdate } from '../api';
-import { isFilled, POST_TYPE_LABEL, REQUIRED_SECTIONS, SECTION_LABEL, SECTION_PLACEHOLDER } from '../postText';
+import { isFilled, POST_TYPE_LABEL, REQUIRED_SECTIONS, SECTION_LABEL, SECTION_PLACEHOLDER, type PostSectionKey } from '../postText';
 import { isSundayLate, useServerNow } from '../useServerNow';
 import { TagInput } from './TagInput';
 import s from './PostForm.module.css';
@@ -115,7 +116,7 @@ export function PostForm({
       const keys = REQUIRED_SECTIONS[v.type];
       const common = {
         title: v.title.trim(),
-        sections: keys.map((key) => ({ key, body: isFilled(v.sections[key]) ? (v.sections[key] ?? '').trim() : null })),
+        sections: Object.fromEntries(keys.map((key) => [key, isFilled(v.sections[key]) ? (v.sections[key] ?? '').trim() : null])),
         tags: v.tags,
         commitUrls: v.commit.trim() ? [v.commit.trim()] : [],
         teamId: v.teamId || null,
@@ -134,16 +135,16 @@ export function PostForm({
           setPostGone(true); // EX-BD04-02
           return true;
         }
-        if (e.code === 'VALIDATION_FAILED' && e.field === 'title') {
-          setErrors((x) => ({ ...x, title: VALIDATION_MSG.tooLong('제목', LIMITS.title) }));
+        if (e.code === 'TITLE_REQUIRED') {
+          setErrors((x) => ({ ...x, title: messageFor(e) }));
           return true;
         }
-        if (e.code === 'VALIDATION_FAILED' && e.field === 'commitUrls') {
+        if (e.code === 'INVALID_COMMIT_URL' || e.code === 'POST_COMMIT_URLS_LIMIT_EXCEEDED') {
           setErrors((x) => ({ ...x, commit: VALIDATION_MSG.commitUrl }));
           return true;
         }
-        if (e.code === 'VALIDATION_FAILED' && e.field === 'tags') {
-          setErrors((x) => ({ ...x, tags: '태그를 다시 확인해 주세요.' }));
+        if (e.code === 'TAG_LIMIT_EXCEEDED' || e.code === 'TAG_TOO_LONG') {
+          setErrors((x) => ({ ...x, tags: messageFor(e) }));
           return true;
         }
         return false;
