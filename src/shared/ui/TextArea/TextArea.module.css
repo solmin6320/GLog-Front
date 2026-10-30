@@ -1,0 +1,12 @@
+/* 목업 .inp.ta */
+.ta {
+  height: auto;
+  min-height: 120px;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.serif {
+  font-family: var(--serif);
+  line-height: 1.7;
+}

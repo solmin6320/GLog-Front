@@ -1,0 +1,55 @@
+{
+  "name": "glog-front",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:tz": "TZ=UTC vitest run && TZ=Asia/Seoul vitest run && TZ=America/Los_Angeles vitest run",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "codegen:check": "graphql-codegen --config codegen.ts --check",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run codegen:check"
+  },
+  "dependencies": {
+    "@apollo/client": "^4.3.1",
+    "graphql": "^16.14.2",
+    "pretendard": "^1.3.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^7.18.4",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@graphql-codegen/cli": "^7.4.3",
+    "@graphql-codegen/client-preset": "^6.2.0",
+    "@graphql-codegen/typescript": "^6.1.0",
+    "@graphql-typed-document-node/core": "^3.2.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^24.19.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "msw": "^2.15.0",
+    "typescript": "~5.9",
+    "typescript-eslint": "^8.71.0",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  }
+}

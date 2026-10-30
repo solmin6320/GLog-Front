@@ -1,0 +1,1 @@
+export { TeamTag } from './TeamTag';

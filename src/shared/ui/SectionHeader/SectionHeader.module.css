@@ -1,0 +1,21 @@
+/* 목업 .sh */
+.sh {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 14px;
+}
+.title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+h3.title {
+  font-size: 15px;
+}
+.right {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}

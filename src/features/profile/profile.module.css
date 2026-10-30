@@ -1,0 +1,209 @@
+/* PR-01 · PR-02 — 목업 W-14 */
+
+/* ①~⑤ 머리 */
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 26px;
+}
+.headMain {
+  min-width: 0;
+}
+.name {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.3;
+}
+.github {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--ink-3);
+  border-radius: 4px;
+}
+.github:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ⑥ 활동 수 */
+.counts {
+  display: flex;
+  gap: 26px;
+  margin: 22px 0 0;
+  font-size: 13.5px;
+}
+.counts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.counts dt {
+  color: var(--ink-3);
+}
+.counts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.section {
+  margin-top: 44px;
+}
+.note {
+  margin-top: 12px;
+}
+
+/* ⑧⑨ | ⑩⑪ */
+.grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 40px;
+  margin-top: 44px;
+  align-items: start;
+}
+/* 경고 숫자 줄 높이 — 옆 칸(주간 판정 이력) 빈 상태가 이 높이만큼 내려가 구분선 · 문구 위치가 맞는다 */
+.grid {
+  --summary-h: 40px;
+}
+.warnBig {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: var(--summary-h);
+  margin-bottom: 16px;
+}
+/* 주간 판정 이력 빈 상태: 경고 숫자 줄만큼 띄워 경고의 구분선 · 문구와 같은 높이에 둔다 */
+/* 제목 아래 여백(14px)은 이 margin과 겹쳐(collapse) 사라지므로 함께 더한다 */
+.emptyAligned {
+  margin-top: calc(14px + var(--summary-h) + 16px);
+}
+.penaltyText {
+  margin: -4px 0 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--red);
+}
+.count {
+  font-weight: 700;
+  color: var(--ink);
+}
+.empty {
+  padding: 18px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+/* ⑫ 소속 팀 */
+.teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.teamLink {
+  display: inline-flex;
+  border-radius: 6px;
+}
+.teamLink:hover > span {
+  border-color: var(--line-input);
+  color: var(--ink);
+}
+
+/* ---------- PR-02 ---------- */
+.editCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.identity {
+  margin-top: 4px;
+}
+.identityName {
+  font-size: 18px;
+  font-weight: 700;
+}
+.identityLogin {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 8px;
+}
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+@media (max-width: 767px) {
+  .head {
+    gap: 18px;
+  }
+  .name {
+    font-size: 22px;
+  }
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    margin-top: 32px;
+  }
+  .section {
+    margin-top: 32px;
+  }
+  .formActions > * {
+    flex: 1 1 0;
+  }
+}
+
+/* 잔디를 불러온 날짜 · 시각 (히트맵 바로 아래) */
+.stamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* 지난 1년 기여 수 — 히트맵 위 */
+.total {
+  margin: 0 0 14px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.total strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}

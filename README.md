@@ -31,6 +31,18 @@ npm run dev          # http://localhost:5173 — 기본 목 모드
 | `pending` | 정다은 | 승인 대기 | 승인 대기 화면 |
 | `rejected` | 최민재 | 거절 | 거절 안내 |
 
+## 로컬 백엔드 연결 (bridge 모드)
+
+`VITE_API_MODE=bridge`는 백엔드가 이미 지원하는 연산(세션 · 홈 · 주간 활동 · 내 팀 목록)만 실서버 GraphQL로 보내고, 나머지는 브라우저 안 목이 받습니다. 연산 목록은 `src/mocks/bridge/operations.ts`의 `BRIDGED`입니다. 연산을 옮길 때는 여기에 한 줄 추가합니다.
+
+```bash
+cd ../GLog-Backend && docker compose up -d && ./gradlew bootRun   # JDK 21, .env 필요
+docker exec -i jandilog-mariadb mariadb -ujandilog -pjandilog jandilog < scripts/dev-seed.sql
+npm run dev -- --port 5180    # .env.local: VITE_API_MODE=bridge
+```
+
+`/__dev-login`을 열면 GitHub OAuth 없이 시드 회원(한동관)으로 로그인합니다(개발 서버 전용).
+
 ## 스크립트
 
 | 명령 | 하는 일 |

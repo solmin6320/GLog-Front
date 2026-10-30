@@ -1,0 +1,74 @@
+/*
+ * 디자인 토큰 — 목업 v2 :root 값이 원천이다 (docs/design/mockup-v2.reference.css).
+ * 접근성 보정(M-16)은 --line-input · --ink-placeholder 두 값뿐이다.
+ */
+:root {
+  --outer: #e2e7e3;
+  --canvas: #f4f6f3;
+  --surface: #ffffff;
+  --surface-2: #f7f9f7;
+  --line: #dce2de;
+  --line-2: #e9edea;
+  --line-input: #87928b;
+  --ink: #17201b;
+  --ink-2: #3f4a44;
+  --ink-3: #66716b;
+  --ink-4: #98a29c;
+  --ink-placeholder: #66716b;
+
+  --green: #1e6b3c;
+  --green-h: #17552f;
+  --green-bg: #e6f3ea;
+  --green-tint: #eef6f0;
+  --green-disabled: #8db89e;
+
+  --h0: #e7ece9;
+  --h1: #c0e3cd;
+  --h2: #7fc49b;
+  --h3: #3a9a5e;
+  --h4: #1e6b3c;
+
+  --blue: #2a4aa8;
+  --blue-bg: #e7edf8;
+  --blue-ink: #24397f;
+  --blue-row: #eef2fb;
+  --red: #b42318;
+  --red-bg: #fdecea;
+  --red-line: #f2c6c1;
+  --red-tint: #fff7f6;
+  --amber: #9c4a0a;
+  --amber-bg: #fcefe2;
+  --dark: #1b1f23;
+  --mute-bg: #ecefed;
+  --tag-bg: #e8ece9;
+  --seg-bg: #e4e9e6;
+  --box-mute: #e9eeeb;
+  --mark: #fff1b8;
+  --future-line: #c5cdc8;
+  --gauge-off: #dce2de;
+
+  --sans: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --serif: 'Noto Serif KR', 'Nanum Myeongjo', 'AppleMyungjo', serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --w-md: 700px;
+  --w-lg: 960px;
+  --w-xl: 1120px;
+  --header-h: 58px;
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 12px;
+  --shadow-pop: 0 18px 44px rgba(20, 30, 25, 0.18);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --overlay: rgba(40, 48, 44, 0.45);
+  --focus-ring: 0 0 0 3px rgba(30, 107, 60, 0.16);
+
+  /* 아바타 6색 (목업 AV) */
+  --av-1: #3b7a57;
+  --av-2: #4b5fa8;
+  --av-3: #9a5b3a;
+  --av-4: #7a5a9a;
+  --av-5: #4f7a86;
+  --av-6: #8a6a3a;
+}

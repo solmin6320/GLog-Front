@@ -1,0 +1,1 @@
+export { GrassHeatmap } from './GrassHeatmap';

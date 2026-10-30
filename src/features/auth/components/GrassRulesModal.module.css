@@ -1,0 +1,36 @@
+.lead {
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.list {
+  margin: 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 14px;
+}
+
+.row dt {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.row dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+@media screen and (max-width: 767px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

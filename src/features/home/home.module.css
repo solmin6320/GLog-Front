@@ -1,0 +1,181 @@
+/* CM-01 홈 — 목업 W-02 (homeBody) */
+
+/* ②③ | 세로선 | ④⑤ */
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px 274px;
+  gap: 32px;
+  align-items: stretch;
+}
+.vline {
+  background: var(--line);
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ② 이번 주 진행 */
+.progress {
+  min-width: 0;
+}
+.progressBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px 40px;
+}
+.strip {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 40px;
+  padding-top: 20px;
+}
+.asOf {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* ③ 진행 안내 + E-41 */
+.progressText {
+  margin-top: 22px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.progressText strong {
+  font-weight: 700;
+}
+.muted {
+  color: var(--ink-3);
+}
+
+/* ④ 내 경고 */
+.warnRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.warnMain {
+  min-width: 0;
+}
+.noWarning {
+  padding-top: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.penalty {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.penaltyText {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+/* ⑤ 받은 초대 */
+.invite {
+  margin-top: 34px;
+}
+.teamless + .invite {
+  margin-top: 20px;
+}
+
+/* ⑥ 상태 배너 */
+.banner {
+  margin-top: 32px;
+}
+
+/* ⑦⑧ 공지 */
+.notices {
+  margin-top: 40px;
+}
+.pin {
+  display: inline-flex;
+  flex: none;
+  width: 15px;
+  color: var(--amber);
+}
+.noticeTitle {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pinned {
+  font-weight: 700;
+}
+.empty {
+  padding: 20px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+/* ⑨ 팀 참가 유도 */
+.teamless {
+  margin-top: 4px;
+}
+.teamlessBody p + p {
+  margin-top: 2px;
+}
+
+@media (max-width: 767px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .vline {
+    display: none;
+  }
+  .stats {
+    padding-top: 0;
+  }
+  .invite {
+    margin-top: 20px;
+  }
+  .notices {
+    margin-top: 32px;
+  }
+}
+
+/* 다음 할 일 버튼 — 진행 안내와 한 덩어리로 (근접성) */
+.next {
+  margin-top: 14px;
+}
+.nextBtn {
+  min-width: 180px;
+}
+/* 자세히 — 눈에 띄지 않게 하되 손가락이 닿는 높이는 지킨다 (피츠) */
+.more {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 44px;
+  padding: 0 4px;
+}
+
+@media (max-width: 767px) {
+  .nextBtn {
+    width: 100%;
+  }
+  /* 덩어리 안은 가깝게, 덩어리 사이는 멀게 */
+  .top {
+    gap: 40px;
+  }
+  .banner {
+    margin-top: 40px;
+  }
+}

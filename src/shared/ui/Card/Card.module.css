@@ -1,0 +1,13 @@
+/* 목업 .card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .card {
+    padding: 18px 16px;
+  }
+}

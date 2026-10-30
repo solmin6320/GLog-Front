@@ -1,0 +1,7 @@
+/* 목업 .hr */
+.hr {
+  height: 1px;
+  border: 0;
+  background: var(--line);
+  margin: 28px 0;
+}

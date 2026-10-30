@@ -1,0 +1,99 @@
+/* AD-01 ②-4 공지 관리 — W-15 · W-16 관리자 표 언어 (패널 제목 20 · 표 .tb) */
+
+/* ③ 패널 제목 + ⑤ [공지 작성] */
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 18px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.headAction {
+  margin-left: auto;
+}
+
+/* ⑥ 목록: 고정 표시 + 제목 · 작성일 · 고정 토글 · 처리 */
+.titleCell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.pin {
+  display: inline-flex;
+  color: var(--amber);
+  flex: none;
+}
+.noticeLink {
+  font-weight: 600;
+  color: var(--ink);
+}
+.noticeLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sysHint {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+.actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ⑦ 에디터 패널 (목록 자리) */
+.editorTitle {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 18px;
+}
+.switchRow {
+  margin: 4px 0 8px;
+}
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* 좁은 화면: 표만 가로로 스크롤하고 첫 열(제목) · 끝 열(처리)은 고정한다 (ACC-ADM-15) */
+@media (max-width: 767px) {
+  .table td:first-child,
+  .table th:first-child,
+  .table td:last-child,
+  .table th:last-child {
+    position: sticky;
+    z-index: 1;
+    background: var(--surface);
+  }
+  .table th:first-child,
+  .table th:last-child {
+    background: var(--surface-2);
+  }
+  .table td:first-child,
+  .table th:first-child {
+    left: 0;
+    max-width: 60vw;
+    white-space: normal;
+  }
+  .table td:last-child,
+  .table th:last-child {
+    right: 0;
+  }
+}

@@ -1,0 +1,120 @@
+/* 목업 .btn .btn-p .btn-o .btn-dg .btn-t .btn-dark */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.primary {
+  background: var(--green);
+  color: var(--surface);
+}
+.primary:hover:not(:disabled) {
+  background: var(--green-h);
+}
+.primary:disabled {
+  background: var(--green-disabled);
+  cursor: not-allowed;
+}
+
+.dark {
+  background: var(--dark);
+  color: var(--surface);
+}
+
+.outline {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.outline:hover:not(:disabled) {
+  border-color: var(--ink-4);
+}
+
+.danger {
+  background: var(--surface);
+  border-color: var(--red-line);
+  color: var(--red);
+}
+.danger:hover:not(:disabled) {
+  background: var(--red-tint);
+}
+
+.text {
+  background: transparent;
+  color: var(--ink);
+  padding: 0 10px;
+}
+.text:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn:disabled:not(.primary) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.xs {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: 7px;
+  gap: 5px;
+}
+.sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  gap: 6px;
+}
+.lg {
+  height: 52px;
+  padding: 0 24px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.full {
+  width: 100%;
+}
+
+.busy {
+  cursor: progress;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
+}

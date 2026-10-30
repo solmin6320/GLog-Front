@@ -1,0 +1,86 @@
+/* 목업 W-02 .wf-top · .ib · .logo · .me · .top-sep */
+
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+.header {
+  position: relative;
+  z-index: 8;
+  flex: none;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.sep {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+}
+
+.me {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 4px 2px 2px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.me:hover {
+  color: var(--ink);
+}
+
+.nick {
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 위아래 여백은 PageContainer(.wf-body)가 가진다 */
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 중간 폭에서도 이름은 숨기고 아바타만 — 헤더가 한 줄을 넘지 않게 */
+@media screen and (max-width: 1279px) {
+  .nick {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .header {
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  /* 하단 탭(56px)이 본문을 가리지 않게 */
+  .main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* 좁은 화면: 이름 숨김(아바타만) — A4 3-4 */
+  .nick {
+    display: none;
+  }
+}

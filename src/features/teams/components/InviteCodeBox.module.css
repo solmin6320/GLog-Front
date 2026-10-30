@@ -1,0 +1,15 @@
+/* 목업 W-10 초대코드 (23px · 굵게 · 자간 넓게) */
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+.code {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
