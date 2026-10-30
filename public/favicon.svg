@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18"><rect x="0" y="0" width="8" height="8" rx="2" fill="#3A9A5E"/><rect x="10" y="0" width="8" height="8" rx="2" fill="#C0E3CD"/><rect x="0" y="10" width="8" height="8" rx="2" fill="#C0E3CD"/><rect x="10" y="10" width="8" height="8" rx="2" fill="#3A9A5E"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1F6B3C" />
+      <stop offset="1" stop-color="#123F25" />
+    </linearGradient>
+    <clipPath id="corner"><rect x="41" y="10" width="13" height="13" rx="3" /></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)" />
+  <rect x="10" y="10" width="13" height="13" rx="3" fill="#2C6B4A" />
+  <rect x="25.5" y="10" width="13" height="13" rx="3" fill="#82C59B" />
+  <rect x="41" y="10" width="13" height="13" rx="3" fill="#E8F4EA" />
+  <polygon points="48.5,10 54,10 54,15.5" fill="#2B4AA8" clip-path="url(#corner)" />
+  <rect x="10" y="25.5" width="13" height="13" rx="3" fill="#C0E2CF" />
+  <rect x="25.5" y="25.5" width="13" height="13" rx="3" fill="#3B9960" />
+  <rect x="41" y="25.5" width="13" height="13" rx="3" fill="#82C59B" />
+  <rect x="10" y="41" width="13" height="13" rx="3" fill="#3B9960" />
+  <rect x="25.5" y="41" width="13" height="13" rx="3" fill="#C0E2CF" />
+  <rect x="41" y="41" width="13" height="13" rx="3" fill="#82C59B" />
+</svg>
