@@ -12,6 +12,7 @@ import {
   DataTable,
   EmptyState,
   Icon,
+  InfoBox,
   LoadMore,
   QueryBoundary,
   SearchInput,
@@ -62,8 +63,12 @@ const EMPTY: Record<AdminMemberStatusParam, string> = {
   all: '승인 대기 · 거절 회원이 없어요.',
 };
 
-/** 가입 승인이 없어진 뒤 남은 계정 정리용 필터. 정리할 게 있거나 이미 그 필터에 있을 때만 보인다 */
-const LEGACY_STATUS: AdminMemberStatusParam[] = ['pending', 'rejected', 'all'];
+/**
+ * 배포 서버(GLog-Backend main)가 아는 필터. 전체 회원 명단(ACTIVE)과 정지(SUSPENDED)는 서버에 아직 없어
+ * 그 필터로 들어오면 "전체"(승인 대기 + 거절)로 보여 주고 안내를 띄운다. 서버에 생기면 이 목록에 다시 넣는다.
+ */
+const SERVER_STATUS: AdminMemberStatusParam[] = ['all', 'pending', 'rejected'];
+const SERVER_OPTIONS = SERVER_STATUS.map((v) => STATUS_OPTIONS.find((o) => o.value === v)!);
 
 const isStatusParam = (v: string): v is AdminMemberStatusParam => STATUS_OPTIONS.some((o) => o.value === v);
 
@@ -78,7 +83,8 @@ export function MembersTab() {
   const titleId = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { status, q } = parseAdminMembersSearch(searchParams);
+  const { status: asked, q } = parseAdminMembersSearch(searchParams);
+  const status = SERVER_STATUS.includes(asked) ? asked : 'all';
   const go = (next: { status: AdminMemberStatusParam; q?: string }) => navigate(paths.adminMembers(next));
 
   const list = usePagedList(AdminMembersQuery, {
@@ -112,6 +118,10 @@ export function MembersTab() {
         {pending ? <span className={s.meta}>정리할 승인 대기 {pending}명</span> : null}
       </div>
 
+      <InfoBox tone="mute" icon="info">
+        전체 회원 명단과 이용 정지는 아직 서버에 없어요. 지금은 승인 대기 · 거절 계정만 볼 수 있어요.
+      </InfoBox>
+
       <div className={s.toolbar}>
         <div className={s.search}>
           <MemberSearch q={q} onSearch={(next) => go({ status, q: next })} />
@@ -119,7 +129,7 @@ export function MembersTab() {
         <div className={s.filter}>
           <Select
             aria-label="상태"
-            options={pending || LEGACY_STATUS.includes(status) ? STATUS_OPTIONS : STATUS_OPTIONS.filter((o) => !LEGACY_STATUS.includes(o.value))}
+            options={SERVER_OPTIONS}
             value={status}
             onChange={(e) => {
               if (isStatusParam(e.target.value)) go({ status: e.target.value, q });

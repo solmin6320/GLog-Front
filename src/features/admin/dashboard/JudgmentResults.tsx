@@ -41,6 +41,7 @@ export type JudgmentFilters = { weekValue: string; q: string | undefined; result
  */
 export function JudgmentResults({
   currentWeekStart,
+  today,
   filters,
   weekOptions,
   onChange,
@@ -53,6 +54,8 @@ export function JudgmentResults({
   onRetryAll,
 }: {
   currentWeekStart: string;
+  /** 오늘 날짜(KST). 지난 주 판정이 이미 돌았는지 가른다 */
+  today: string;
   filters: JudgmentFilters;
   weekOptions: { value: string; label: string }[];
   onChange: (next: Partial<{ week: string; q: string | undefined; result: AdminResultParam }>) => void;
@@ -189,7 +192,7 @@ export function JudgmentResults({
                 />
               </>
             ) : (
-              <EmptyState icon="clock" title={notExecutedText(week.weekStart, currentWeekStart)} />
+              <EmptyState icon="clock" title={notExecutedText(week.weekStart, currentWeekStart, today)} />
             )}
           </>
         )}

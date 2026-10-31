@@ -108,6 +108,7 @@ describe('팀 오류 코드 별칭 (TEAM_ERROR_ALIASES)', () => {
     ['INVITATION_ALREADY_JOINED', 'ALREADY_TEAM_MEMBER'],
     ['INVITEE_ALREADY_MEMBER', 'ALREADY_TEAM_MEMBER'],
     ['LEADER_LAST_MEMBER', 'LAST_MEMBER'],
+    ['EXEMPTION_REQUEST_DUPLICATE', 'EXEMPTION_DUPLICATE'],
   ])('%s → %s (메시지 · 다른 extensions는 그대로)', async (backendCode, frontCode) => {
     on('joinTeamByCode', fail(backendCode, '원문 메시지'));
     const r = await runBridged('TeamJoinByInviteCode', { code: 'ABC123' }, AUTH);

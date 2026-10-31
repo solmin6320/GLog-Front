@@ -124,11 +124,13 @@ describe('AD-01 ②-2 회원 · 관리자 권한 탭', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('배포 서버에 없는 활성 회원 명단 · 정지 필터는 서버에 묻지 않고 오류 화면을 보여 준다', async () => {
-    renderRoute('/admin/members');
-    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  it('배포 서버에 없는 전체 회원 · 정지 필터는 고를 수 없고, 그 주소로 오면 "전체"(대기 + 거절)를 안내와 함께 보여 준다', async () => {
     renderRoute('/admin/members?status=suspended');
-    expect((await screen.findAllByRole('button', { name: '다시 시도' })).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/전체 회원 명단과 이용 정지는 아직 서버에 없어요/)).toBeInTheDocument();
+    await screen.findByText('정다은', { selector: 'span' });
+    const select = screen.getByRole('combobox', { name: '상태' });
+    expect(select).toHaveValue('all');
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['전체', '승인 대기', '거절']);
   });
 
   it('ACC-FIX-01 · E-09: 관리자가 아니면 권한 없음', async () => {

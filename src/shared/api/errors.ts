@@ -20,6 +20,7 @@ export type ErrorCode =
   | 'ALREADY_TEAM_MEMBER'
   | 'TEAM_JOIN_BLOCKED'
   | 'INVITEE_NOT_FOUND'
+  | 'INVITATION_DUPLICATE'
   | 'TEAM_GONE'
   | 'LEADER_MUST_TRANSFER'
   | 'LAST_MEMBER'
@@ -52,6 +53,7 @@ const CATEGORY: Record<ErrorCode, ErrorCategory> = {
   LOGIN_CODE_INVALID: 'validation',
   INVITE_CODE_NOT_FOUND: 'validation',
   ALREADY_TEAM_MEMBER: 'validation',
+  INVITATION_DUPLICATE: 'validation',
   LEADER_MUST_TRANSFER: 'validation',
   LAST_MEMBER: 'validation',
   EXEMPTION_DUPLICATE: 'validation',

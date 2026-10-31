@@ -81,6 +81,7 @@ const BY_CODE: Record<string, string> = {
   ALREADY_TEAM_MEMBER: '이미 참가한 팀이에요.', // E-11 (TM-06은 E-16, TM-04는 E-17로 덮는다)
   TEAM_JOIN_BLOCKED: '이 팀에는 참가할 수 없어요. 팀장에게 문의해 주세요.', // E-12
   INVITEE_NOT_FOUND: '그 아이디의 회원을 찾을 수 없어요. 먼저 가입해야 초대할 수 있어요.', // E-15
+  INVITATION_DUPLICATE: '이미 초대를 보냈어요. 상대가 수락하면 팀원이 돼요.',
   TEAM_GONE: '없어진 팀이에요.', // E-18
   LEADER_MUST_TRANSFER: '팀장은 다른 팀원에게 팀장을 넘긴 뒤에 나갈 수 있어요.', // E-19
   LAST_MEMBER: '혼자 있는 팀이에요. 나가면 팀이 삭제돼요. 삭제할까요?', // E-20

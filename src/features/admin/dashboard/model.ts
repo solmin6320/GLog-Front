@@ -100,10 +100,13 @@ export function failKpiLabel(latestJudgedWeekStart: string | null | undefined, c
   return `${formatMD(latestJudgedWeekStart)} 주 미달`;
 }
 
-/** 판정이 아직 없는 주의 안내 (5-4-9). 지난 주 · 이번 주는 '월요일 오전에 실행', 그보다 오래된 주는 결과 없음 */
-export function notExecutedText(weekStart: string, currentWeekStart: string): string {
-  if (weekStart === currentWeekStart) return '이번 주 판정은 월요일 오전에 실행돼요.';
-  if (weekStart === addDays(currentWeekStart, -7)) return '지난 주 판정은 월요일 오전에 실행돼요.';
+/**
+ * 판정이 아직 없는 주의 안내 (5-4-9). 이번 주는 '다음 월요일 오전에 실행'.
+ * 지난 주는 이번 주 월요일 오전에 판정하므로, 오늘이 그 월요일일 때만 '오늘 오전에 실행'이고 화요일부터는 결과 없음이다.
+ */
+export function notExecutedText(weekStart: string, currentWeekStart: string, today: string): string {
+  if (weekStart === currentWeekStart) return '이번 주 판정은 다음 월요일 오전에 실행돼요.';
+  if (weekStart === addDays(currentWeekStart, -7) && today === currentWeekStart) return '지난 주 판정은 오늘 오전에 실행돼요.';
   return COPY.emptyWeek;
 }
 

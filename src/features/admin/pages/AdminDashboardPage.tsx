@@ -117,6 +117,7 @@ export default function AdminDashboardPage() {
         <div className={s.listCol}>
           <JudgmentResults
             currentWeekStart={clock.currentWeekStart}
+            today={clock.today}
             filters={{ weekValue: shownWeek, q, result }}
             weekOptions={weekOptions(clock.currentWeekStart, [shownWeek, latest])}
             onChange={changeFilters}

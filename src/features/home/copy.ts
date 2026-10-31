@@ -15,6 +15,7 @@ export const HOME_COPY = {
   /** ⑨ 5-2-7 */
   teamlessTitle: '팀에 참가해야 판정이 시작돼요',
   teamlessBody: ['기록글은 지금도 쓸 수 있어요.', '처음 팀에 들어간 주는 판정하지 않아요.'],
+  teamlessWrite: '기록글 쓰기',
   /** EX-CM01-01 */
   noNotices: '등록된 공지가 없어요.',
   noticesFailed: '공지를 불러오지 못했어요.',

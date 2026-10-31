@@ -41,6 +41,8 @@ export const COPY = {
   emptyAll: '면제 기간과 대기 중인 요청이 없어요.',
   emptyPeriods: '등록된 면제 기간이 없어요.',
   emptyRequests: '대기 중인 요청이 없어요.',
+  emptyApproved: '승인한 요청이 없어요.',
+  emptyRejected: '거절한 요청이 없어요.',
 
   created: '등록했어요.',
   updated: '저장했어요.',
