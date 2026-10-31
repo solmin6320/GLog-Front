@@ -4,7 +4,7 @@ import type { HomeBanner } from '@/domain/banner';
 import { deductionText, liveProgressText } from '@/domain/weekly';
 import type { HomeNoticesQueryQuery, HomeQueryQuery } from '@/gql/graphql';
 import { useClock } from '@/session';
-import { asOfLabel, formatDateTimeMD, formatWeekRangeWithDay } from '@/shared/lib/format';
+import { asOfLabel, formatDotDate, formatWeekRangeWithDay } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import {
   BigStat,
@@ -193,7 +193,7 @@ export function TeamlessCard() {
                 팀 만들기
               </LinkButton>
               <LinkButton to={paths.teamJoin()} variant="outline">
-                초대코드 입력
+                팀 참가
               </LinkButton>
             </>
           }
@@ -236,7 +236,7 @@ export function NoticePreview({ data, loading, error, onRetry }: NoticeProps) {
             <RowItem
               key={n.id}
               to={paths.notice(n.id)}
-              right={<time dateTime={n.createdAt}>{formatDateTimeMD(n.createdAt)}</time>}
+              right={<time dateTime={n.createdAt}>{formatDotDate(n.createdAt)}</time>}
             >
               <span className={s.pin} aria-hidden={n.isPinned ? undefined : true}>
                 {n.isPinned ? (
@@ -260,7 +260,11 @@ export function NoticePreview({ data, loading, error, onRetry }: NoticeProps) {
   }
   return (
     <section className={s.notices} aria-labelledby="home-notices-title">
-      <SectionHeader id="home-notices-title" title="공지" right={<TextLink to={paths.notices()}>전체보기</TextLink>} />
+      <SectionHeader id="home-notices-title" title="공지" right={
+          <TextLink to={paths.notices()} className={s.moreLink}>
+            전체보기
+          </TextLink>
+        } />
       {body}
     </section>
   );

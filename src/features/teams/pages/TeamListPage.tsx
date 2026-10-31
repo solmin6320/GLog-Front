@@ -13,9 +13,9 @@ function TopActions() {
   return (
     <>
       <LinkButton to={paths.teamJoin()} variant="outline">
-        초대코드 입력
+        팀 참가
       </LinkButton>
-      <LinkButton to={paths.teamNew()}>팀 만들기</LinkButton>
+      <LinkButton to={paths.teamNew()} icon="plus">팀 만들기</LinkButton>
     </>
   );
 }
@@ -109,9 +109,9 @@ export default function TeamListPage() {
                 body="팀을 만들거나 초대코드로 참가해 보세요."
                 action={
                   <>
-                    <LinkButton to={paths.teamNew()}>팀 만들기</LinkButton>
+                    <LinkButton to={paths.teamNew()} icon="plus">팀 만들기</LinkButton>
                     <LinkButton to={paths.teamJoin()} variant="outline">
-                      초대코드 입력
+                      팀 참가
                     </LinkButton>
                   </>
                 }

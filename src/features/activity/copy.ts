@@ -3,7 +3,7 @@
  * E-40 · 5-2-7 · "아직 판정 기록이 없어요." 등은 CM-01 · PR-01과 같은 글자 — 승격 후보(@/domain/messages).
  */
 export const WEEKLY_COPY = {
-  title: '내 주간 활동',
+  title: '주간 활동',
   sub: '판정은 월요일 오전에 개인 단위로 한 번만 이뤄져요',
   prevWeek: '이전 주',
   nextWeek: '다음 주',

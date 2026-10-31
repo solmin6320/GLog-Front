@@ -299,6 +299,15 @@ describe('AD-01 ②-3 빈 상태', () => {
     expect(await screen.findByRole('dialog', { name: '면제 기간 등록' })).toBeInTheDocument();
   });
 
+  it('R3: 빈 상태의 [처리한 요청 보기] → 승인함 목록과 [요청 상태] 필터가 보인다', async () => {
+    ew.periods = [];
+    ew.requests = ew.requests.map((e, i) => (i === 0 ? { ...e, status: 'APPROVED' as const } : e)).filter((e) => e.status !== 'PENDING');
+    const { user } = renderRoute('/admin/exemptions');
+    await user.click(await screen.findByRole('button', { name: '처리한 요청 보기' }));
+    expect(await screen.findByRole('combobox', { name: '요청 상태' })).toHaveValue('APPROVED');
+    expect(await screen.findByRole('table', { name: '개인 면제 요청' })).toBeInTheDocument();
+  });
+
   it('처리한 요청: [요청 상태]에서 "거절함"을 고르면 거절 사유와 함께 보이고, 승인 · 거절 버튼은 없다', async () => {
     ew.requests[0] = { ...ew.requests[0]!, status: 'REJECTED', rejectReason: '증빙이 없어요.' };
     const { user } = renderRoute('/admin/exemptions');

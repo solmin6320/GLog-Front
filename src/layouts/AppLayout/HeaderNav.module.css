@@ -72,22 +72,49 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* 채워진 초록 버튼은 이것 하나뿐이라 가장 먼저 눈에 들어온다 */
-  .write {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 40px;
-    padding: 0 16px;
-    border-radius: var(--radius);
-    background: var(--green);
-    color: var(--surface);
-    font-size: 14px;
-    font-weight: 700;
-  }
+}
 
-  .write:hover {
-    background: var(--green-h);
+/* 채워진 초록 버튼은 이것 하나뿐이라 가장 먼저 눈에 들어온다. 모든 폭에서 헤더에 있다 */
+.write {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  background: var(--green);
+  color: var(--surface);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.write:hover {
+  background: var(--green-h);
+}
+
+/* 1279px 이하: 글쓰기는 연필 아이콘만 */
+@media screen and (max-width: 1279px) {
+  .write .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .write {
+    width: 40px;
+    padding: 0;
+  }
+}
+
+/* 767px 이하: 다른 헤더 버튼(메뉴 · 검색 · 아바타)과 같은 누름 크기 */
+@media screen and (max-width: 767px) {
+  .write {
+    width: var(--tap, 44px);
+    min-height: var(--tap, 44px);
   }
 }
 
@@ -106,8 +133,5 @@
   }
   .item {
     padding: 0 10px;
-  }
-  .write {
-    padding: 0 12px;
   }
 }

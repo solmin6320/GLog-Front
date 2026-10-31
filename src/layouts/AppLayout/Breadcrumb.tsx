@@ -4,7 +4,8 @@ import { TeamScopeQuery } from '@/guards/api';
 import { isBigintId } from '@/shared/lib/ids';
 import { paths } from '@/shared/lib/paths';
 import { Icon } from '@/shared/ui';
-import { DRAWER_GROUPS, drawerActive, leafLabel } from './drawerNav';
+import { DRAWER_GROUPS, drawerActive } from './drawerNav';
+import { useLeafLabel } from './useLeafLabel';
 import s from './Breadcrumb.module.css';
 
 /**
@@ -24,12 +25,12 @@ export function Breadcrumb() {
   const teamMatch = /^\/teams\/([^/]+)(?:\/([^/]+))?\/?$/.exec(pathname);
   const teamId = teamMatch && isBigintId(teamMatch[1]) ? teamMatch[1] : null;
   const scope = useQuery(TeamScopeQuery, teamId ? { variables: { id: teamId }, fetchPolicy: 'cache-only' } : skipToken);
+  // 소메뉴 아래 화면(글쓰기 · 글 수정 · 프로필 수정 · 공지 상세)은 마지막 칸에 화면 이름을 덧붙인다
+  const leaf = useLeafLabel(pathname);
   if (!active || active.group === 'home') return null;
   const group = DRAWER_GROUPS.find((g) => g.key === active.group);
   if (!group) return null;
   const item = group.items.find((i) => i.key === active.item);
-  // 소메뉴 아래 화면(글쓰기 · 글 수정 · 프로필 수정)은 마지막 칸에 화면 이름을 덧붙인다
-  const leaf = leafLabel(pathname);
   if (teamId || (teamMatch && !TEAM_STATIC.has(teamMatch[1] ?? ''))) {
     const team = scope.data?.team;
     const sub = teamMatch?.[2] ? TEAM_SUB[teamMatch[2]] : undefined;
@@ -115,9 +116,16 @@ export function Breadcrumb() {
               <Icon name="chevR" size={14} />
             </li>
             <li>
-              <span className={s.here} aria-current="page">
-                {item.label}
-              </span>
+              {/* 아래 화면이 있으면 소메뉴는 링크 — "지금 있는 곳"(굵게)은 마지막 칸 하나뿐 */}
+              {leaf === null ? (
+                <span className={s.here} aria-current="page">
+                  {item.label}
+                </span>
+              ) : (
+                <Link to={item.to} className={s.link}>
+                  {item.label}
+                </Link>
+              )}
             </li>
           </>
         ) : null}

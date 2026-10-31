@@ -4,7 +4,8 @@ import { Link, useLocation } from 'react-router';
 import { useIsAdmin, useViewer } from '@/session';
 import { Icon, IconButton, Logo } from '@/shared/ui';
 import { AdminLayoutCountsQuery } from '../api';
-import { DRAWER_GROUPS, drawerActive, leafLabel, type DrawerBadgeKey } from './drawerNav';
+import { DRAWER_GROUPS, drawerActive, type DrawerBadgeKey } from './drawerNav';
+import { useLeafLabel } from './useLeafLabel';
 import s from './Drawer.module.css';
 
 export const DRAWER_ID = 'app-drawer';
@@ -37,11 +38,12 @@ function DrawerPanel({ onClose }: { onClose: () => void }) {
   const active = drawerActive(pathname, search);
   const groups = DRAWER_GROUPS.filter((g) => !g.adminOnly || isAdmin);
   const activeGroup = groups.find((g) => g.key === active?.group);
+  // 글쓰기 · 글 수정 · 프로필 수정 · 공지 상세는 소메뉴 대신 화면 이름 (이름을 아직 모르면 대메뉴까지만)
+  const leaf = useLeafLabel(pathname);
   const here = activeGroup
     ? {
         group: activeGroup.label,
-        // 글쓰기 · 글 수정 · 프로필 수정은 소메뉴 대신 화면 이름
-        item: leafLabel(pathname) ?? activeGroup.items.find((i) => i.key === active?.item)?.label ?? null,
+        item: leaf !== null ? leaf || null : (activeGroup.items.find((i) => i.key === active?.item)?.label ?? null),
       }
     : null;
 

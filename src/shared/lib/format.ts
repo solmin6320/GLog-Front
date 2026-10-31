@@ -58,6 +58,12 @@ export function formatDotDate(iso: DateTimeString): string {
   return `${p.year}.${String(p.month).padStart(2, '0')}.${String(p.day).padStart(2, '0')}`;
 }
 
+/** 2026.09.29 14:05 (KST) — 공지처럼 해가 바뀌어도 남는 글의 작성 시각 */
+export function formatDotDateTime(iso: DateTimeString): string {
+  const p = kstPartsOf(iso);
+  return `${formatDotDate(iso)} ${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
+}
+
 /** 9/29 (KST) — DateTime을 월/일로 */
 export function formatDateTimeMD(iso: DateTimeString): string {
   const p = kstPartsOf(iso);

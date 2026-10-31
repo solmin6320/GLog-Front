@@ -39,6 +39,7 @@ export const COPY = {
 
   /** 5-4-9 · ACC-ADM-11 */
   emptyAll: '면제 기간과 대기 중인 요청이 없어요.',
+  showHandled: '처리한 요청 보기',
   emptyPeriods: '등록된 면제 기간이 없어요.',
   emptyRequests: '대기 중인 요청이 없어요.',
   emptyApproved: '승인한 요청이 없어요.',

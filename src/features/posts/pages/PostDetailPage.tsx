@@ -39,14 +39,17 @@ const COMMENT_PAGE = 50;
  */
 export default function PostDetailPage() {
   const { postId } = useParams();
-  if (!isObjectId(postId)) {
-    return (
-      <PageContainer width="md">
-        <FullState kind="notFound" />
-      </PageContainer>
-    );
-  }
+  if (!isObjectId(postId)) return <PostNotFound />;
   return <PostDetail postId={postId.toLowerCase()} />;
+}
+
+function PostNotFound() {
+  useDocumentTitle('페이지를 찾을 수 없음');
+  return (
+    <PageContainer width="md">
+      <FullState kind="notFound" />
+    </PageContainer>
+  );
 }
 
 function PostDetail({ postId }: { postId: string }) {
@@ -56,9 +59,11 @@ function PostDetail({ postId }: { postId: string }) {
     select: (d) => (d.post?.__typename === 'Post' ? d.post.comments : null),
     pageSize: COMMENT_PAGE,
   });
-  // 탭 제목은 글 제목 (지운 글 · 없는 글은 게시판)
+  // 탭 제목은 글 제목. 없는 글은 404 화면이므로 "페이지를 찾을 수 없음", 지운 글 · 불러오는 중은 게시판 (R1)
   const post = detail.data?.post;
-  useDocumentTitle(post?.__typename === 'Post' ? post.title : '게시판');
+  useDocumentTitle(
+    post?.__typename === 'Post' ? post.title : detail.data && !post ? '페이지를 찾을 수 없음' : '게시판',
+  );
   return (
     <PageContainer width="md">
       <QueryBoundary

@@ -6,7 +6,7 @@ import type { PostFilter } from '@/gql/graphql';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
 import { parsePostsSearch, paths, postTypeToEnum, type PostTypeParam } from '@/shared/lib/paths';
-import { EmptyState, LinkButton, LoadMore, PageContainer, QueryBoundary, Segmented, TextLink } from '@/shared/ui';
+import { EmptyState, LinkButton, LoadMore, PageContainer, PageTitle, QueryBoundary, Segmented, TextLink } from '@/shared/ui';
 import { PostListQuery, PostTagsQuery, PostTypeCountsQuery } from '../api';
 import { BoardSearch } from '../components/BoardSearch';
 import { PostListItem, PostListSkeleton } from '../components/PostListItem';
@@ -56,7 +56,8 @@ export default function PostListPage() {
 
   const board = (body: ReactNode) => (
     <>
-      <h1 className="visually-hidden">게시판</h1>
+      {/* 글쓰기 버튼은 헤더(데스크톱) · 하단 탭(모바일) 하나만 둔다 — 지금 탭의 글 종류로 열린다 */}
+      <PageTitle title="게시판" />
       <div className={s.top}>
         <Segmented
           items={TYPES.map((t) => ({ value: t, label: typeLabel(t), count: q ? (countOf(t) ?? null) : null }))}
@@ -64,9 +65,6 @@ export default function PostListPage() {
           onChange={(t) => go({ type: t, q, tag })}
           ariaLabel="글 종류"
         />
-        <LinkButton to={paths.postNew({ type })} icon="pencil">
-          글쓰기
-        </LinkButton>
       </div>
       <div className={s.search}>
         <BoardSearch current={q ?? ''} onSearch={(next) => go({ type, q: next, tag })} />
@@ -102,16 +100,7 @@ export default function PostListPage() {
       }
     />
   ) : (
-    <EmptyState
-      icon="file"
-      title="아직 글이 없어요."
-      body="첫 글을 남겨보세요."
-      action={
-        <LinkButton to={paths.postNew({ type })} icon="pencil">
-          글쓰기
-        </LinkButton>
-      }
-    />
+    <EmptyState icon="file" title="아직 글이 없어요." body="첫 글을 남겨보세요." />
   );
 
   return (

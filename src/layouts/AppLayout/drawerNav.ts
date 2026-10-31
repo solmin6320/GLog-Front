@@ -55,7 +55,7 @@ export const DRAWER_GROUPS: readonly DrawerGroup[] = [
     label: '팀',
     icon: 'users',
     items: [
-      { key: 'teamList', label: '내 팀 목록', to: paths.teams() },
+      { key: 'teamList', label: '내 팀', to: paths.teams() },
       { key: 'teamNew', label: '팀 만들기', to: paths.teamNew() },
       { key: 'teamJoin', label: '팀 참가', to: paths.teamJoin() },
       { key: 'invitations', label: '받은 초대', to: paths.invitations(), badge: 'invitations' },
@@ -72,7 +72,7 @@ export const DRAWER_GROUPS: readonly DrawerGroup[] = [
   },
   {
     key: 'notices',
-    label: '공지사항',
+    label: '공지',
     icon: 'mega',
     items: [{ key: 'noticeList', label: '공지 목록', to: paths.notices() }],
   },

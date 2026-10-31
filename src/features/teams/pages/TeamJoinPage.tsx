@@ -86,7 +86,7 @@ export default function TeamJoinPage() {
               취소
             </LinkButton>
             <Button type="submit" loading={join.pending}>
-              {join.pending ? '확인 중...' : '참가하기'}
+              {join.pending ? '확인 중...' : '팀 참가'}
             </Button>
           </div>
         </form>

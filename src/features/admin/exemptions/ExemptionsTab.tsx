@@ -57,7 +57,19 @@ export function ExemptionsTab() {
       </div>
 
       {allEmpty ? (
-        <EmptyState icon="half" title={COPY.emptyAll} action={registerButton} />
+        <EmptyState
+          icon="half"
+          title={COPY.emptyAll}
+          action={
+            <>
+              {registerButton}
+              {/* R3: 빈 상태에서도 승인 · 거절한 요청으로 갈 길을 남긴다 → 승인함 목록과 [요청 상태] 필터가 보인다 */}
+              <Button variant="outline" onClick={() => setReqStatus('APPROVED')}>
+                {COPY.showHandled}
+              </Button>
+            </>
+          }
+        />
       ) : (
         <>
           <PeriodsSection list={periods} onEdit={(period) => setDialog({ kind: 'edit', period })} onDelete={(period) => setDialog({ kind: 'delete', period })} />

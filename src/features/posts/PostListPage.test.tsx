@@ -178,18 +178,21 @@ describe('BD-01 게시판 목록', () => {
     );
   });
 
-  it('ACC-BD01-08 글이 하나도 없으면 "아직 글이 없어요" + [글쓰기]', async () => {
+  it('ACC-BD01-08 글이 하나도 없으면 "아직 글이 없어요" — 글쓰기 버튼은 헤더 하나만(본문에 중복 없음)', async () => {
     board.posts.length = 0;
     open('/posts?type=devlog');
     expect(await screen.findByText('아직 글이 없어요.')).toBeInTheDocument();
     expect(screen.getByText('첫 글을 남겨보세요.')).toBeInTheDocument();
-    for (const a of screen.getAllByRole('link', { name: '글쓰기' })) expect(a).toHaveAttribute('href', '/posts/new?type=devlog');
+    expect(screen.getByRole('heading', { level: 1, name: '게시판' })).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByRole('link', { name: /글쓰기/ })).not.toBeInTheDocument();
+    // 헤더 글쓰기(데스크톱 · 모바일)는 지금 탭의 글 종류로 연다
+    for (const a of screen.getAllByRole('link', { name: '새 글쓰기' })) expect(a).toHaveAttribute('href', '/posts/new?type=devlog');
   });
 
-  it('ACC-BD01-10 개발일지 탭의 [글쓰기] → /posts/new?type=devlog (작성 화면 기본 종류)', async () => {
+  it('ACC-BD01-10 개발일지 탭에서 헤더 [글쓰기] → /posts/new?type=devlog (작성 화면 기본 종류)', async () => {
     const { user, router } = open('/posts?type=devlog');
     await list('개발일지 글 목록');
-    await user.click(screen.getByRole('link', { name: '글쓰기' }));
+    await user.click(screen.getAllByRole('link', { name: '새 글쓰기' })[0] as HTMLElement);
     await waitFor(() => expect(router.state.location.pathname).toBe('/posts/new'));
     expect(await screen.findByRole('tab', { name: '개발일지' })).toHaveAttribute('aria-selected', 'true');
   });

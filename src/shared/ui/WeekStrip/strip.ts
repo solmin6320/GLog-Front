@@ -31,7 +31,8 @@ export function stripDayText(d: StripDay): string {
   if (d.isToday) parts.push('오늘');
   if (d.grassCount != null && d.grassCount > 0) parts.push(`기여 ${d.grassCount}회`);
   else if (d.grassLevel != null && d.grassLevel > 0) parts.push('잔디 있음');
-  else parts.push('잔디 없음');
+  // 있을 때 "기여 N회"와 말을 맞춘다 (R2)
+  else parts.push('기여 없음');
   if (d.hasRecord) parts.push(d.recordCount ? `기록글 ${d.recordCount}개` : '기록글 있음');
   else parts.push('기록글 없음');
   parts.push(d.verified ? '인증됨' : '인증 안 됨');

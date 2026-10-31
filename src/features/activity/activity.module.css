@@ -19,7 +19,7 @@
   margin-bottom: 24px;
 }
 
-/* ② | ④ */
+/* ② | ④ — 표(약 460px)와 판정 카드(340px)가 나란히 들어가는 1024px 이상만 두 단 */
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -199,7 +199,43 @@
   color: var(--ink-3);
 }
 
+/* 1023px 이하: 한 단. 이번 주 판정 카드를 날짜별 표 위로 (태블릿에서 표가 잘리던 문제 · 모바일에서 카드가 묻히던 문제) */
+@media (max-width: 1023px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .layout > section:last-child:not(:first-child) {
+    order: -1;
+  }
+}
+
 @media (max-width: 767px) {
+  /* 활동 없는 날 · 아직 안 온 날은 "날짜 ··· 내용" 한 줄 (DataTable 카드 모양의 4줄 대신) */
+  .quietDay,
+  .futureDay {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .quietDay td,
+  .futureDay td {
+    width: auto !important;
+    padding: 0 !important;
+  }
+  .quietDay td:not(:first-child):not(:last-child),
+  .futureDay td:nth-child(n + 3) {
+    display: none !important;
+  }
+  .quietDay td:last-child,
+  .futureDay td:nth-child(2) {
+    display: block !important;
+  }
+  .quietDay td::before,
+  .futureDay td::before {
+    content: none !important;
+  }
   .layout,
   .summary,
   .guides {

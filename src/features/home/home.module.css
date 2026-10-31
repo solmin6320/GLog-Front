@@ -187,3 +187,10 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* ⑧ 전체보기: 글자 높이(17px)보다 넓게 눌리도록 — 최소 24px (WCAG 2.5.8) */
+.moreLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}

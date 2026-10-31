@@ -24,15 +24,15 @@ describe('WeekStrip', () => {
   it('칸마다 스크린리더 문구를 단다', () => {
     render(<WeekStrip days={WEEK} />);
     expect(screen.getByText('9월 29일 화요일, 기여 1회, 기록글 1개, 인증됨')).toBeInTheDocument();
-    expect(screen.getByText('9월 30일 수요일, 잔디 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
-    expect(screen.getByText('10월 1일 목요일, 오늘, 잔디 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
+    expect(screen.getByText('9월 30일 수요일, 기여 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
+    expect(screen.getByText('10월 1일 목요일, 오늘, 기여 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
     expect(screen.getByText('10월 2일 금요일, 아직 오지 않은 날')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(7);
   });
 
   it('오늘 · 미래 · 기록글 · 인증일 표시', () => {
     render(<WeekStrip days={WEEK} size={54} />);
-    const today = squareFor('10월 1일 목요일, 오늘, 잔디 없음, 기록글 없음, 인증 안 됨');
+    const today = squareFor('10월 1일 목요일, 오늘, 기여 없음, 기록글 없음, 인증 안 됨');
     expect(today).toHaveClass('today');
     expect(today).not.toHaveClass('future');
 
@@ -51,7 +51,7 @@ describe('WeekStrip', () => {
     const monItem = mon.closest('li') as HTMLElement;
     expect(monItem.querySelector('.dl')).toHaveClass('on');
     expect(monItem.querySelector('.ul')).not.toHaveClass('off');
-    const wedItem = squareFor('9월 30일 수요일, 잔디 없음, 기록글 없음, 인증 안 됨').closest('li') as HTMLElement;
+    const wedItem = squareFor('9월 30일 수요일, 기여 없음, 기록글 없음, 인증 안 됨').closest('li') as HTMLElement;
     expect(wedItem.querySelector('.ul')).toHaveClass('off');
     expect(wedItem.querySelector('.dl')).toHaveTextContent('수');
   });
@@ -63,7 +63,7 @@ describe('WeekStrip', () => {
     ];
     const { rerender } = render(<WeekStrip days={days} />);
     expect(squareFor('9월 21일 월요일, 기여 2회, 기록글 없음, 인증됨')).toHaveAttribute('data-level', '3');
-    expect(squareFor('9월 22일 화요일, 잔디 없음, 기록글 없음, 인증 안 됨')).toHaveAttribute('data-level', '0');
+    expect(squareFor('9월 22일 화요일, 기여 없음, 기록글 없음, 인증 안 됨')).toHaveAttribute('data-level', '0');
     rerender(<WeekStrip days={days} fallbackLevel={2} />);
     expect(squareFor('9월 21일 월요일, 기여 2회, 기록글 없음, 인증됨').style.background).toBe('var(--h2)');
   });
