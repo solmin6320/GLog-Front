@@ -141,8 +141,8 @@ export const seedAdminMembers = (): AdminMember[] => [
 ];
 
 /**
- * 회원 저장소. adminMembers(status: PENDING 기본 · REJECTED · SUSPENDED · ALL=대기+거절, 신청 오래된 순),
- * adminMemberRoster(활성 전체, id 오름차순), 승인 · 거절 · 되돌리기 · 승격 · 정지 · 정지 해제.
+ * 회원 저장소. adminMembers(status: PENDING 기본 · REJECTED · ALL=대기+거절, 신청 오래된 순),
+ * 승인 · 거절 · 되돌리기 · 승격(promoteMemberToAdmin). 배포 서버 main 기준이라 활성 명단 · 정지는 없다.
  */
 export function installAdminMembers(initial: AdminMember[] = seedAdminMembers()) {
   const rows = initial.map((m) => ({ ...m }));
@@ -168,18 +168,10 @@ export function installAdminMembers(initial: AdminMember[] = seedAdminMembers())
         ),
       ),
     )
-    .on(
-      'adminMemberRoster',
-      adminOnly<{ keyword?: string | null }>(({ keyword }) =>
-        page(rows.filter((m) => m.status === 'ACTIVE' && match(m, keyword)).sort((a, b) => Number(a.id) - Number(b.id))),
-      ),
-    )
     .on('approveMember', change({ status: 'ACTIVE' }))
     .on('rejectMember', change({ status: 'REJECTED' }))
     .on('revertMemberToPending', change({ status: 'PENDING' }))
-    .on('promoteToAdmin', change({ role: 'ADMIN' }))
-    .on('suspendMember', change({ status: 'SUSPENDED' }))
-    .on('unsuspendMember', change({ status: 'ACTIVE' }));
+    .on('promoteMemberToAdmin', change({ role: 'ADMIN' }));
   return rows;
 }
 

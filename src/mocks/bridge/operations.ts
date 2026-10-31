@@ -535,26 +535,26 @@ const toMemberRow = (m: BackendAdminMember) => ({
 
 const ADMIN_MEMBER_FIELDS = 'id githubLogin nickname status role createdAt';
 
+/**
+ * 배포 서버(GLog-Backend main)에는 활성 회원 명단(adminMemberRoster)과 정지(SUSPENDED)가 없다.
+ * 그 필터는 서버에 보내지 않고 NOT_AVAILABLE로 막는다. 승인 대기 · 거절 · 전체(대기+거절)만 서버로 간다.
+ */
+const SERVER_MEMBER_FILTERS = new Set(['PENDING', 'REJECTED', 'ALL']);
+
 const adminMembersQuery: Op = async ({ filter, search, after }, auth) => {
   type Page = { items: BackendAdminMember[]; nextCursor: string | null; totalCount: number };
-  // ACTIVE(전체 회원)는 명단 쿼리, 승인 대기 · 거절은 기존 승인 쿼리
-  const d =
-    (filter ?? 'ACTIVE') === 'ACTIVE'
-      ? (
-          await ask<{ adminMemberRoster: Page }>(
-            `query($keyword: String, $after: String) { adminMemberRoster(keyword: $keyword, after: $after) { items { ${ADMIN_MEMBER_FIELDS} } nextCursor totalCount } }`,
-            { keyword: search ?? null, after: after ?? null },
-            auth,
-          )
-        ).adminMemberRoster
-      : (
-          await ask<{ adminMembers: Page }>(
-            `query($status: MemberApprovalFilter, $keyword: String, $after: String) {
-              adminMembers(status: $status, keyword: $keyword, after: $after) { items { ${ADMIN_MEMBER_FIELDS} } nextCursor totalCount } }`,
-            { status: filter, keyword: search ?? null, after: after ?? null },
-            auth,
-          )
-        ).adminMembers;
+  const status = (filter as string | null | undefined) ?? 'ACTIVE';
+  if (!SERVER_MEMBER_FILTERS.has(status)) {
+    throw new BridgeError([{ message: 'not on the deployed server', extensions: { code: 'NOT_AVAILABLE', classification: 'INTERNAL_ERROR' } }]);
+  }
+  const d = (
+    await ask<{ adminMembers: Page }>(
+      `query($status: MemberApprovalFilter, $keyword: String, $after: String) {
+        adminMembers(status: $status, keyword: $keyword, after: $after) { items { ${ADMIN_MEMBER_FIELDS} } nextCursor totalCount } }`,
+      { status, keyword: search ?? null, after: after ?? null },
+      auth,
+    )
+  ).adminMembers;
   return {
     adminMembers: { __typename: 'AdminMemberConnection', nodes: d.items.map(toMemberRow), pageInfo: pageInfo(d.nextCursor), totalCount: d.totalCount },
   };
@@ -584,15 +584,16 @@ const adminDashboardSummary: Op = async (_v, auth) => {
   };
 };
 
+/** 화면 계약의 뮤테이션 이름 → 배포 서버 이름 (승격만 이름이 다르다) */
 const memberAction =
-  (field: 'approveMember' | 'rejectMember' | 'revertMemberToPending' | 'promoteToAdmin' | 'suspendMember' | 'unsuspendMember'): Op =>
+  (field: 'approveMember' | 'rejectMember' | 'revertMemberToPending' | 'promoteToAdmin', serverField: string = field): Op =>
   async ({ memberId }, auth) => {
     const d = await ask<Record<string, BackendAdminMember>>(
-      `mutation($memberId: ID!) { ${field}(memberId: $memberId) { ${ADMIN_MEMBER_FIELDS} } }`,
+      `mutation($memberId: ID!) { ${serverField}(memberId: $memberId) { ${ADMIN_MEMBER_FIELDS} } }`,
       { memberId },
       auth,
     );
-    return { [field]: toMemberRow(d[field]!) };
+    return { [field]: toMemberRow(d[serverField]!) };
   };
 
 /* ---------------- 프로필 ---------------- */
@@ -604,7 +605,7 @@ type BackendProfile = {
   profileImageUrl: string | null;
   postCount: number;
   commentCount: number;
-  grass: { fetchedAt: string; totalContributions: number; days: { date: string; count: number }[] } | null;
+  grass: { fetchedAt: string; days: { date: string; count: number }[] } | null;
   warning: { onHold: boolean; warningCount: number | null; penaltyTarget: boolean | null };
   teams: { id: string; name: string }[];
   teamWarnings: { onHold: boolean; teams: { name: string; count: number }[] };
@@ -624,7 +625,7 @@ const profileQuery: Op = async ({ id }, auth) => {
     ask<{ profile: BackendProfile }>(
       `query($id: ID!) { profile(memberId: $id) {
         id nickname githubLogin profileImageUrl postCount commentCount
-        grass { fetchedAt totalContributions days { date count } }
+        grass { fetchedAt days { date count } }
         warning { onHold warningCount penaltyTarget }
         teams { id name }
         teamWarnings { onHold teams { name count } } } }`,
@@ -649,7 +650,8 @@ const profileQuery: Op = async ({ id }, auth) => {
         __typename: 'GrassCalendar',
         status: p.grass ? 'OK' : 'FAILED',
         updatedAt: p.grass?.fetchedAt ?? null,
-        totalContributions: p.grass?.totalContributions ?? 0,
+        // 배포 서버에는 총합 필드가 없어 날짜별 기여 수를 더한다
+        totalContributions: (p.grass?.days ?? []).reduce((sum, g) => sum + g.count, 0),
         days: (p.grass?.days ?? []).map((g) => ({ __typename: 'GrassDay', date: g.date, count: g.count, level: relativeLevel(g.count, p.grass?.days ?? []) })),
         privateContributionSuspected: false,
       },
@@ -1714,9 +1716,7 @@ export const BRIDGED: Record<string, Op> = {
   AdminMembersApprove: memberAction('approveMember'),
   AdminMembersReject: memberAction('rejectMember'),
   AdminMembersRevert: memberAction('revertMemberToPending'),
-  AdminMembersPromote: memberAction('promoteToAdmin'),
-  AdminMembersSuspend: memberAction('suspendMember'),
-  AdminMembersUnsuspend: memberAction('unsuspendMember'),
+  AdminMembersPromote: memberAction('promoteToAdmin', 'promoteMemberToAdmin'),
 };
 
 export const isBridged = (operationName: string | null | undefined): operationName is string =>
