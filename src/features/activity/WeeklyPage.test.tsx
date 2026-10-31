@@ -26,12 +26,12 @@ describe('AC-01 내 주간 활동', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(8); // 머리 1 + 7일
 
     const tue = rowOf(table, '9/29 화');
-    expect(tue).toHaveTextContent('1칸');
+    expect(tue).toHaveTextContent('1회');
     expect(within(tue).getByText('기록글 1개')).toBeInTheDocument();
     expect(within(tue).getByText('1일')).toBeInTheDocument();
-    expect(tue).toHaveTextContent('잔디 1칸 + 기록글 1개');
+    expect(tue).toHaveTextContent('기여 1회 + 기록글 1개');
 
-    expect(rowOf(table, '9/28 월')).toHaveTextContent('잔디 3칸');
+    expect(rowOf(table, '9/28 월')).toHaveTextContent('기여 3회');
     expect(rowOf(table, '9/30 수')).toHaveTextContent('활동 없음');
     const today = rowOf(table, '10/1 목');
     expect(today).toHaveTextContent('0일');
@@ -70,7 +70,7 @@ describe('AC-01 내 주간 활동', () => {
     const mon = rowOf(table, '9/21 월');
     expect(mon).toHaveTextContent('있음');
     expect(mon).toHaveTextContent('1일');
-    expect(table).not.toHaveTextContent('칸'); // 지난 주는 칸 수를 모른다(B-03)
+    expect(table).not.toHaveTextContent(/기여 [0-9]+회/); // 지난 주는 기여 수를 모른다(B-03)
     expect(table).not.toHaveTextContent('아직 오지 않은 날이에요');
     const days = screen.getByRole('region', { name: '날짜별 인증' });
     expect(within(days).getByText('통과')).toBeInTheDocument();
