@@ -234,15 +234,12 @@
   }
 }
 
-/* ---------- 중간 폭 (768~1279px): 닫힘은 좁게, 열면 제자리에서 왼쪽으로 겹쳐 펼친다 — 헤더 폭이 늘지 않는다 ---------- */
+/* ---------- 768px 이상: 열면 제자리에서 왼쪽(메뉴 쪽)으로 겹쳐 펼친다 — 헤더 폭이 늘지 않고,
+   오른쪽의 글쓰기 버튼 · 아바타는 가려지지 않는다 ---------- */
 
-@media screen and (min-width: 768px) and (max-width: 1279px) {
-  .trigger {
-    width: 180px;
-  }
-
+@media screen and (min-width: 768px) {
   .open {
-    width: 180px;
+    width: 288px;
     height: 34px;
   }
 
@@ -256,6 +253,18 @@
 
   .open .pop {
     width: min(470px, calc(100vw - 32px));
+  }
+}
+
+/* ---------- 중간 폭 (768~1279px): 닫힘은 좁게 ---------- */
+
+@media screen and (min-width: 768px) and (max-width: 1279px) {
+  .trigger {
+    width: 180px;
+  }
+
+  .open {
+    width: 180px;
   }
 
   .keys {

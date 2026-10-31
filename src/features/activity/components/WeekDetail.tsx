@@ -112,6 +112,13 @@ const DAY_COLUMNS: Column<Day>[] = [
   { key: 'detail', header: '내역', render: (d) => (d.isFuture ? null : <span className={s.detail}>{dayDetail(d)}</span>) },
 ];
 
+/** 좁은 화면에서 한 줄로 접는 날: 아직 안 온 날 · 활동이 하나도 없는 날 (값이 전부 "—"라 4줄이 필요 없다) */
+function dayRowClass(d: Day): string | undefined {
+  if (d.isFuture) return s.futureDay;
+  const quiet = !(d.grassCount ?? 0) && !d.hasGrass && !(d.recordCount ?? 0) && !d.hasRecord && !d.verified;
+  return quiet ? s.quietDay : undefined;
+}
+
 /** ④ 이번 주 판정 — 이번 주를 볼 때만. 문구는 A2 2-4 */
 function ThisWeekCard({ week }: { week: Week }) {
   const live = week.live;
@@ -219,9 +226,16 @@ export function WeekDetail({ week, ruleNoticeId }: { week: Week; ruleNoticeId: s
           <div className={s.strip}>
             <WeekStrip days={toStripDays(week.days)} size={54} fallbackLevel={PAST_GRASS_LEVEL} />
           </div>
-          <DataTable caption="날짜별 인증" columns={DAY_COLUMNS} rows={week.days} rowKey={(d) => d.date} />
+          <DataTable
+            caption="날짜별 인증"
+            columns={DAY_COLUMNS}
+            rows={week.days}
+            rowKey={(d) => d.date}
+            rowClassName={dayRowClass}
+          />
           <Foot>{WEEKLY_COPY.countRule}</Foot>
         </section>
+        {/* 한 단(1023px 이하)에서는 CSS order로 표 위에 온다 — 결과가 날짜 7줄 아래에 묻히지 않게 */}
         {current ? <ThisWeekCard week={week} /> : null}
       </div>
     </>

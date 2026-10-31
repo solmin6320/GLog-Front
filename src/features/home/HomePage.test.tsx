@@ -49,14 +49,14 @@ describe('CM-01 홈', () => {
     expect(screen.queryByRole('link', { name: '보러 가기' })).not.toBeInTheDocument();
   });
 
-  it('ACC-HOME-02: 팀 미소속 — ②③④ 없이 "팀에 참가해야 판정이 시작돼요" + [팀 만들기] [초대코드 입력]', async () => {
+  it('ACC-HOME-02: 팀 미소속 — ②③④ 없이 "팀에 참가해야 판정이 시작돼요" + [팀 만들기] [팀 참가]', async () => {
     backend.on('myTeams', []).on('receivedTeamInvitations', invitations(1));
     renderRoute('/', { as: 'noteam', bridge: true });
     expect(await screen.findByRole('heading', { level: 1, name: '서연님, 환영해요' })).toBeInTheDocument();
     expect(screen.getByText('팀에 참가해야 판정이 시작돼요')).toBeInTheDocument();
     expect(screen.getByText('처음 팀에 들어간 주는 판정하지 않아요.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '팀 만들기' })).toHaveAttribute('href', '/teams/new');
-    expect(screen.getByRole('link', { name: '초대코드 입력' })).toHaveAttribute('href', '/teams/join');
+    expect(screen.getByRole('link', { name: '팀 참가' })).toHaveAttribute('href', '/teams/join');
     expect(screen.getByText('받은 초대 1건')).toBeInTheDocument();
     expect(await screen.findByRole('list', { name: '최근 공지' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '이번 주 진행' })).not.toBeInTheDocument();

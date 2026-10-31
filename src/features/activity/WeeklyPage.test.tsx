@@ -9,7 +9,7 @@ import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/r
 beforeEach(() => installHome());
 const renderRoute = (path: string, o: RenderRouteOptions = {}) => renderRouteRaw(path, { ...o, bridge: true });
 
-// AC-01 내 주간 활동 (화면설계서 5-1-21 · 목업 W-06). 기준 시각: 2026-10-01(목) 10:00 KST · 이번 주 9/28 ~ 10/4
+// AC-01 주간 활동 (화면설계서 5-1-21 · 목업 W-06). 기준 시각: 2026-10-01(목) 10:00 KST · 이번 주 9/28 ~ 10/4
 
 function rowOf(table: HTMLElement, date: string): HTMLElement {
   const row = within(table)
@@ -19,7 +19,7 @@ function rowOf(table: HTMLElement, date: string): HTMLElement {
   return row;
 }
 
-describe('AC-01 내 주간 활동', () => {
+describe('AC-01 주간 활동', () => {
   it('ACC-AC01-01: 날짜별 7행 — 미래 "아직 오지 않은 날이에요" · 오늘 "오늘" · 잔디+기록글도 인증일 1일', async () => {
     renderRoute('/weekly');
     const table = await screen.findByRole('table', { name: '날짜별 인증' });

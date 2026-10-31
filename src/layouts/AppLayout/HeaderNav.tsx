@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router';
 import { useViewer } from '@/session';
-import { paths } from '@/shared/lib/paths';
+import { parsePostsSearch, paths } from '@/shared/lib/paths';
 import { Icon, type IconName } from '@/shared/ui';
 import { drawerActive, type DrawerGroupKey } from './drawerNav';
 import s from './HeaderNav.module.css';
@@ -19,6 +19,12 @@ const ITEMS: readonly { group: DrawerGroupKey; label: string; icon: IconName; to
   { group: 'posts', label: '게시판', icon: 'file', to: paths.posts({ type: 'troubleshooting' }) },
   { group: 'notices', label: '공지', icon: 'mega', to: paths.notices() },
 ];
+
+/** 글쓰기 주소: 게시판 · 글쓰기 화면이면 지금 보고 있는 글 종류로, 그 밖에는 개발일지 */
+function writePath(pathname: string, search: string): string {
+  const onBoard = pathname === '/posts' || pathname === '/posts/new';
+  return paths.postNew({ type: onBoard ? parsePostsSearch(new URLSearchParams(search)).type : 'devlog' });
+}
 
 export function HeaderNav() {
   const { pathname, search } = useLocation();
@@ -51,10 +57,20 @@ export function HeaderNav() {
           );
         })}
       </ul>
-      <Link to={paths.postNew({ type: 'devlog' })} className={s.write} aria-label="새 글쓰기">
-        <Icon name="pencil" size={16} />
-        <span className={s.label}>글쓰기</span>
-      </Link>
     </nav>
+  );
+}
+
+/**
+ * 글쓰기 버튼 — 모든 폭에서 헤더에 하나. 검색창 오른쪽에 두어, 검색창이 왼쪽(메뉴 쪽)으로 펼쳐져도 가려지지 않는다.
+ * 1280px 이상은 "글쓰기" 글자까지, 그 아래는 연필 아이콘만.
+ */
+export function HeaderWrite() {
+  const { pathname, search } = useLocation();
+  return (
+    <Link to={writePath(pathname, search)} className={s.write} aria-label="새 글쓰기">
+      <Icon name="pencil" size={16} />
+      <span className={s.label}>글쓰기</span>
+    </Link>
   );
 }

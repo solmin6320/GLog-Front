@@ -114,11 +114,14 @@ describe('BD-03 글 상세', () => {
     renderRouteB('/posts/000000000000000000000000');
     expect(await title('찾는 내용이 없어요. 삭제됐을 수 있어요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '뒤로' })).toBeInTheDocument();
+    // R1: 404 화면이면 탭 제목도 404
+    await waitFor(() => expect(document.title).toBe('페이지를 찾을 수 없음 · 잔디로그'));
   });
 
   it('ACC-BD03-06 형식이 틀린 postId는 부르지 않고 404', async () => {
     renderRouteB('/posts/not-an-id');
     expect(await title('찾는 내용이 없어요. 삭제됐을 수 있어요.')).toBeInTheDocument();
+    expect(document.title).toBe('페이지를 찾을 수 없음 · 잔디로그');
   });
 
   it('ACC-BD03-04 끝난 주의 본인 글 [삭제] → 확인창에 E-28 문구 → /posts + "삭제했어요."', async () => {

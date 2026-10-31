@@ -87,7 +87,9 @@ export function PostForm({
   const set = <K extends keyof PostFormValues>(key: K, v: PostFormValues[K]) => setValues((x) => ({ ...x, [key]: v }));
 
   const required = REQUIRED_SECTIONS[values.type];
-  const filled = required.filter((k) => isFilled(values.sections[k])).length;
+  // 진행 카운터는 별표(*) 칸 수와 같게 센다: 제목 + 글 종류별 항목
+  const requiredCount = required.length + 1;
+  const filled = (isFilled(values.title) ? 1 : 0) + required.filter((k) => isFilled(values.sections[k])).length;
   const dirty = !sameContent(values, start);
 
   /* ---------- 이탈 확인 (E-26) ---------- */
@@ -270,13 +272,13 @@ export function PostForm({
           />
         ))}
 
-        {filled === required.length ? (
+        {filled === requiredCount ? (
           <InfoBox tone="ok" icon="check" role="status">
             필수 항목을 다 채웠어요. 이 글은 인증에 들어가요
           </InfoBox>
         ) : (
           <InfoBox tone="mute" icon="info" role="status">
-            필수 항목을 다 채우면 인증에 들어가요 ({filled} / {required.length})
+            필수 항목을 다 채우면 인증에 들어가요 ({filled} / {requiredCount})
           </InfoBox>
         )}
 
@@ -302,10 +304,10 @@ export function PostForm({
         ) : null}
 
         <div className={s.buttons}>
-          <Button variant="text" onClick={cancel}>
+          <Button variant="outline" onClick={cancel}>
             취소
           </Button>
-          <Button type="submit" size="lg" loading={save.pending}>
+          <Button type="submit" loading={save.pending}>
             {save.pending ? '저장 중...' : mode === 'new' ? '등록' : '수정'}
           </Button>
         </div>

@@ -1,6 +1,6 @@
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { DEFAULT_PAGE_SIZE, usePagedList } from '@/shared/api';
-import { formatDateTimeMD } from '@/shared/lib/format';
+import { formatDotDate } from '@/shared/lib/format';
 import { paths } from '@/shared/lib/paths';
 import {
   EmptyState,
@@ -22,11 +22,11 @@ import s from './NoticeListPage.module.css';
  * 읽기 전용 · 댓글 없음. 20개씩 [더 보기](③).
  */
 export default function NoticeListPage() {
-  useDocumentTitle('공지사항');
+  useDocumentTitle('공지 목록');
   const list = usePagedList(NoticeListQuery, { variables: {}, select: (d) => d.notices });
   return (
     <PageContainer>
-      <PageTitle title="공지사항" />
+      <PageTitle title="공지 목록" />
       <div className={s.body}>
         <QueryBoundary
           loading={list.loading}
@@ -42,7 +42,7 @@ export default function NoticeListPage() {
               <>
                 <RowList ariaLabel="공지 목록">
                   {list.nodes.map((n) => (
-                    <RowItem key={n.id} to={paths.notice(n.id)} right={<span>{formatDateTimeMD(n.createdAt)}</span>}>
+                    <RowItem key={n.id} to={paths.notice(n.id)} right={<span>{formatDotDate(n.createdAt)}</span>}>
                       <span className={n.isPinned ? s.pin : s.pinSpace} aria-hidden={n.isPinned ? undefined : true}>
                         {n.isPinned ? (
                           <>

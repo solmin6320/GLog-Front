@@ -21,26 +21,44 @@ const progress = () => screen.getByText(/필수 항목을 다 채/);
 const postIdIn = (pathname: string) => /^\/posts\/([0-9a-f]{24})$/.exec(pathname)?.[1];
 
 describe('BD-04 글쓰기', () => {
-  it('ACC-BD04-01 트러블슈팅 = 문제 · 원인 · 해결 3칸, 개발일지로 바꾸면 한 일 · 배운 점 2칸', async () => {
+  it('ACC-BD04-01 트러블슈팅 = 문제 · 원인 · 해결 3칸, 개발일지로 바꾸면 한 일 · 배운 점 2칸 (카운터는 제목 포함 별표 칸 수)', async () => {
     const { user } = renderRoute('/posts/new');
     expect(await heading('글쓰기')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '트러블슈팅' })).toHaveAttribute('aria-selected', 'true');
     for (const name of ['문제', '원인', '해결']) expect(field(new RegExp(`^${name}`))).toBeInTheDocument();
-    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (0 / 3)');
+    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (0 / 4)');
     await user.click(screen.getByRole('tab', { name: '개발일지' }));
     expect(field(/^한 일/)).toBeInTheDocument();
     expect(field(/^배운 점/)).toHaveAttribute('placeholder', '배운 점을 적어 주세요');
     expect(screen.queryByRole('textbox', { name: /^문제/ })).not.toBeInTheDocument();
-    expect(progress()).toHaveTextContent('(0 / 2)');
+    expect(progress()).toHaveTextContent('(0 / 3)');
+  });
+
+  it('경로 표시: 홈 › 게시판 › 개발일지 › 글쓰기 — 글 종류 칸은 링크, 굵은 칸은 "글쓰기" 하나', async () => {
+    renderRoute('/posts/new?type=devlog');
+    await heading('글쓰기');
+    const crumb = screen.getByRole('navigation', { name: '현재 위치' });
+    expect(within(crumb).getByRole('link', { name: '개발일지' })).toHaveAttribute('href', '/posts?type=devlog');
+    expect(within(crumb).getByText('글쓰기')).toHaveAttribute('aria-current', 'page');
+    expect(crumb.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  });
+
+  it('[취소] · [등록]은 같은 크기 버튼', async () => {
+    renderRoute('/posts/new');
+    await heading('글쓰기');
+    const sizeOf = (el: HTMLElement) => [...el.classList].filter((c) => /(^|_)(sm|md|lg)(_|$)/.test(c)).join();
+    expect(sizeOf(screen.getByRole('button', { name: '취소' }))).toBe(sizeOf(screen.getByRole('button', { name: '등록' })));
   });
 
   it('ACC-BD04-02 · 03 · 04 ⑩ 실시간 안내: 공백만은 빈 칸, 다 채우면 곧바로 "다 채웠어요"', async () => {
     const { user } = renderRoute('/posts/new?type=devlog');
     await heading('글쓰기');
     await user.type(field(/^한 일/), '   ');
-    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (0 / 2)');
+    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (0 / 3)');
+    await user.type(field(/^제목/), '오늘 한 일');
+    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (1 / 3)');
     await user.type(field(/^한 일/), '표를 만들었어요.');
-    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (1 / 2)');
+    expect(progress()).toHaveTextContent('필수 항목을 다 채우면 인증에 들어가요 (2 / 3)');
     await user.type(field(/^배운 점/), '가로 스크롤이 편해요.');
     expect(progress()).toHaveTextContent('필수 항목을 다 채웠어요. 이 글은 인증에 들어가요');
   });

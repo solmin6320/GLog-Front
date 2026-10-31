@@ -44,8 +44,8 @@ describe('drawerActive — A1 3-2 활성 항목 매핑', () => {
 });
 
 describe('DRAWER_GROUPS — 목업 W-03 + 관리자 그룹 (M-09)', () => {
-  it('대메뉴 순서는 홈 · 내 활동 · 팀 · 게시판 · 공지사항 · 프로필 · 관리자', () => {
-    expect(DRAWER_GROUPS.map((g) => g.label)).toEqual(['홈', '내 활동', '팀', '게시판', '공지사항', '프로필', '관리자']);
+  it('대메뉴 순서는 홈 · 내 활동 · 팀 · 게시판 · 공지 · 프로필 · 관리자', () => {
+    expect(DRAWER_GROUPS.map((g) => g.label)).toEqual(['홈', '내 활동', '팀', '게시판', '공지', '프로필', '관리자']);
   });
 
   it('관리자 그룹만 adminOnly이고 서브 6개', () => {

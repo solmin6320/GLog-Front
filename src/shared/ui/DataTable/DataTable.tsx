@@ -15,6 +15,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   rowTone,
+  rowClassName,
   empty,
   caption,
   footer,
@@ -23,6 +24,8 @@ export function DataTable<T>({
   rows: T[];
   rowKey: (row: T) => string;
   rowTone?: (row: T) => 'me' | 'focus' | undefined;
+  /** 화면마다 행 모양을 바꿀 때 (예: 좁은 화면에서 빈 날을 한 줄로) */
+  rowClassName?: (row: T) => string | undefined;
   empty?: ReactNode;
   caption?: string;
   footer?: ReactNode;
@@ -59,7 +62,7 @@ export function DataTable<T>({
               rows.map((row) => {
                 const tone = rowTone?.(row);
                 return (
-                  <tr key={rowKey(row)} className={cx(tone && styles[tone])} data-tone={tone}>
+                  <tr key={rowKey(row)} className={cx(tone && styles[tone], rowClassName?.(row))} data-tone={tone}>
                     {columns.map((c) => (
                       <td
                         key={c.key}

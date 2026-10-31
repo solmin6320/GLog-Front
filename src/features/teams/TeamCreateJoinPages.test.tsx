@@ -81,7 +81,7 @@ describe('TM-03 팀 참가', () => {
   async function submitCode(code: string, as: 'plain' | 'noteam' = 'noteam') {
     const r = renderRoute('/teams/join', { as, bridge: true });
     await r.user.type(await screen.findByRole('textbox', { name: '초대코드' }), code);
-    await r.user.click(screen.getByRole('button', { name: '참가하기' }));
+    await r.user.click(screen.getByRole('button', { name: '팀 참가' }));
     return r;
   }
 

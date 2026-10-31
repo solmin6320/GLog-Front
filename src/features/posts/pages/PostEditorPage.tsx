@@ -44,9 +44,17 @@ export default function PostEditorPage() {
 
 function NewPost({ type, team }: { type: PostFormValues['type']; team?: string }) {
   const teams = useQuery(PostEditorTeamsQuery);
+  // R4: 캐시에 있던 옛 팀 목록에 ?team= 팀이 없으면 서버 응답을 기다린다 — 폼은 첫 값으로 팀을 고정하므로
+  // 먼저 그리면 미리 선택이 빠진 채 등록될 수 있다
+  const waitForTeam = !!team && teams.loading && !teams.data?.myTeams.some((t) => t.id === team);
   return (
     <PageContainer width="md">
-      <QueryBoundary loading={teams.loading} error={teams.error} data={teams.data} onRetry={() => void teams.refetch()}>
+      <QueryBoundary
+        loading={teams.loading}
+        error={teams.error}
+        data={waitForTeam ? undefined : teams.data}
+        onRetry={() => void teams.refetch()}
+      >
         {(d) => (
           <PostForm
             mode="new"

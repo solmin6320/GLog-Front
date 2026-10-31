@@ -3,7 +3,7 @@ import { useViewer } from '@/session';
 import { paths } from '@/shared/lib/paths';
 import { Avatar, IconButton, Logo } from '@/shared/ui';
 import { DRAWER_ID } from './Drawer';
-import { HeaderNav } from './HeaderNav';
+import { HeaderNav, HeaderWrite } from './HeaderNav';
 import { HeaderSearch } from './HeaderSearch';
 import s from './AppLayout.module.css';
 
@@ -26,6 +26,7 @@ export function Header({ drawerOpen, onOpenDrawer }: Props) {
       <div className={s.grow} />
       <HeaderNav />
       <HeaderSearch />
+      <HeaderWrite />
       <span className={s.sep} aria-hidden="true" />
       <Link to={paths.profileMe()} className={s.me} aria-label={`${viewer.nickname} 내 프로필`}>
         <Avatar name={viewer.nickname} imageUrl={viewer.profileImageUrl} size={32} />

@@ -50,7 +50,7 @@ describe('TM-01 내 팀 목록', () => {
     expect(screen.queryByText(/미달/)).not.toBeInTheDocument();
     // ② 상단 액션
     expect(screen.getByRole('link', { name: '팀 만들기' })).toHaveAttribute('href', '/teams/new');
-    expect(screen.getByRole('link', { name: '초대코드 입력' })).toHaveAttribute('href', '/teams/join');
+    expect(screen.getByRole('link', { name: '팀 참가' })).toHaveAttribute('href', '/teams/join');
   });
 
   it('③ 받은 초대 배너: "받은 초대 2건" + [보러 가기] → TM-04', async () => {
@@ -60,13 +60,13 @@ describe('TM-01 내 팀 목록', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/teams/invitations'));
   });
 
-  it('ACC-TM01-01 팀 0개: 빈 상태 + [팀 만들기] [초대코드 입력], 상단 ② 버튼은 숨김 (받은 초대 배너는 유지)', async () => {
+  it('ACC-TM01-01 팀 0개: 빈 상태 + [팀 만들기] [팀 참가], 상단 ② 버튼은 숨김 (받은 초대 배너는 유지)', async () => {
     backend.on('myTeams', []).on('receivedTeamInvitations', invitations(1));
     renderRoute('/teams', { as: 'noteam', bridge: true });
     expect(await screen.findByText('아직 참가한 팀이 없어요.')).toBeInTheDocument();
     expect(screen.getByText('팀을 만들거나 초대코드로 참가해 보세요.')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: '팀 만들기' })).toHaveLength(1);
-    expect(screen.getAllByRole('link', { name: '초대코드 입력' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: '팀 참가' })).toHaveLength(1);
     expect(screen.getByText('받은 초대 1건')).toBeInTheDocument();
   });
 

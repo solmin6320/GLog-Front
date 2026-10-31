@@ -4,9 +4,6 @@
   gap: 12px;
   flex-wrap: wrap;
 }
-.top > :last-child {
-  margin-left: auto;
-}
 .search {
   max-width: 560px;
   margin-top: 22px;

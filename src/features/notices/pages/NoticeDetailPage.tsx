@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client/react';
 import { useParams } from 'react-router';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
-import { formatDateTime } from '@/shared/lib/format';
+import { formatDotDateTime } from '@/shared/lib/format';
 import { isBigintId } from '@/shared/lib/ids';
 import { paths } from '@/shared/lib/paths';
 import { FullState, PageContainer, Pill, QueryBoundary, TextLink } from '@/shared/ui';
@@ -27,7 +27,7 @@ export default function NoticeDetailPage() {
 function NoticeDetail({ id }: { id: string }) {
   const q = useQuery(NoticeDetailQuery, { variables: { id } });
   // 없는(지운) 공지면 404 화면이므로 탭 제목도 404에 맞춘다
-  useDocumentTitle(q.data?.notice?.title ?? (q.data && !q.data.notice ? '페이지를 찾을 수 없음' : '공지사항'));
+  useDocumentTitle(q.data?.notice?.title ?? (q.data && !q.data.notice ? '페이지를 찾을 수 없음' : '공지'));
   return (
     <PageContainer width="md">
       <QueryBoundary
@@ -45,7 +45,7 @@ function NoticeDetail({ id }: { id: string }) {
             ) : null}
             <h1 className={s.title}>{notice.title}</h1>
             <p className={s.date}>
-              <time dateTime={notice.createdAt}>{formatDateTime(notice.createdAt)}</time>
+              <time dateTime={notice.createdAt}>{formatDotDateTime(notice.createdAt)}</time>
               {/* 글 · 댓글과 같이 고친 공지에는 (수정됨) */}
               {notice.updatedAt && notice.updatedAt !== notice.createdAt ? ' (수정됨)' : null}
             </p>

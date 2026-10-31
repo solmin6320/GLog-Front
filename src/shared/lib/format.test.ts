@@ -2,6 +2,7 @@ import {
   asOfLabel,
   formatDateTime,
   formatDateTimeMD,
+  formatDotDateTime,
   formatDotDate,
   formatFullDate,
   formatMD,
@@ -58,6 +59,7 @@ describe('DateTime 표기 (KST)', () => {
     expect(formatDateTime('2026-09-30T15:05:00Z')).toBe('10/1 00:05');
     expect(formatDateTime('2026-09-30T14:55:00Z')).toBe('9/30 23:55');
     expect(formatDateTimeMD('2026-09-30T15:00:00Z')).toBe('10/1');
+    expect(formatDotDateTime('2025-12-31T15:05:00Z')).toBe('2026.01.01 00:05');
   });
 
   it('formatDotDate: 연 경계', () => {

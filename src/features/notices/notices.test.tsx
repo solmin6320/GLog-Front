@@ -26,17 +26,17 @@ const notice = (id: string, title: string, at: string, isPinned = false): Backen
 const rows = async () => within(await screen.findByRole('list', { name: '공지 목록' })).getAllByRole('listitem');
 
 describe('NT-01 공지 목록', () => {
-  it('시드: 고정 공지가 📌와 함께 맨 위, 나머지는 최신순 · 날짜 M/D · 행 전체가 NT-02 링크', async () => {
+  it('시드: 고정 공지가 📌와 함께 맨 위, 나머지는 최신순 · 날짜 YYYY.MM.DD · 행 전체가 NT-02 링크', async () => {
     renderRoute('/notices');
-    expect(await screen.findByRole('heading', { level: 1, name: '공지사항' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: '공지 목록' })).toBeInTheDocument();
     const items = await rows();
     expect(items.map((li) => li.textContent)).toEqual([
-      '고정 공지잔디 인정 규칙 안내9/1',
-      '10월 정기 모임은 10/8(목) 저녁 7시예요9/29',
-      '2학기 스터디 팀 모집9/22',
-      '추석 연휴에도 판정은 그대로 진행돼요9/18',
-      'GitHub 비공개 기여 설정 확인해 주세요9/10',
-      '잔디로그 정식 오픈8/20',
+      '고정 공지잔디 인정 규칙 안내2026.09.01',
+      '10월 정기 모임은 10/8(목) 저녁 7시예요2026.09.29',
+      '2학기 스터디 팀 모집2026.09.22',
+      '추석 연휴에도 판정은 그대로 진행돼요2026.09.18',
+      'GitHub 비공개 기여 설정 확인해 주세요2026.09.10',
+      '잔디로그 정식 오픈2026.08.20',
     ]);
     expect(within(items[0] as HTMLElement).getByRole('link')).toHaveAttribute('href', '/notices/2');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
@@ -61,9 +61,9 @@ describe('NT-01 공지 목록', () => {
     renderRoute('/notices');
     const items = await rows();
     expect(items.slice(0, 3).map((li) => li.textContent)).toEqual([
-      '고정 공지2학기 스터디 팀 모집9/22',
-      '고정 공지잔디 인정 규칙 안내9/1',
-      '10월 정기 모임은 10/8(목) 저녁 7시예요9/29',
+      '고정 공지2학기 스터디 팀 모집2026.09.22',
+      '고정 공지잔디 인정 규칙 안내2026.09.01',
+      '10월 정기 모임은 10/8(목) 저녁 7시예요2026.09.29',
     ]);
   });
 
@@ -80,12 +80,21 @@ describe('NT-02 공지 상세', () => {
     renderRoute('/notices/2');
     expect(await screen.findByRole('heading', { level: 1, name: '잔디 인정 규칙 안내' })).toBeInTheDocument();
     expect(screen.getByText('고정')).toBeInTheDocument();
-    expect(screen.getByText('9/1 09:00')).toBeInTheDocument();
+    expect(screen.getByText('2026.09.01 09:00')).toBeInTheDocument();
     const body = screen.getByText((_, el) => el?.tagName === 'DIV' && (el.textContent ?? '').startsWith('매주 월요일 오전에'));
     expect(body.textContent).toContain('\n\n통과 조건\n');
     expect(screen.queryByText(/댓글/)).not.toBeInTheDocument();
     expect(screen.queryByText('한동관', { selector: 'main *' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '공지 목록으로' })).toHaveAttribute('href', '/notices');
+  });
+
+  it('경로 표시: 홈 › 공지 › 공지 목록 › {공지 제목} — 굵은 "지금 위치"는 마지막 칸 하나', async () => {
+    renderRoute('/notices/2');
+    await screen.findByRole('heading', { level: 1, name: '잔디 인정 규칙 안내' });
+    const crumb = screen.getByRole('navigation', { name: '현재 위치' });
+    await waitFor(() => expect(within(crumb).getByText('잔디 인정 규칙 안내')).toHaveAttribute('aria-current', 'page'));
+    expect(within(crumb).getByRole('link', { name: '공지 목록' })).toHaveAttribute('href', '/notices');
+    expect(crumb.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
   });
 
   it('일반 공지에는 고정 배지가 없다 · HTML 문자열은 글자 그대로', async () => {
