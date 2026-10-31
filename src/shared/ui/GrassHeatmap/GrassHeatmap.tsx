@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import { formatMonthDay } from '@/shared/lib/format';
-import { weekdayIndex, weekdayLabel } from '@/shared/lib/kst';
+import { addDays, weekdayIndex, weekdayLabel } from '@/shared/lib/kst';
 import { useOverflowX } from '../useOverflowX';
 import { VisuallyHidden } from '../VisuallyHidden';
 import styles from './GrassHeatmap.module.css';
@@ -11,9 +11,23 @@ const LEVELS = [0, 1, 2, 3, 4] as const;
 const ROW_LABELS = ['월', '', '수', '', '금', '', ''] as const;
 
 type Day = { date: string; count: number; level: number };
+/** 서버가 값을 주지 않은 날(빈 칸으로 그린다) */
+type Cell = Day & { missing?: boolean };
+
+/** 늘 1년(365일)을 그린다. 서버가 2주치만 줘도 칸 크기가 1년 달력과 같게 마지막 날 기준으로 앞을 빈 날로 채운다 */
+const YEAR_DAYS = 365;
+function fillYear(days: Day[]): Cell[] {
+  const last = days[days.length - 1];
+  if (!last || days.length >= YEAR_DAYS) return days;
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  return Array.from({ length: YEAR_DAYS }, (_, i) => {
+    const date = addDays(last.date, i - YEAR_DAYS + 1);
+    return byDate.get(date) ?? { date, count: 0, level: 0, missing: true };
+  });
+}
 
 /** 열(주)마다 그 주에 처음 나오는 달을 라벨로. 같은 달이 이어지면 비운다 */
-function monthLabels(days: Day[], lead: number, columns: number): (string | null)[] {
+function monthLabels(days: Cell[], lead: number, columns: number): (string | null)[] {
   const labels: (string | null)[] = Array.from({ length: columns }, () => null);
   let last = -1;
   days.forEach((d, i) => {
@@ -29,11 +43,12 @@ function monthLabels(days: Day[], lead: number, columns: number): (string | null
 }
 
 /**
- * 1년 잔디 히트맵 (GitHub 프로필 달력과 같은 모양). 열 = 주(월~일 행), 카드 폭을 꽉 채운다.
+ * 1년 잔디 히트맵 (GitHub 프로필 달력과 같은 모양). 열 = 주(월~일 행), 칸은 11px 고정.
  * 위에 월 라벨, 왼쪽에 월 · 수 · 금 라벨, 아래에 적음 → 많음 범례. 좁은 화면에서는 칸이 너무 작아지지 않게 가로 스크롤.
  */
-export function GrassHeatmap({ days }: { days: Day[] }) {
+export function GrassHeatmap({ days: given }: { days: Day[] }) {
   const [ref, overflow] = useOverflowX<HTMLDivElement>();
+  const days = fillYear(given);
   const first = days[0];
   const lead = first ? weekdayIndex(first.date) : 0;
   const columns = Math.max(1, Math.ceil((lead + days.length) / 7));
@@ -55,12 +70,12 @@ export function GrassHeatmap({ days }: { days: Day[] }) {
     setTip({ x, y: r.top, text: el.dataset.tip ?? '' });
   };
 
-  const cols = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+  const cols = { gridTemplateColumns: `repeat(${columns}, var(--cell))` };
 
   return (
     <div className={styles.wrap}>
       <div ref={ref} className={styles.scroll} role="region" aria-label="잔디 기록" tabIndex={overflow ? 0 : undefined}>
-        <div className={styles.frame} style={{ minWidth: `${columns * 13 + 32}px` }}>
+        <div className={styles.frame}>
           <span aria-hidden="true" />
           <div className={styles.months} style={cols} aria-hidden="true">
             {months.map((m, i) => (
@@ -86,10 +101,10 @@ export function GrassHeatmap({ days }: { days: Day[] }) {
                   className={styles.cell}
                   style={{ background: `var(--h${level})` }}
                   data-level={level}
-                  data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · 기여 ${d.count}건`}
+                  data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · ${d.missing ? '아직 불러오지 않음' : `기여 ${d.count}건`}`}
                 >
                   <VisuallyHidden>
-                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.count > 0 ? `잔디 ${d.count}칸` : '잔디 없음'}`}
+                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.missing ? '아직 불러오지 않음' : d.count > 0 ? `잔디 ${d.count}칸` : '잔디 없음'}`}
                   </VisuallyHidden>
                 </li>
               );
