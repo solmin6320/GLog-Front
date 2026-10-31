@@ -299,6 +299,19 @@ describe('AD-01 ②-3 빈 상태', () => {
     expect(await screen.findByRole('dialog', { name: '면제 기간 등록' })).toBeInTheDocument();
   });
 
+  it('처리한 요청: [요청 상태]에서 "거절함"을 고르면 거절 사유와 함께 보이고, 승인 · 거절 버튼은 없다', async () => {
+    ew.requests[0] = { ...ew.requests[0]!, status: 'REJECTED', rejectReason: '증빙이 없어요.' };
+    const { user } = renderRoute('/admin/exemptions');
+    await screen.findByRole('table', { name: '개인 면제 요청' });
+    await user.selectOptions(screen.getByRole('combobox', { name: '요청 상태' }), 'REJECTED');
+    const table = await screen.findByRole('table', { name: '개인 면제 요청' });
+    await waitFor(() => expect(within(table).getByText('증빙이 없어요.')).toBeInTheDocument());
+    expect(within(table).getByText('반려')).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /승인|거절/ })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: '요청 상태' }), 'APPROVED');
+    expect(await screen.findByText('승인한 요청이 없어요.')).toBeInTheDocument();
+  });
+
   it('한쪽만 비면 그 섹션만 빈 문구', async () => {
     ew.requests = ew.requests.filter((e) => e.status !== 'PENDING');
     renderRoute('/admin/exemptions');

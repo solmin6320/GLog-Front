@@ -66,7 +66,8 @@ export function formatDateTimeMD(iso: DateTimeString): string {
 
 function hourLabel(hour: number, minute: number): string {
   const ampm = hour < 12 ? '오전' : '오후';
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  // 자정 대는 '오전 0시', 정오 대는 '오후 12시'
+  const h12 = hour === 0 ? 0 : hour % 12 === 0 ? 12 : hour % 12;
   return minute === 0 ? `${ampm} ${h12}시` : `${ampm} ${h12}시 ${minute}분`;
 }
 

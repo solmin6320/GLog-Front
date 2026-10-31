@@ -12,7 +12,7 @@ import m from './Manage.module.css';
 type PendingInvitation = NonNullable<TeamManageQueryQuery['team']>['pendingInvitations'][number];
 
 /** 아이디 초대에서 인라인으로 보여 줄 서버 오류 (E-15 · E-16) */
-const INLINE_CODES = new Set(['INVITEE_NOT_FOUND', 'ALREADY_TEAM_MEMBER', 'VALIDATION_FAILED']);
+const INLINE_CODES = new Set(['INVITEE_NOT_FOUND', 'ALREADY_TEAM_MEMBER', 'INVITATION_DUPLICATE', 'VALIDATION_FAILED']);
 
 /** TM-06 ② 아이디로 초대 + ③ 보낸 초대 목록 */
 export function InviteMemberSection({ teamId, pending }: { teamId: string; pending: PendingInvitation[] }) {

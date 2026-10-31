@@ -50,5 +50,7 @@ export const TEAM_COPY = {
   overlapsExemptionPeriod: '이 주간은 이미 면제 기간이에요. 따로 승인하지 않아도 돼요.',
   /** TM-06 ⑧ 비고 */
   deleteAskAdmin: '삭제는 관리자에게 문의해 주세요.',
+  /** 보는 사람이 관리자일 때 (관리자는 글 상세에서 바로 지운다) */
+  deleteAsAdmin: '관리자라서 글 상세 화면에서 바로 삭제할 수 있어요.',
   copyFailed: '복사하지 못했어요. 직접 골라서 복사해 주세요.',
 } as const;

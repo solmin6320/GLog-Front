@@ -747,6 +747,7 @@ const TEAM_ERROR_ALIASES: Record<string, string> = {
   INVITATION_ALREADY_JOINED: 'ALREADY_TEAM_MEMBER',
   INVITEE_ALREADY_MEMBER: 'ALREADY_TEAM_MEMBER',
   LEADER_LAST_MEMBER: 'LAST_MEMBER',
+  EXEMPTION_REQUEST_DUPLICATE: 'EXEMPTION_DUPLICATE',
 };
 async function askTeam<T>(query: string, vars: Record<string, unknown>, auth: Auth): Promise<T> {
   try {

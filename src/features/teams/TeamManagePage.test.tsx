@@ -17,6 +17,7 @@ function serveManageMutations() {
       if (!invitee) throw backendError('INVITEE_NOT_FOUND');
       const t = teamOf(teamId);
       if (t.memberIds.includes(invitee.id)) throw backendError('INVITEE_ALREADY_MEMBER');
+      if ((t.sent ?? []).some((x) => x.inviteeId === invitee.id)) throw backendError('INVITATION_DUPLICATE');
       const sent = { id: '99', inviteeId: invitee.id, createdAt: '2026-10-01T10:00:00+09:00' };
       t.sent = [sent, ...(t.sent ?? [])];
       return { id: sent.id, createdAt: sent.createdAt, invitee };
@@ -144,6 +145,12 @@ describe('TM-06 팀 관리', () => {
     expect(await screen.findByText('초대를 보냈어요.')).toBeInTheDocument();
     expect(input).toHaveValue('');
     await waitFor(() => expect(screen.getByRole('list', { name: '보낸 초대' })).toHaveTextContent('@jihoon-park'));
+
+    // 이미 초대한 회원을 다시 초대: 서버 INVITATION_DUPLICATE → 입력 형식 오류가 아니라 중복 안내
+    await user.type(input, 'jihoon-park');
+    await user.click(invite);
+    expect(await screen.findByText('이미 초대를 보냈어요. 상대가 수락하면 팀원이 돼요.')).toBeInTheDocument();
+    expect(screen.queryByText('GitHub 아이디 형식이 아니에요.')).not.toBeInTheDocument();
   });
 
   it('ACC-TM06-05 보낸 초대 [취소] → 행이 사라진다', async () => {
@@ -213,7 +220,8 @@ describe('TM-06 팀 관리', () => {
       expect(controls.some((el) => /^수정/.test(el.textContent ?? ''))).toBe(true);
     }
     expect(within(list).queryByRole('button', { name: /삭제/ })).not.toBeInTheDocument();
-    expect(screen.getByText('삭제는 관리자에게 문의해 주세요.')).toBeInTheDocument();
+    // 기본 시험 회원(한동관)은 관리자라 '관리자에게 문의' 대신 글 상세에서 지우라는 안내
+    expect(screen.getByText('관리자라서 글 상세 화면에서 바로 삭제할 수 있어요.')).toBeInTheDocument();
 
     const postEdit = within(list).getAllByRole('link', { name: /^수정: / })[0];
     expect(postEdit?.getAttribute('href')).toMatch(/^\/posts\/[0-9a-f]{24}\/edit$/);

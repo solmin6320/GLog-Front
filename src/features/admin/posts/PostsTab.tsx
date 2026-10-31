@@ -122,7 +122,7 @@ export function PostsTab() {
           ) : (
             <>
               <div className={s.table}>
-                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => `${r.kind}:${r.targetId}`} caption="글과 댓글" />
+                <DataTable columns={columns} rows={list.nodes} rowKey={(r) => `${r.kind}:${r.targetId}`} caption={kind === 'post' ? '글' : kind === 'comment' ? '댓글' : '글과 댓글'} />
               </div>
               <LoadMore
                 hasMore={list.hasMore}

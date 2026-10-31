@@ -3,7 +3,8 @@ import { useApolloClient, useMutation, useQuery } from '@apollo/client/react';
 import { useDocumentTitle } from '@/layouts/useDocumentTitle';
 import { useAction, usePagedList, type PagedList } from '@/shared/api';
 import { formatWeekRange } from '@/shared/lib/format';
-import { Button, DataTable, EmptyState, Icon, LoadMore, QueryBoundary, TableSkeleton, type Column } from '@/shared/ui';
+import type { PersonalExemptionStatus } from '@/gql/graphql';
+import { Button, DataTable, EmptyState, Icon, LoadMore, QueryBoundary, Select, StatusBadge, TableSkeleton, type Column } from '@/shared/ui';
 import { AdminExemptionsApprove, AdminExemptionsPeriodsQuery, AdminExemptionsRequestsQuery, AdminExemptionsSummaryQuery } from './api';
 import { COPY, exemptionsRefetch, requestLine, type PeriodRow, type RequestRow } from './model';
 import { DeletePeriodDialog, PeriodDialog } from './PeriodDialogs';
@@ -28,14 +29,16 @@ export function ExemptionsTab() {
   const close = () => setDialog(null);
 
   const periods = usePagedList(AdminExemptionsPeriodsQuery, { variables: {}, select: (d) => d.exemptionPeriods });
+  // 기본은 대기. 처리한 요청(승인 · 거절)도 다시 볼 수 있게 상태를 고른다
+  const [reqStatus, setReqStatus] = useState<PersonalExemptionStatus>('PENDING');
   const requests = usePagedList(AdminExemptionsRequestsQuery, {
-    variables: { status: 'PENDING' },
+    variables: { status: reqStatus },
     select: (d) => d.personalExemptionRequests,
   });
   const pending = useQuery(AdminExemptionsSummaryQuery).data?.adminDashboardSummary.pendingExemptionRequestCount;
 
   const bothLoaded = !!periods.data && !!requests.data;
-  const allEmpty = bothLoaded && periods.nodes.length === 0 && requests.nodes.length === 0;
+  const allEmpty = bothLoaded && reqStatus === 'PENDING' && periods.nodes.length === 0 && requests.nodes.length === 0;
   const registerButton = (
     <Button icon="half" onClick={() => setDialog({ kind: 'create' })}>
       {COPY.register}
@@ -60,6 +63,8 @@ export function ExemptionsTab() {
           <PeriodsSection list={periods} onEdit={(period) => setDialog({ kind: 'edit', period })} onDelete={(period) => setDialog({ kind: 'delete', period })} />
           <RequestsSection
             list={requests}
+            status={reqStatus}
+            onStatus={setReqStatus}
             onApproveRetro={(request) => setDialog({ kind: 'approve', request })}
             onReject={(request) => setDialog({ kind: 'reject', request })}
           />
@@ -148,12 +153,22 @@ function PeriodsSection({
 
 /* ---------- ⑦ 개인 면제 요청 ---------- */
 
+const REQUEST_STATUS_OPTIONS: { value: PersonalExemptionStatus; label: string }[] = [
+  { value: 'PENDING', label: '대기' },
+  { value: 'APPROVED', label: '승인함' },
+  { value: 'REJECTED', label: '거절함' },
+];
+
 function RequestsSection({
   list,
+  status,
+  onStatus,
   onApproveRetro,
   onReject,
 }: {
   list: PagedList<unknown, RequestRow>;
+  status: PersonalExemptionStatus;
+  onStatus: (s: PersonalExemptionStatus) => void;
   onApproveRetro: (r: RequestRow) => void;
   onReject: (r: RequestRow) => void;
 }) {
@@ -210,6 +225,15 @@ function RequestsSection({
       header: '처리',
       align: 'right',
       render: (r) => {
+        // 처리한 요청: 결과와 거절 사유만 보인다
+        if (r.status !== 'PENDING') {
+          return (
+            <span className={s.result}>
+              <StatusBadge kind="exemptionRequest" status={r.status} />
+              {r.rejectReason ? <span className={s.rejectReason}>{r.rejectReason}</span> : null}
+            </span>
+          );
+        }
         const target = `${r.member.nickname} ${formatWeekRange(r.weekStart)}`;
         return (
           <span className={s.actions}>
@@ -231,12 +255,20 @@ function RequestsSection({
         <h3 id={headingId} className={s.sectionTitle}>
           {COPY.requestsTitle}
         </h3>
-        {list.totalCount != null ? <span className={s.meta}>대기 {list.totalCount}건</span> : null}
+        {list.totalCount != null && status === 'PENDING' ? <span className={s.meta}>대기 {list.totalCount}건</span> : null}
+        <div className={s.headAction}>
+          <Select
+            aria-label="요청 상태"
+            options={REQUEST_STATUS_OPTIONS}
+            value={status}
+            onChange={(e) => onStatus(e.target.value as PersonalExemptionStatus)}
+          />
+        </div>
       </div>
       <QueryBoundary loading={list.loading} error={list.error} data={list.data} skeleton={<TableSkeleton rows={2} cols={4} />} onRetry={list.refetch}>
         {() =>
           list.nodes.length === 0 ? (
-            <p className={s.empty}>{COPY.emptyRequests}</p>
+            <p className={s.empty}>{status === 'PENDING' ? COPY.emptyRequests : status === 'APPROVED' ? COPY.emptyApproved : COPY.emptyRejected}</p>
           ) : (
             <>
               <div className={s.table}>

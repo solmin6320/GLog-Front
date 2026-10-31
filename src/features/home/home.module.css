@@ -179,3 +179,11 @@
     margin-top: 40px;
   }
 }
+
+/* 팀 미소속 안내 안의 "기록글 쓰기" 글자 링크 */
+.teamlessLink {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import type { HomeBanner } from '@/domain/banner';
 import { deductionText, liveProgressText } from '@/domain/weekly';
 import type { HomeNoticesQueryQuery, HomeQueryQuery } from '@/gql/graphql';
@@ -170,8 +171,19 @@ export function TeamlessCard() {
           title={HOME_COPY.teamlessTitle}
           body={
             <div className={s.teamlessBody}>
-              {HOME_COPY.teamlessBody.map((line) => (
-                <p key={line}>{line}</p>
+              {HOME_COPY.teamlessBody.map((line, i) => (
+                <p key={line}>
+                  {line}
+                  {/* 첫 줄("지금도 쓸 수 있어요") 바로 뒤에 글쓰기로 가는 길을 둔다. 주요 버튼 두 개(팀 만들기 · 초대코드)는 그대로 */}
+                  {i === 0 ? (
+                    <>
+                      {' '}
+                      <Link to={paths.postNew()} className={s.teamlessLink}>
+                        {HOME_COPY.teamlessWrite}
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
               ))}
             </div>
           }

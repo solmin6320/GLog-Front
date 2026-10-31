@@ -5,6 +5,7 @@ import type { TeamManagedContentsQueryQuery } from '@/gql/graphql';
 import { MSG } from '@/domain/messages';
 import { appError, useAction, usePagedList } from '@/shared/api';
 import { paths } from '@/shared/lib/paths';
+import { useIsAdmin } from '@/session';
 import { LIMITS, validateRequiredText } from '@/shared/lib/validators';
 import {
   Button,
@@ -145,6 +146,7 @@ function PostRow({ node }: { node: ContentNode }) {
 /** TM-06 ⑧ 팀 글 관리 — 행마다 [수정]만. 삭제 버튼은 두지 않는다 (삭제는 관리자만) */
 export function TeamContentsSection({ teamId }: { teamId: string }) {
   const list = usePagedList(TeamManagedContentsQuery, { variables: { id: teamId }, select: (d) => d.team?.managedContents });
+  const isAdmin = useIsAdmin();
 
   let body;
   if (list.nodes.length === 0 && list.loading) body = <ListSkeleton rows={3} />;
@@ -180,7 +182,7 @@ export function TeamContentsSection({ teamId }: { teamId: string }) {
       {list.nodes.length > 0 ? (
         <LoadMore hasMore={list.hasMore} loading={list.loadingMore} error={list.loadMoreError} onLoadMore={list.loadMore} endText={null} />
       ) : null}
-      <Hint>{TEAM_COPY.deleteAskAdmin}</Hint>
+      <Hint>{isAdmin ? TEAM_COPY.deleteAsAdmin : TEAM_COPY.deleteAskAdmin}</Hint>
     </section>
   );
 }

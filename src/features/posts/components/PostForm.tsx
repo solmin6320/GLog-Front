@@ -201,6 +201,7 @@ export function PostForm({
         onChange={(t) => void changeType(t)}
         ariaLabel="글 종류"
       />
+      {mode === 'edit' ? <p className={s.typeLocked}>등록한 글은 종류를 바꿀 수 없어요.</p> : null}
     </fieldset>
   );
 

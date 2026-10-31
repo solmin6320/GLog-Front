@@ -124,7 +124,7 @@ describe('AD-01 대시보드 진입', () => {
 
   it('5-4-9: 판정 전인 이번 주를 고르면 실행 안내가 나온다', async () => {
     renderRoute('/admin?week=2026-09-28');
-    expect(await screen.findByText('이번 주 판정은 월요일 오전에 실행돼요.')).toBeInTheDocument();
+    expect(await screen.findByText('이번 주 판정은 다음 월요일 오전에 실행돼요.')).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: '판정 결과' })).not.toBeInTheDocument();
   });
 });
