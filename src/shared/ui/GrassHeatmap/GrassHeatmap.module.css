@@ -1,5 +1,7 @@
-/* 1년 잔디 — GitHub 프로필 달력처럼 카드 폭을 채운다. 열 = 주, 행 = 월~일 */
+/* 1년 잔디 — GitHub 프로필 달력처럼 칸 크기를 고정한다(카드 폭에 따라 늘리지 않는다). 열 = 주, 행 = 월~일 */
 .wrap {
+  --cell: 11px;
+  --gap: 3px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -20,14 +22,17 @@
 /* [요일 라벨 | 칸] × [월 라벨 / 칸] */
 .frame {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-columns: 26px auto;
+  justify-content: center;
+  width: max-content;
+  margin: 0 auto;
   grid-template-rows: auto auto;
   column-gap: 6px;
   row-gap: 6px;
 }
 .months {
   display: grid;
-  column-gap: 3px;
+  column-gap: var(--gap);
   font-size: 12px;
   color: var(--ink-3);
   line-height: 1;
@@ -38,8 +43,8 @@
 }
 .rows {
   display: grid;
-  grid-template-rows: repeat(7, minmax(0, 1fr));
-  row-gap: 3px;
+  grid-template-rows: repeat(7, var(--cell));
+  row-gap: var(--gap);
   font-size: 11px;
   color: var(--ink-3);
 }
@@ -50,9 +55,9 @@
 }
 .grid {
   display: grid;
-  grid-template-rows: repeat(7, auto);
+  grid-template-rows: repeat(7, var(--cell));
   grid-auto-flow: column;
-  gap: 3px;
+  gap: var(--gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -60,14 +65,16 @@
 .cell {
   position: relative;
   display: block;
-  aspect-ratio: 1;
-  border-radius: 3px;
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 2px;
   outline: 1px solid rgba(23, 32, 27, 0.04);
   outline-offset: -1px;
 }
 .pad {
   display: block;
-  aspect-ratio: 1;
+  width: var(--cell);
+  height: var(--cell);
 }
 .cell:hover {
   outline: 2px solid var(--ink);
@@ -77,6 +84,9 @@
 /* 적음 → 많음 범례 (오른쪽 아래) */
 .legend {
   display: flex;
+  width: max-content;
+  max-width: 100%;
+  margin-left: auto;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
@@ -90,9 +100,9 @@
   margin-left: 4px;
 }
 .swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 2px;
 }
 
 /* 호버 툴팁: 칸 위에 뜬다. 클릭은 통과시킨다 */
