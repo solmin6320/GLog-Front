@@ -26,7 +26,7 @@ describe('CM-01 홈', () => {
     expect(within(progress).getByText('아직 통과 전이에요. 1일 더 인증하면 통과!')).toBeInTheDocument();
     expect(within(progress).getByText('다음 차감까지 1주 남았어요.')).toBeInTheDocument();
     // 요일 7칸 (스크린리더 문구)
-    expect(within(progress).getByText('9월 29일 화요일, 잔디 1칸, 기록글 1개, 인증됨')).toBeInTheDocument();
+    expect(within(progress).getByText('9월 29일 화요일, 기여 1회, 기록글 1개, 인증됨')).toBeInTheDocument();
   });
 
   it('ACC-HOME-03 · ④: 경고 1/3 + [자세히] → /warnings(M-11) · 받은 초대 2건 + [보러 가기]', async () => {

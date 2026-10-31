@@ -23,7 +23,7 @@ function squareFor(text: string) {
 describe('WeekStrip', () => {
   it('칸마다 스크린리더 문구를 단다', () => {
     render(<WeekStrip days={WEEK} />);
-    expect(screen.getByText('9월 29일 화요일, 잔디 1칸, 기록글 1개, 인증됨')).toBeInTheDocument();
+    expect(screen.getByText('9월 29일 화요일, 기여 1회, 기록글 1개, 인증됨')).toBeInTheDocument();
     expect(screen.getByText('9월 30일 수요일, 잔디 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
     expect(screen.getByText('10월 1일 목요일, 오늘, 잔디 없음, 기록글 없음, 인증 안 됨')).toBeInTheDocument();
     expect(screen.getByText('10월 2일 금요일, 아직 오지 않은 날')).toBeInTheDocument();
@@ -40,12 +40,12 @@ describe('WeekStrip', () => {
     expect(future).toHaveClass('future');
     expect(future.style.background).toBe('');
 
-    const rec = squareFor('9월 29일 화요일, 잔디 1칸, 기록글 1개, 인증됨');
+    const rec = squareFor('9월 29일 화요일, 기여 1회, 기록글 1개, 인증됨');
     expect(rec).toHaveClass('record');
     expect(rec.querySelector('.rc')).not.toBeNull();
     expect(rec.style.background).toBe('var(--h1)');
 
-    const mon = squareFor('9월 28일 월요일, 잔디 3칸, 기록글 없음, 인증됨');
+    const mon = squareFor('9월 28일 월요일, 기여 3회, 기록글 없음, 인증됨');
     expect(mon.querySelector('.rc')).toBeNull();
     // 인증일: 굵은 라벨 + 밑줄
     const monItem = mon.closest('li') as HTMLElement;
@@ -62,10 +62,10 @@ describe('WeekStrip', () => {
       { ...base, date: '2026-09-22', grassLevel: null, grassCount: null },
     ];
     const { rerender } = render(<WeekStrip days={days} />);
-    expect(squareFor('9월 21일 월요일, 잔디 2칸, 기록글 없음, 인증됨')).toHaveAttribute('data-level', '3');
+    expect(squareFor('9월 21일 월요일, 기여 2회, 기록글 없음, 인증됨')).toHaveAttribute('data-level', '3');
     expect(squareFor('9월 22일 화요일, 잔디 없음, 기록글 없음, 인증 안 됨')).toHaveAttribute('data-level', '0');
     rerender(<WeekStrip days={days} fallbackLevel={2} />);
-    expect(squareFor('9월 21일 월요일, 잔디 2칸, 기록글 없음, 인증됨').style.background).toBe('var(--h2)');
+    expect(squareFor('9월 21일 월요일, 기여 2회, 기록글 없음, 인증됨').style.background).toBe('var(--h2)');
   });
 
   it('size 12는 라벨 없는 미니 스트립', () => {

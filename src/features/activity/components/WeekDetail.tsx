@@ -38,7 +38,7 @@ function toStripDays(days: Day[]): StripDay[] {
 function dayDetail(d: Day): string {
   const parts: string[] = [];
   if (d.grassCount != null) {
-    if (d.grassCount > 0) parts.push(`잔디 ${d.grassCount}칸`);
+    if (d.grassCount > 0) parts.push(`기여 ${d.grassCount}회`);
   } else if (d.hasGrass) parts.push('잔디');
   if (d.recordCount != null) {
     if (d.recordCount > 0) parts.push(`기록글 ${d.recordCount}개`);
@@ -58,7 +58,7 @@ function GrassCell({ d }: { d: Day }) {
             <i key={i} style={{ background: `var(--h${level})` }} />
           ))}
         </span>
-        <span className={s.grassCount}>{`${d.grassCount}칸`}</span>
+        <span className={s.grassCount}>{`${d.grassCount}회`}</span>
       </span>
     );
   }

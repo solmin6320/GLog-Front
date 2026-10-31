@@ -29,7 +29,7 @@ export function stripDayText(d: StripDay): string {
   if (d.isFuture) return `${date}, 아직 오지 않은 날`;
   const parts = [date];
   if (d.isToday) parts.push('오늘');
-  if (d.grassCount != null && d.grassCount > 0) parts.push(`잔디 ${d.grassCount}칸`);
+  if (d.grassCount != null && d.grassCount > 0) parts.push(`기여 ${d.grassCount}회`);
   else if (d.grassLevel != null && d.grassLevel > 0) parts.push('잔디 있음');
   else parts.push('잔디 없음');
   if (d.hasRecord) parts.push(d.recordCount ? `기록글 ${d.recordCount}개` : '기록글 있음');

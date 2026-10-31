@@ -104,7 +104,7 @@ export function GrassHeatmap({ days: given }: { days: Day[] }) {
                   data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · ${d.missing ? '아직 불러오지 않음' : `기여 ${d.count}건`}`}
                 >
                   <VisuallyHidden>
-                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.missing ? '아직 불러오지 않음' : d.count > 0 ? `잔디 ${d.count}칸` : '잔디 없음'}`}
+                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.missing ? '아직 불러오지 않음' : d.count > 0 ? `기여 ${d.count}회` : '잔디 없음'}`}
                   </VisuallyHidden>
                 </li>
               );
