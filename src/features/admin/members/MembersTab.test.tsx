@@ -3,7 +3,7 @@ import { beforeEach } from 'vitest';
 import { adminBaseline, installAdminMembers, type AdminMember } from '@/test/fixtures/admin';
 import { renderRoute as renderRouteRaw, type RenderRouteOptions } from '@/test/render';
 
-// 회원 탭 — bridge + 가짜 백엔드 (member-approval.graphqls · 관리자 승격 · 정지)
+// 회원 탭 — bridge + 가짜 백엔드 (배포 서버 member-approval.graphqls: 승인 대기 · 거절 · 승격)
 let members: AdminMember[];
 beforeEach(() => {
   adminBaseline();
@@ -124,57 +124,11 @@ describe('AD-01 ②-2 회원 · 관리자 권한 탭', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('활성 회원 명단: 일반 회원은 [관리자로 승격] · 관리자는 "관리자" 표시 · 확인 뒤 승격 · 취소하면 그대로', async () => {
-    const { user } = renderRoute('/admin/members');
-    await screen.findByText('김철수', { selector: 'span' });
-    expect(within(rowOf('김철수')).getByText('일반 회원')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '김철수 관리자로 승격' }));
-    const dialog = await screen.findByRole('dialog', { name: '김철수 님을 관리자로 승격할까요?' });
-    await user.click(within(dialog).getByRole('button', { name: '취소' }));
-    expect(byName('김철수')?.role).toBe('MEMBER');
-
-    await user.click(screen.getByRole('button', { name: '김철수 관리자로 승격' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '관리자로 승격' }));
-    expect(await screen.findByText('관리자로 승격했어요.')).toBeInTheDocument();
-    await waitFor(() => expect(within(rowOf('김철수')).getByText('관리자')).toBeInTheDocument());
-    expect(byName('김철수')?.role).toBe('ADMIN');
-    // 이미 관리자인 행에는 승격 버튼이 없다
-    expect(within(rowOf('김철수')).queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('정지: 확인 뒤 정지 → 전체 회원에서 빠지고 "정지" 필터에 나온다 · 취소하면 그대로 · [정지 해제]로 되돌린다', async () => {
-    const { user, router } = renderRoute('/admin/members');
-    await screen.findByText('김철수', { selector: 'span' });
-    expect(within(rowOf('김철수')).getByRole('button', { name: '김철수 이용 정지' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '김철수 이용 정지' }));
-    const dialog = await screen.findByRole('dialog', { name: '김철수 님의 이용을 정지할까요?' });
-    await user.click(within(dialog).getByRole('button', { name: '취소' }));
-    expect(statusOf('김철수')).toBe('ACTIVE');
-
-    await user.click(screen.getByRole('button', { name: '김철수 이용 정지' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '이용 정지' }));
-    expect(await screen.findByText('이용을 정지했어요.')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText('김철수', { selector: 'span' })).not.toBeInTheDocument());
-    expect(statusOf('김철수')).toBe('SUSPENDED');
-
-    await user.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'suspended');
-    await waitFor(() => expect(router.state.location.search).toBe('?status=suspended'));
-    expect(within(rowOf('김철수')).getByText('정지됨')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '김철수 정지 해제' }));
-    expect(await screen.findByText('정지를 풀었어요.')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText('김철수', { selector: 'span' })).not.toBeInTheDocument());
-    expect(statusOf('김철수')).toBe('ACTIVE');
-    expect(await screen.findByText('정지한 회원이 없어요.')).toBeInTheDocument();
-  });
-
-  it('관리자 행에는 정지 · 승격 버튼이 없다', async () => {
-    renderRoute('/admin/members?q=handong');
-    await screen.findByRole('table');
-    const row = rowOf('한동관');
-    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+  it('배포 서버에 없는 활성 회원 명단 · 정지 필터는 서버에 묻지 않고 오류 화면을 보여 준다', async () => {
+    renderRoute('/admin/members');
+    expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+    renderRoute('/admin/members?status=suspended');
+    expect((await screen.findAllByRole('button', { name: '다시 시도' })).length).toBeGreaterThan(0);
   });
 
   it('ACC-FIX-01 · E-09: 관리자가 아니면 권한 없음', async () => {

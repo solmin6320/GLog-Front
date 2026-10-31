@@ -8,9 +8,13 @@
  *   backend.on('inviteToTeam', ({ githubLogin }) => { throw backendError('INVITEE_NOT_FOUND'); });
  *   expect(backend.calls('kickTeamMember')[0]?.args).toEqual({ teamId: '1', memberId: '2' });
  */
-import { Kind, parse, valueFromASTUntyped, type FieldNode, type OperationDefinitionNode } from 'graphql';
+import { buildSchema, Kind, parse, validate, valueFromASTUntyped, type FieldNode, type OperationDefinitionNode } from 'graphql';
 import { http, HttpResponse } from 'msw';
 import { personaByToken, type TestPersona } from './personas';
+import schemaSource from './backend-schema.graphqls?raw';
+
+/** 배포 백엔드 스키마. bridge가 서버에 없는 필드·인자를 쓰면 실서버처럼 요청 전체가 거절되므로 테스트에서 먼저 잡는다 */
+const schema = buildSchema(schemaSource);
 
 /** vars = 요청 변수 전체 (중첩 필드 인자 — 예: profile { judgmentHistory(after: $after) } — 를 읽을 때) */
 export type BackendCtx = { auth: string | null; viewer: TestPersona | null; query: string; vars: Record<string, unknown> };
@@ -155,6 +159,9 @@ export const backendHandler = http.post('*/__backend/graphql', async ({ request 
   const ctx: BackendCtx = { auth, viewer: personaByToken(auth), query: body.query, vars };
   const data: Record<string, unknown> = {};
   const errors: { message: string; path: string[]; extensions: { code: string; classification: string } }[] = [];
+
+  const invalid = validate(schema, parse(body.query));
+  if (invalid.length) throw new Error(`test backend: 배포 백엔드 스키마에 맞지 않는 요청 — ${invalid.map((e) => e.message).join(' / ')}\n${body.query}`);
 
   for (const field of rootFields(body.query, body.operationName)) {
     const name = field.name.value;

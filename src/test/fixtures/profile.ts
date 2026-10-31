@@ -15,7 +15,7 @@ export type ProfileFx = {
   profileImageUrl: string | null;
   postCount: number;
   commentCount: number;
-  grass: { fetchedAt: string; totalContributions: number; days: { date: string; count: number }[] } | null;
+  grass: { fetchedAt: string; days: { date: string; count: number }[] } | null;
   warning: { onHold: boolean; warningCount: number | null; penaltyTarget: boolean | null };
   teams: { id: string; name: string }[];
   teamWarnings: { onHold: boolean; teams: { name: string; count: number }[] };
@@ -33,7 +33,6 @@ const week = (weekStart: string, result: ProfileWeek['result'], verifiedDays: nu
 /** 1년치 잔디 (오늘 오전 6시 갱신) */
 const grassYear = () => ({
   fetchedAt: '2026-10-01T06:00:00',
-  totalContributions: 120,
   days: Array.from({ length: 365 }, (_, i) => ({ date: addDays('2025-10-02', i), count: i % 3 === 0 ? 2 : i % 7 === 0 ? 5 : 0 })),
 });
 
