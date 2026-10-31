@@ -6,6 +6,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/__backend/:path*",
+      "destination": "https://15-165-214-154.sslip.io/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
