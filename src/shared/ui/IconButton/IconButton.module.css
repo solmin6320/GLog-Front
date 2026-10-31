@@ -2,9 +2,9 @@
 .ib {
   border: 0;
   background: transparent;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: var(--control-md);
+  height: var(--control-md);
+  border-radius: var(--radius);
   display: inline-grid;
   place-items: center;
   flex: none;
@@ -20,7 +20,15 @@
   cursor: not-allowed;
 }
 .sm {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: var(--control-xs);
+  height: var(--control-xs);
+  border-radius: var(--radius);
+}
+
+/* 좁은 화면: 손가락이 닿는 권장 크기(44px). 헤더 높이(58px) 안에 들어간다 */
+@media (max-width: 767px) {
+  .ib:not(.sm) {
+    width: var(--tap);
+    height: var(--tap);
+  }
 }

@@ -1,6 +1,6 @@
 /* 목업 .kl .big */
 .kl {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
   margin-bottom: 8px;
@@ -13,22 +13,22 @@
   color: var(--green);
 }
 .big {
-  font-size: 40px;
+  font-size: var(--fs-display);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .big small {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink-3);
   letter-spacing: -0.01em;
   margin-left: 4px;
 }
 .md {
-  font-size: 32px;
+  font-size: var(--fs-2xl);
 }
 .md small {
-  font-size: 15px;
+  font-size: var(--fs-md);
 }

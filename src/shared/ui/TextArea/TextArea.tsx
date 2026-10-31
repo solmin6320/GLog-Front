@@ -15,7 +15,7 @@ type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   serif?: boolean;
 };
 
-/** 여러 줄 입력. serif면 본문 글꼴(글쓰기 본문). 나머지 규칙은 TextField와 같다. */
+/** 여러 줄 입력. serif면 긴 본문용 넓은 줄 간격(글꼴은 다른 입력칸과 같다 — 이름은 호출부 호환용). 나머지 규칙은 TextField와 같다. */
 export const TextArea = forwardRef<HTMLTextAreaElement, Props>(function TextArea(
   { label, required, optionalLabel, hint, error, counter, serif, id, className, onChange, maxLength, 'aria-describedby': ariaDescribedBy, ...rest },
   ref,

@@ -1,6 +1,6 @@
 /* 목업 .foot */
 .foot {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   margin-top: 10px;
 }

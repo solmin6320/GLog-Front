@@ -5,7 +5,7 @@
   align-items: flex-start;
   gap: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 13px 14px;
   margin-bottom: 8px;
   background: var(--surface);
@@ -66,11 +66,11 @@
   min-width: 0;
 }
 .title {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   line-height: 1.4;
 }
 .desc {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }

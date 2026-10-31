@@ -1,6 +1,6 @@
 .lead {
   margin-bottom: 14px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 
@@ -15,7 +15,7 @@
   gap: 12px;
   padding: 11px 0;
   border-bottom: 1px solid var(--line-2);
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 .row dt {

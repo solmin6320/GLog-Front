@@ -33,7 +33,7 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
@@ -45,7 +45,7 @@
 
 .sm .input {
   height: 36px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   padding-left: 36px;
   padding-right: 38px;
 }
@@ -60,6 +60,6 @@
 
 @media (max-width: 767px) {
   .sm .input {
-    font-size: 16px;
+    font-size: var(--fs-lg);
   }
 }

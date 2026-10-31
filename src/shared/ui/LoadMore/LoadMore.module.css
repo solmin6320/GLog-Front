@@ -6,13 +6,13 @@
   padding: 20px 0 8px;
 }
 .error {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--red);
   font-weight: 500;
 }
 .end {
   padding: 20px 0 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }

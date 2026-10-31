@@ -54,7 +54,7 @@
 }
 .hereLabel {
   display: block;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   opacity: 0.8;
 }
@@ -64,7 +64,7 @@
   flex-wrap: wrap;
   gap: 2px;
   margin-top: 2px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 .herePath strong {
@@ -99,7 +99,7 @@
   height: 44px;
   padding: 0 12px 0 15px;
   border-radius: var(--radius);
-  font-size: 14.5px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
 }
@@ -131,7 +131,7 @@ a.top:hover {
   min-height: 40px;
   padding: 0 10px;
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 .subLink::before {
@@ -167,12 +167,12 @@ a.top:hover {
   min-width: 20px;
   height: 20px;
   padding: 0 5px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   display: grid;
   place-items: center;
   background: var(--red);
   color: var(--surface);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

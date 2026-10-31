@@ -9,12 +9,13 @@ import styles from './WeekStrip.module.css';
  * 주간 잔디 스트립.
  * size 12 = 표 안 미니(라벨 · 밑줄 없음). 32 · 46 · 54 = 큰 스트립(요일 라벨 + 인증일 밑줄).
  * 큰 스트립은 좁은 화면에서 칸이 함께 줄어든다.
+ * 46 · 54는 칸 표시(진하기 · 기록글 모서리 · 밑줄 · 오늘 테두리 · 남은 날 점선) 범례를 기본으로 단다. 끄려면 legend={false}.
  */
 export function WeekStrip({
   days,
   size = 46,
   showLabels,
-  legend = false,
+  legend,
   fallbackLevel = 3,
   className,
 }: {
@@ -78,17 +79,24 @@ export function WeekStrip({
       <ul className={styles.big} style={{ '--sq': `${size}px` } as CSSProperties}>
         {items}
       </ul>
-      {legend ? <StripLegend /> : null}
+      {(legend ?? size >= 46) ? (
+        <StripLegend today={days.some((d) => d.isToday)} future={days.some((d) => d.isFuture)} />
+      ) : null}
     </div>
   );
 }
 
-function StripLegend() {
+/** 칸에 쓰인 표시만 설명한다. 오늘 · 남은 날은 그 주에 있을 때만 */
+function StripLegend({ today, future }: { today: boolean; future: boolean }) {
   return (
     <div className={styles.legend}>
       <span>
-        <i className={styles.lgSq} aria-hidden="true" />
-        잔디
+        <span className={styles.lgScale} aria-hidden="true">
+          {[1, 2, 3, 4].map((l) => (
+            <i key={l} style={{ background: `var(--h${l})` }} />
+          ))}
+        </span>
+        잔디(진할수록 기여 많음)
       </span>
       <span>
         <i className={styles.lgRc} aria-hidden="true" />
@@ -98,6 +106,18 @@ function StripLegend() {
         <i className={styles.lgUl} aria-hidden="true" />
         인증일
       </span>
+      {today ? (
+        <span>
+          <i className={styles.lgToday} aria-hidden="true" />
+          오늘
+        </span>
+      ) : null}
+      {future ? (
+        <span>
+          <i className={styles.lgFuture} aria-hidden="true" />
+          남은 날
+        </span>
+      ) : null}
     </div>
   );
 }

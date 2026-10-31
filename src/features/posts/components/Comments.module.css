@@ -5,7 +5,7 @@
   padding: 18px 2px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 /* 목업 .rows li (align top) */
@@ -37,7 +37,7 @@
   text-decoration: underline;
 }
 .date {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .actions {
@@ -49,8 +49,8 @@
   border: 0;
   background: transparent;
   padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: var(--radius);
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
@@ -67,7 +67,7 @@
 }
 .content {
   margin-top: 4px;
-  font-size: 14.5px;
+  font-size: var(--fs-md);
   white-space: pre-wrap;
 }
 
@@ -82,7 +82,7 @@
   border: 1px solid var(--line-input);
   border-radius: var(--radius);
   background: var(--surface);
-  font-size: 14.5px;
+  font-size: var(--fs-md);
   resize: vertical;
 }
 .editInput:focus {
@@ -111,7 +111,7 @@
   border: 1px solid var(--line-input);
   border-radius: var(--radius);
   background: var(--surface);
-  font-size: 14.5px;
+  font-size: var(--fs-md);
 }
 .input:focus {
   outline: none;

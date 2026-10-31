@@ -7,5 +7,5 @@
 }
 .reset {
   margin-left: 6px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
 }

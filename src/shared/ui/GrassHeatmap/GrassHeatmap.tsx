@@ -74,50 +74,53 @@ export function GrassHeatmap({ days: given }: { days: Day[] }) {
 
   return (
     <div className={styles.wrap}>
-      <div ref={ref} className={styles.scroll} role="region" aria-label="잔디 기록" tabIndex={overflow ? 0 : undefined}>
-        <div className={styles.frame}>
-          <span aria-hidden="true" />
-          <div className={styles.months} style={cols} aria-hidden="true">
-            {months.map((m, i) => (
-              <span key={i} className={styles.month}>
-                {m}
-              </span>
-            ))}
+      {/* 히트맵 폭만큼만 차지하고 가운데 — 범례가 히트맵 오른쪽 끝에 맞춰진다 */}
+      <div className={styles.inner}>
+        <div ref={ref} className={styles.scroll} role="region" aria-label="잔디 기록" tabIndex={overflow ? 0 : undefined}>
+          <div className={styles.frame}>
+            <span className={styles.corner} aria-hidden="true" />
+            <div className={styles.months} style={cols} aria-hidden="true">
+              {months.map((m, i) => (
+                <span key={i} className={styles.month}>
+                  {m}
+                </span>
+              ))}
+            </div>
+            <div className={styles.rows} aria-hidden="true">
+              {ROW_LABELS.map((l, i) => (
+                <span key={i}>{l}</span>
+              ))}
+            </div>
+            <ul className={styles.grid} style={cols} onMouseOver={showTip} onMouseLeave={() => setTip(null)}>
+              {Array.from({ length: lead }, (_, i) => (
+                <li key={`pad-${i}`} className={styles.pad} aria-hidden="true" />
+              ))}
+              {days.map((d) => {
+                const level = clampLevel(d.level);
+                return (
+                  <li
+                    key={d.date}
+                    className={styles.cell}
+                    style={{ background: `var(--h${level})` }}
+                    data-level={level}
+                    data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · ${d.missing ? '아직 불러오지 않음' : `기여 ${d.count}건`}`}
+                  >
+                    <VisuallyHidden>
+                      {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.missing ? '아직 불러오지 않음' : d.count > 0 ? `기여 ${d.count}회` : '기여 없음'}`}
+                    </VisuallyHidden>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-          <div className={styles.rows} aria-hidden="true">
-            {ROW_LABELS.map((l, i) => (
-              <span key={i}>{l}</span>
-            ))}
-          </div>
-          <ul className={styles.grid} style={cols} onMouseOver={showTip} onMouseLeave={() => setTip(null)}>
-            {Array.from({ length: lead }, (_, i) => (
-              <li key={`pad-${i}`} className={styles.pad} aria-hidden="true" />
-            ))}
-            {days.map((d) => {
-              const level = clampLevel(d.level);
-              return (
-                <li
-                  key={d.date}
-                  className={styles.cell}
-                  style={{ background: `var(--h${level})` }}
-                  data-level={level}
-                  data-tip={`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일 · ${d.missing ? '아직 불러오지 않음' : `기여 ${d.count}건`}`}
-                >
-                  <VisuallyHidden>
-                    {`${formatMonthDay(d.date)} ${weekdayLabel(d.date)}요일, ${d.missing ? '아직 불러오지 않음' : d.count > 0 ? `기여 ${d.count}회` : '잔디 없음'}`}
-                  </VisuallyHidden>
-                </li>
-              );
-            })}
-          </ul>
         </div>
-      </div>
-      <div className={styles.legend} aria-hidden="true">
-        <span>적음</span>
-        {LEVELS.map((l) => (
-          <span key={l} className={styles.swatch} style={{ background: `var(--h${l})` }} />
-        ))}
-        <span>많음</span>
+        <div className={styles.legend} aria-hidden="true">
+          <span>적음</span>
+          {LEVELS.map((l) => (
+            <span key={l} className={styles.swatch} style={{ background: `var(--h${l})` }} />
+          ))}
+          <span>많음</span>
+        </div>
       </div>
       {tip ? (
         <div className={styles.tip} style={{ left: tip.x, top: tip.y }} role="presentation">

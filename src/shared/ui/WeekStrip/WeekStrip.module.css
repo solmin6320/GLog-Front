@@ -22,7 +22,7 @@
   width: 100%;
   max-width: var(--sq);
   aspect-ratio: 1 / 1;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 /* 기록글 모서리: 다리 길이 = 칸 × 0.3 → 대각선 기준 15% */
 .big .rc {
@@ -42,7 +42,7 @@
 .mini .sq {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 /* 6px 모서리 = 칸의 절반 → 대각선 기준 25% */
 .mini .rc {
@@ -81,7 +81,7 @@
 }
 
 .dl {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   line-height: 1.2;
   color: var(--ink-3);
   font-weight: 500;
@@ -95,7 +95,7 @@
   width: 22px;
   max-width: 100%;
   height: 3.5px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--dark);
 }
 .ul.off {
@@ -108,7 +108,7 @@
   flex-wrap: wrap;
   gap: 6px 16px;
   margin-top: 10px;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
   align-items: center;
 }
@@ -117,17 +117,34 @@
   align-items: center;
   gap: 6px;
 }
-.lgSq {
+/* 잔디 진하기 4단계 */
+.lgScale {
+  display: inline-flex;
+  gap: 2px;
+}
+.lgScale > i {
+  width: 10px;
+  height: 1var(--radius-sm);
+  border-radius: var(--radius-sm);
+}
+.lgToday,
+.lgFuture {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
-  background: var(--h3);
+  border-radius: var(--radius-sm);
   display: inline-block;
+}
+.lgToday {
+  background: var(--h0);
+  box-shadow: inset 0 0 0 2px var(--dark);
+}
+.lgFuture {
+  border: 1.5px dashed var(--future-line);
 }
 .lgRc {
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--h0);
   display: inline-block;
   position: relative;
@@ -144,7 +161,7 @@
 .lgUl {
   width: 14px;
   height: 3.5px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--dark);
   display: inline-block;
 }

@@ -10,13 +10,17 @@
 }
 .summary {
   margin-top: 14px;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 .muted {
   color: var(--ink-3);
 }
 .list {
   margin-top: 8px;
+}
+/* 빈 상태 상자가 검색칸 · 태그 줄에 붙지 않게 */
+.empty {
+  margin-top: 20px;
 }
 .otherTab {
   display: block;

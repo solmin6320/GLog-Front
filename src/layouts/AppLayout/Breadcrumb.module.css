@@ -12,7 +12,7 @@
   min-height: 40px;
   margin: 0 auto;
   padding: 0 20px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   overflow-x: auto;
   white-space: nowrap;

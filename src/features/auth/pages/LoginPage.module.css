@@ -15,7 +15,7 @@
 }
 
 .title {
-  font-size: 44px;
+  font-size: var(--fs-display);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.15;
@@ -24,7 +24,7 @@
 
 .sub {
   margin-top: 16px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--ink-2);
 }
 
@@ -45,7 +45,7 @@
 
 .hint {
   margin-top: 18px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 
@@ -54,8 +54,8 @@
   padding: 2px 4px;
   border: 0;
   background: transparent;
-  font-size: 14px;
-  color: var(--blue);
+  font-size: var(--fs-md);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -63,12 +63,12 @@
 }
 
 .rulesLink:hover {
-  color: var(--blue-ink);
+  color: var(--link-h);
 }
 
 @media screen and (max-width: 767px) {
   .title {
-    font-size: 36px;
+    font-size: var(--fs-display);
   }
 
   .cta {

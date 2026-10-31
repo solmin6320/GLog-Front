@@ -9,12 +9,12 @@
   margin-bottom: 18px;
 }
 .title {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 .meta {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 
@@ -33,7 +33,7 @@
 }
 .search input[type='search'] {
   height: 40px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
 }
 .filter {
   flex: 0 0 auto;
@@ -41,7 +41,7 @@
 }
 .count {
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -63,8 +63,8 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 13px;
-  color: var(--blue);
+  font-size: var(--fs-sm);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 3px;
   white-space: nowrap;
@@ -114,13 +114,13 @@
   align-items: center;
   height: 24px;
   padding: 0 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--green);
   color: var(--surface);
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 .memberTag {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
