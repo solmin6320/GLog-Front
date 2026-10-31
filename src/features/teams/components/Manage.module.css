@@ -7,15 +7,15 @@
 }
 
 .mutedXs {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .note {
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .emptyNote {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   margin-top: 12px;
 }
@@ -107,10 +107,10 @@
 }
 .dangerTitle {
   color: var(--red);
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .dangerBody {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   margin-top: 3px;
 }

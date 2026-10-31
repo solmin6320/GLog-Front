@@ -38,14 +38,14 @@
 }
 .asOf {
   margin-top: 10px;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 
 /* ③ 진행 안내 + E-41 */
 .progressText {
   margin-top: 22px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   line-height: 1.6;
 }
 .progressText strong {
@@ -67,7 +67,7 @@
 }
 .noWarning {
   padding-top: 6px;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 700;
 }
 .penalty {
@@ -78,7 +78,7 @@
   gap: 8px;
 }
 .penaltyText {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--red);
 }
@@ -108,7 +108,7 @@
 }
 .noticeTitle {
   min-width: 0;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -120,7 +120,7 @@
 .empty {
   padding: 20px 2px;
   border-top: 1px solid var(--line);
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 

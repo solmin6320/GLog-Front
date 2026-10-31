@@ -9,12 +9,12 @@
   margin-bottom: 22px;
 }
 .title {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 .meta {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 .headAction {
@@ -33,13 +33,13 @@
   margin-bottom: 12px;
 }
 .sectionTitle {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .empty {
   padding: 22px 0;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 .note {
@@ -47,7 +47,7 @@
   align-items: flex-start;
   gap: 6px;
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--ink-3);
 }
@@ -66,7 +66,7 @@
   color: var(--ink);
 }
 .pastTag {
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 999px;
@@ -91,7 +91,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--blue);
 }
 .actions {
@@ -109,23 +109,23 @@
 }
 .lead {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .affected {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--ink);
 }
 .listCaption {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 .muted {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--ink-3);
 }
@@ -145,7 +145,7 @@
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 .previewRow:last-child {
   border-bottom: 0;
@@ -208,7 +208,7 @@
   gap: 6px;
 }
 .rejectReason {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   text-align: right;
 }

@@ -1,7 +1,7 @@
 /* AD-01 ②-1 경고 복구 · 벌칙 (목업 W-16) */
 
 .pageTitle {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0 0 22px;
@@ -29,7 +29,7 @@
   font-variant-numeric: tabular-nums;
 }
 .private {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .muted {
@@ -62,7 +62,7 @@
 /* ⑧ 복구 미리보기 (영향 미리보기형 확인) */
 .lead {
   margin: 0 0 14px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .previewTable {
@@ -78,7 +78,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   border-bottom: 1px solid var(--line-2);
 }
 .previewRow:last-child {

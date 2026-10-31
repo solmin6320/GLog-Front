@@ -5,9 +5,9 @@
   gap: 2px;
   height: 26px;
   padding: 0 10px;
-  border-radius: 13px;
+  border-radius: 999px;
   background: var(--tag-bg);
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--ink-2);
   white-space: nowrap;

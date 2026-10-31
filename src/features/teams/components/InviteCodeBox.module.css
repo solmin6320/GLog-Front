@@ -6,7 +6,7 @@
   gap: 10px 14px;
 }
 .code {
-  font-size: 23px;
+  font-size: var(--fs-xl);
   font-weight: 800;
   letter-spacing: 0.14em;
   color: var(--ink);

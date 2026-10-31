@@ -7,15 +7,15 @@
   margin-bottom: 14px;
 }
 .title {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 h3.title {
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 .right {
   margin-left: auto;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }

@@ -9,7 +9,7 @@
 }
 .weekLabel {
   min-width: 0;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
   padding: 0 6px;
@@ -49,7 +49,7 @@
   white-space: nowrap;
 }
 .futureText {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   white-space: nowrap;
 }
@@ -57,7 +57,7 @@
   color: var(--ink-3);
 }
 .zero {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 .grass {
@@ -74,19 +74,19 @@
   display: block;
   width: 12px;
   height: 12px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .grassCount {
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .detail {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
 }
 
 /* ④ 이번 주 판정 */
 .cardTitle {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 16px;
@@ -98,17 +98,17 @@
 }
 .message {
   margin-top: 18px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
 }
 .subMessage {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .teamlessBody {
   margin-top: 6px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 
@@ -124,7 +124,7 @@
   gap: 40px;
 }
 .label {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
   margin-bottom: 8px;
@@ -134,16 +134,16 @@
 }
 .lead {
   margin-top: 14px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
 }
 .calm {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 700;
 }
 .guide {
   margin-top: 22px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 .penaltyBadge {
@@ -151,7 +151,7 @@
 }
 .penaltyText {
   margin-top: 22px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--red);
 }
@@ -169,7 +169,7 @@
   margin-top: 40px;
 }
 .guideTitle {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 14px;
@@ -184,7 +184,7 @@
   gap: 8px;
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 .rule dt {
   font-weight: 700;
@@ -194,7 +194,7 @@
   color: var(--ink-3);
 }
 .penaltyGuide {
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.75;
   color: var(--ink-3);
 }

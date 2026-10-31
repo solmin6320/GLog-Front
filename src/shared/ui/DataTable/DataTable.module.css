@@ -10,11 +10,11 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 .table th {
   text-align: left;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--ink-3);
   background: var(--surface-2);
@@ -88,10 +88,12 @@
     grid-template-columns: 76px minmax(0, 1fr);
     gap: 12px;
     align-items: center;
+    /* 값 칸의 배지 · 칩이 줄 끝까지 늘어나지 않게 */
+    justify-items: start;
   }
   .table td[data-label]:not(:first-child)::before {
     content: attr(data-label);
-    font-size: 12.5px;
+    font-size: var(--fs-xs);
     color: var(--ink-3);
   }
   .me {

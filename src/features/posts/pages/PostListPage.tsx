@@ -122,7 +122,7 @@ export default function PostListPage() {
                 </p>
               ) : null}
               {list.nodes.length === 0 ? (
-                empty
+                <div className={s.empty}>{empty}</div>
               ) : (
                 <>
                   <ul className={s.list} aria-label={`${typeLabel(type)} 글 목록`}>

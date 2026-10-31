@@ -56,19 +56,41 @@
   --w-lg: 960px;
   --w-xl: 1120px;
   --header-h: 58px;
-  --radius-sm: 6px;
-  --radius: 9px;
-  --radius-lg: 12px;
+
+  /* 글자 크기 6단계 — 화면은 px 대신 이 토큰만 쓴다. 숫자 강조(큰 통계 · 로그인 표제)만 --fs-display */
+  --fs-xs: 12px; /* 보조 · 시각 · 범례 */
+  --fs-sm: 13px; /* 설명 · 표 머리 · 작은 버튼 */
+  --fs-md: 14px; /* 본문 · 버튼 · 입력칸 */
+  --fs-lg: 16px; /* 강조 본문 · 섹션 제목 · 큰 버튼 */
+  --fs-xl: 20px; /* 소제목 · 관리자 화면 제목 */
+  --fs-2xl: 26px; /* 페이지 제목 */
+  --fs-display: 36px; /* 큰 숫자(BigStat) · 로그인 표제 */
+
+  /* 모서리 3단계 (+ 원형 50% · 알약 999px) */
+  --radius-sm: 4px; /* 잔디 칸 · 키캡 · 작은 표시 */
+  --radius: 8px; /* 버튼 · 입력칸 · 칩 · 탭 */
+  --radius-lg: 12px; /* 카드 · 모달 · 안내 상자 */
+
+  /* 조작 요소 높이 4단계 — Button xs·sm·md·lg 기준. 모바일 손가락 영역은 --tap */
+  --control-xs: 28px;
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+  --tap: 44px;
+
+  /* 글자 링크 — 브랜드 초록 하나 */
+  --link: var(--green);
+  --link-h: var(--green-h);
   --shadow-pop: 0 18px 44px rgba(20, 30, 25, 0.18);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08);
   --overlay: rgba(40, 48, 44, 0.45);
   --focus-ring: 0 0 0 3px rgba(30, 107, 60, 0.16);
 
-  /* 아바타 6색 (목업 AV) */
-  --av-1: #3b7a57;
-  --av-2: #4b5fa8;
-  --av-3: #9a5b3a;
-  --av-4: #7a5a9a;
-  --av-5: #4f7a86;
-  --av-6: #8a6a3a;
+  /* 아바타 6색 — 팔레트 안 색만 (흰 글자 대비 4.5:1 이상) */
+  --av-1: var(--green);
+  --av-2: #3b7a57;
+  --av-3: #4f7a86;
+  --av-4: var(--ink-2);
+  --av-5: var(--amber);
+  --av-6: var(--ink-3);
 }

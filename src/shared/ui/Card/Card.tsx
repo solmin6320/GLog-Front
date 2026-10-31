@@ -10,5 +10,5 @@ export function Card({
   style,
   ...rest
 }: HTMLAttributes<HTMLDivElement> & { padding?: number | string; as?: 'div' | 'section' | 'aside' }) {
-  return <Tag className={cx(styles.card, className)} style={padding === undefined ? style : { padding, ...style }} {...rest} />;
+  return <Tag data-card="" className={cx(styles.card, className)} style={padding === undefined ? style : { padding, ...style }} {...rest} />;
 }

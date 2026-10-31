@@ -2,7 +2,7 @@
   display: block;
   max-width: 100%;
   background: var(--line-2);
-  border-radius: 6px;
+  border-radius: var(--radius);
   animation: pulse 1.4s ease-in-out infinite;
 }
 @keyframes pulse {

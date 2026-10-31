@@ -5,21 +5,22 @@
   overflow-x: auto;
   background: var(--seg-bg);
   padding: 4px;
-  border-radius: 10px;
+  /* 안쪽 칸(8) + 여백(4) — 바깥 높이가 버튼 md(40)와 같다 */
+  border-radius: var(--radius-lg);
   gap: 2px;
 }
 .item {
   flex: none;
-  height: 38px;
-  padding: 0 18px;
+  height: var(--control-sm);
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
-  font-size: 14.5px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink-2);
   cursor: pointer;
@@ -45,6 +46,6 @@
 @media (max-width: 767px) {
   .item {
     padding: 0 14px;
-    font-size: 14px;
+    font-size: var(--fs-md);
   }
 }

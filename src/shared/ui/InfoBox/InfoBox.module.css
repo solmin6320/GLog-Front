@@ -1,8 +1,8 @@
 /* 목업 .box .box-blue .box-mute .box-ok (+ red · warn) */
 .box {
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 13px 16px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   display: flex;
   align-items: center;
   flex-wrap: wrap;

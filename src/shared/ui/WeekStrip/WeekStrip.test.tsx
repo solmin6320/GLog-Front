@@ -78,9 +78,19 @@ describe('WeekStrip', () => {
 
   it('legend', () => {
     render(<WeekStrip days={WEEK} legend />);
-    expect(screen.getByText('잔디')).toBeInTheDocument();
+    expect(screen.getByText('잔디(진할수록 기여 많음)')).toBeInTheDocument();
     expect(screen.getByText('기록글')).toBeInTheDocument();
     expect(screen.getByText('인증일')).toBeInTheDocument();
+    expect(screen.getByText('오늘')).toBeInTheDocument();
+    expect(screen.getByText('남은 날')).toBeInTheDocument();
+  });
+
+  it('범례는 큰 스트립(46 · 54)에 기본으로 달리고, 32 · legend={false}면 빠진다', () => {
+    const { unmount } = render(<WeekStrip days={WEEK} size={54} />);
+    expect(screen.getByText('인증일')).toBeInTheDocument();
+    unmount();
+    render(<WeekStrip days={WEEK} size={32} />);
+    expect(screen.queryByText('인증일')).toBeNull();
   });
 
   it('showLabels=false면 요일 라벨을 숨긴다', () => {

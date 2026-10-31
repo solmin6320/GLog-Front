@@ -4,7 +4,22 @@
   align-items: center;
   text-align: center;
   gap: 8px;
-  padding: 48px 16px;
+  padding: 40px 16px;
+}
+/* 카드와 같은 상자. 이미 Card 안이면(data-card) 상자를 빼서 테두리가 겹치지 않게 한다 */
+.boxed {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+:global([data-card]) .boxed {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+.sm {
+  padding: 24px 16px;
+  gap: 4px;
 }
 .icon {
   width: 48px;
@@ -17,12 +32,17 @@
   margin-bottom: 6px;
 }
 .title {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+.sm .title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink-2);
+}
 .body {
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--ink-3);
   max-width: 44ch;
 }

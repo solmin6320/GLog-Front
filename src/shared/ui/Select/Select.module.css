@@ -8,7 +8,7 @@
 /* 라벨 없는 필터용 (목업 .sel) */
 .compact {
   height: 40px;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   padding-left: 12px;
   padding-right: 36px;

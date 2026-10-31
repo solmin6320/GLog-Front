@@ -6,7 +6,7 @@
   line-height: 1.6;
   resize: vertical;
 }
+/* 긴 본문 입력 — 글꼴은 다른 입력칸과 같은 Pretendard, 줄 간격만 넓힌다 */
 .serif {
-  font-family: var(--serif);
   line-height: 1.7;
 }

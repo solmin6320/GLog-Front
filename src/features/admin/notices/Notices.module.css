@@ -9,7 +9,7 @@
   margin-bottom: 18px;
 }
 .title {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -40,7 +40,7 @@
 }
 .sysHint {
   flex-basis: 100%;
-  font-size: 12.5px;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 .date {
@@ -57,7 +57,7 @@
 
 /* ⑦ 에디터 패널 (목록 자리) */
 .editorTitle {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 18px;

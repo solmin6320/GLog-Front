@@ -80,13 +80,14 @@ export function ProfileHeader({ member, isOwn, isAdmin }: { member: Member; isOw
             <LinkButton to={paths.profileEdit()} variant="outline" size="sm">
               {PROFILE_COPY.edit}
             </LinkButton>
+            {/* 관리자 메뉴 · 로그아웃은 보조 동작 — 테두리 없는 글자 버튼으로 무게를 낮춘다 */}
             {isAdmin ? (
-              <LinkButton to={paths.admin()} variant="outline" size="sm" icon="shield">
+              <LinkButton to={paths.admin()} variant="text" size="sm" icon="shield">
                 {PROFILE_COPY.adminMenu}
               </LinkButton>
             ) : null}
             {/* 로그아웃은 여기 한 곳 — 헤더 · 드로어에서는 뺐다 (되돌릴 수 없는 동작이라 자주 쓰는 메뉴와 떨어뜨린다) */}
-            <Button variant="outline" size="sm" icon="logout" onClick={() => void signOut()}>
+            <Button variant="text" size="sm" icon="logout" onClick={() => void signOut()}>
               로그아웃
             </Button>
           </div>
@@ -203,14 +204,17 @@ export function WarningSection({ member }: { member: Member }) {
   return (
     <section aria-labelledby="profile-warning-title">
       <SectionHeader id="profile-warning-title" title="경고" />
-      {ws.isOnHold ? (
-        <>
-          <StatusBadge kind="judgment" status="HOLD" context="profile" />
-          <p className={s.empty}>{PROFILE_COPY.onHold}</p>
-        </>
-      ) : (
-        <WarningNumbers ws={ws} />
-      )}
+      {/* 프로필의 모든 섹션은 [제목 + 흰 상자] 한 모양 */}
+      <Card padding={18}>
+        {ws.isOnHold ? (
+          <>
+            <StatusBadge kind="judgment" status="HOLD" context="profile" />
+            <p className={s.caption}>{PROFILE_COPY.onHold}</p>
+          </>
+        ) : (
+          <WarningNumbers ws={ws} />
+        )}
+      </Card>
     </section>
   );
 }
@@ -224,7 +228,7 @@ function WarningNumbers({ ws }: { ws: Member['warningState'] }) {
       </div>
       {ws.isPenaltyTarget ? <p className={s.penaltyText}>{PROFILE_COPY.penalty}</p> : null}
       {ws.activeCount === 0 ? (
-        <p className={s.empty}>{PROFILE_COPY.noWarning}</p>
+        <p className={s.caption}>{PROFILE_COPY.noWarning}</p>
       ) : ws.byCategory.length > 0 ? (
         <>
           <RowList ariaLabel="팀별 경고">
@@ -265,8 +269,7 @@ export function HistorySection({ list }: { list: PagedList<ProfileHistoryQueryQu
     body = <SectionError message={PROFILE_COPY.historyFailed} onRetry={list.refetch} />;
   } else if (list.nodes.length === 0) {
     // 팀 미소속 · 첫 주 (EX-PR01-03)
-    // 경고 · 소속 팀의 빈 상태와 같은 모양(왼쪽 정렬, 위 구분선)으로 맞춘다
-    body = <p className={`${s.empty} ${s.emptyAligned}`}>{PROFILE_COPY.noHistory}</p>;
+    body = <EmptyState size="sm" title={PROFILE_COPY.noHistory} />;
   } else {
     const current = list.data?.member?.currentWeek ?? null;
     const rows: HistoryRow[] = [
@@ -319,7 +322,8 @@ export function TeamsSection({ member }: { member: Member }) {
     <section className={s.section} aria-labelledby="profile-teams-title">
       <SectionHeader id="profile-teams-title" title="소속 팀" />
       {teams.length > 0 ? (
-        <ul className={s.teams}>
+        <Card padding={18}>
+          <ul className={s.teams}>
           {teams.map((t) => (
             <li key={t.id}>
               {t.viewerRole ? (
@@ -331,9 +335,10 @@ export function TeamsSection({ member }: { member: Member }) {
               )}
             </li>
           ))}
-        </ul>
+          </ul>
+        </Card>
       ) : (
-        <p className={s.empty}>{PROFILE_COPY.noPublicTeams}</p>
+        <EmptyState size="sm" title={PROFILE_COPY.noPublicTeams} />
       )}
     </section>
   );
